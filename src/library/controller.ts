@@ -32,6 +32,10 @@ export class LibraryController {
     const provider = this.providers.find((p) => p.id === this.view.providers.value);
     this.view.status.textContent = state.error ?? (state.loading ? '正在刷新…' : `${state.items.length} 个文件`);
     if (state.stale) this.view.status.textContent += ' 内容可能不是最新。';
-    if (!state.loading && !state.error && !state.items.length && provider) this.view.status.textContent = '音乐库为空。';
+    if (!state.loading && !state.error && provider) {
+      if (!['available', 'online'].includes(provider.availability)) this.view.status.textContent = '来源暂不可用；保留上次成功扫描的内容。';
+      else if (['pending', 'running', 'never'].includes(provider.scanState ?? '')) this.view.status.textContent = '来源扫描尚未完成，请稍后刷新。';
+      else if (!state.items.length) this.view.status.textContent = '音乐库为空。';
+    }
   }
 }
