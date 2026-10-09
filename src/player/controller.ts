@@ -5,7 +5,7 @@ import type { AudioFactory, AudioPort, MediaObservation } from './audio-adapter'
 import { initialState } from './state';
 import { ControlQueue, isUncertain } from './control-queue';
 import { RecoveryBudget } from './recovery';
-import { trackPosition } from './timeline';
+import { trackPosition, seekAllowed } from './timeline';
 
 export class PlayerController {
   state = initialState();
@@ -91,8 +91,15 @@ export class PlayerController {
   }
   private clearBufferingTimer(): void { if (this.bufferingTimer) clearTimeout(this.bufferingTimer); this.bufferingTimer = null; }
   seek(positionMs: number): void {
-    if (!Number.isFinite(positionMs) || !this.audio) return;
     const playback = this.state.playback;
+    if (!playback || !seekAllowed(playback, positionMs)) {
+      this.state.message = '请输入当前曲目可定位范围内的有效位置。'; this.emit(); return;
+    }
+    if (playback.seekMode === 'timeRestart' && this.queue) {
+      this.clearBufferingTimer(); this.audio?.destroy(); this.audio = null;
+      this.state.phase = 'seeking'; this.state.message = null; this.emit(); this.queue.seek(positionMs); return;
+    }
+    if (!this.audio) return;
     if (playback?.seekMode !== 'byteRange') { this.fail(errorMessage(new ApiError('SEEK_UNSUPPORTED', 'Seek not available'))); return; }
     const range = playback.seekableRange; const seconds = (positionMs - playback.positionOriginMs) / 1000;
     if (!range || positionMs < range.startMs || positionMs > range.endMs
