@@ -1,0 +1,26 @@
+export interface Ready { product: string; instanceId: string; apiVersion: string; ready: boolean }
+export interface AuthSession { user: { id: string; role: string }; csrfToken: string; expiresAt: string }
+export interface Provider {
+  id: string; name: string; capabilities: string[]; availability: string; scanState?: string;
+}
+export interface SourceTrack {
+  sourceTrackId: string; providerInstanceId: string; displayName: string;
+  title: string | null; artists: string[] | null; durationMs: number | null;
+  codec: string | null; container: string | null; bitrateBps: number | null;
+  availability: string; assetId: string | null; recordingId?: string | null;
+}
+export interface TrackPage { items: SourceTrack[]; nextCursor: string | null; libraryRevision: string }
+export interface OutputProfile { mime: string; codec: string; container: string; transport: string }
+export interface Playback {
+  sessionId: string; attemptId: string; assetId: string; representationId: string;
+  deliveryMode: 'direct' | 'proxy' | 'processed'; outputProfile: OutputProfile;
+  streamUrl: string; expiresAt: string; seekMode: 'byteRange' | 'timeRestart' | 'none';
+  seekableRange: { startMs: number; endMs: number } | null;
+  positionOriginMs: number; effectiveProcessing: unknown[];
+  resumeDecision: 'continue' | 'restartRequired' | 'unavailable';
+}
+export interface Capabilities {
+  htmlAudio: true; formats: { mime: string; canPlay: CanPlayTypeResult }[];
+}
+export interface Preferences { forceProcessing: boolean; gainDb: number }
+export interface ObservedError { code: string; message: string; outputProfile?: OutputProfile }
