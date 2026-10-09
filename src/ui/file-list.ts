@@ -34,7 +34,7 @@ export class FileListView {
       button.onclick = () => this.onPlay?.(track);
       const action = element('td'); action.append(button);
       row.append(element('td', track.title || track.displayName), element('td', `${duration} / ${track.codec ?? '格式未知'} / ${bitrate}`),
-        element('td', track.availability === 'available' ? '可播放' : track.availability === 'missing' ? '文件缺失' : '暂不可用'), action);
+        element('td', track.availability === 'available' ? '可用' : track.availability === 'missing' ? '文件缺失' : '暂不可用'), action);
       return row;
     }));
   }
