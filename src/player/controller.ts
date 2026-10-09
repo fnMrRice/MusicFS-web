@@ -57,8 +57,14 @@ export class PlayerController {
   }
   seek(positionMs: number): void {
     if (!Number.isFinite(positionMs) || !this.audio) return;
-    if (this.state.playback?.seekMode !== 'byteRange') { this.fail(errorMessage(new ApiError('SEEK_UNSUPPORTED', 'Seek not available'))); return; }
-    this.audio.seek(positionMs / 1000);
+    const playback = this.state.playback;
+    if (playback?.seekMode !== 'byteRange') { this.fail(errorMessage(new ApiError('SEEK_UNSUPPORTED', 'Seek not available'))); return; }
+    const range = playback.seekableRange; const seconds = (positionMs - playback.positionOriginMs) / 1000;
+    if (!range || positionMs < range.startMs || positionMs > range.endMs
+      || !this.audio.seekable.some((r) => seconds >= r.start && seconds <= r.end)) {
+      this.state.message = '目标尚不在当前可定位范围内，请等待加载或选择其他位置。'; this.emit(); return;
+    }
+    this.audio.seek(seconds);
   }
   private fail(message: string): void { this.state.phase = 'error'; this.state.message = message; this.emit(); }
   private emit(): void { this.onChange?.(); }
