@@ -7,6 +7,7 @@ export class PlayerView {
   readonly position = element('input');
   readonly jump = element('button', '跳转');
   readonly status = element('p');
+  readonly processing = element('input');
   private title = element('p', '尚未选择歌曲');
   private progress = element('p');
   private note = element('p');
@@ -15,7 +16,9 @@ export class PlayerView {
     const label = element('label', '曲目位置（秒）'); this.position.id = 'position'; label.htmlFor = this.position.id;
     this.position.type = 'number'; this.position.min = '0'; this.position.step = '0.1'; this.position.value = '0';
     tools.append(label, this.position, this.jump, this.stop); this.status.setAttribute('role', 'status'); this.note.className = 'muted';
-    root.append(element('h2', '播放器'), this.title, this.status, this.progress, this.audioRoot, tools, this.note);
+    const processingLabel = element('label', '服务端处理（降低 6 dB，下一首生效）'); this.processing.type = 'checkbox'; this.processing.id = 'processing'; processingLabel.htmlFor = this.processing.id;
+    const processingRow = element('div'); processingRow.append(this.processing, processingLabel);
+    root.append(element('h2', '播放器'), processingRow, this.title, this.status, this.progress, this.audioRoot, tools, this.note);
   }
   render(state: PlayerState): void {
     const names: Record<string, string> = { idle: '请选择歌曲', resolving: '正在准备…', loading: '正在加载…', playing: '播放中', paused: '已暂停', buffering: '正在缓冲…', seeking: '正在定位…', recovering: '正在恢复…', ended: '播放结束', error: '播放失败' };

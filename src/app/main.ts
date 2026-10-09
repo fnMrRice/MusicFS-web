@@ -21,7 +21,7 @@ const player = new PlayerController(new PlaybackApi(application.client), audioFa
 player.onChange = () => playerView.render(player.state);
 playerView.stop.onclick = () => player.stop();
 playerView.jump.onclick = () => player.seek(Number(playerView.position.value) * 1000);
-library.view.onPlay = (track) => { void player.select(track); };
+library.view.onPlay = (track) => { void player.select(track, { forceProcessing: playerView.processing.checked, gainDb: playerView.processing.checked ? -6 : 0 }); };
 application.onLogout = () => { player.stop(); library.clear(); };
 playerView.render(player.state);
 window.addEventListener('pagehide', () => player.stop());
