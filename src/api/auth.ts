@@ -1,0 +1,23 @@
+import { ApiClient, ApiError } from './client';
+import type { AuthSession, Ready } from './types';
+
+function session(value: AuthSession): AuthSession {
+  if (!value || typeof value.csrfToken !== 'string' || !value.user || typeof value.user.id !== 'string')
+    throw new ApiError('INVALID_RESPONSE', 'Invalid authentication response');
+  return value;
+}
+export class AuthApi {
+  constructor(private client: ApiClient) {}
+  async ready(): Promise<Ready> { return this.client.request('/health/ready'); }
+  async restore(): Promise<AuthSession> {
+    const value = session(await this.client.request<AuthSession>('/auth/session'));
+    this.client.csrfToken = value.csrfToken; return value;
+  }
+  async login(token: string): Promise<AuthSession> {
+    const value = session(await this.client.request<AuthSession>('/auth/session', { method: 'POST', bearer: token }));
+    this.client.csrfToken = value.csrfToken; return value;
+  }
+  async logout(): Promise<void> {
+    await this.client.request('/auth/session', { method: 'DELETE' }); this.client.csrfToken = null;
+  }
+}
