@@ -2,6 +2,8 @@
 
 状态：2026-10-09，Windows / Edge 154.0.4258.62 真实无头浏览器完成3项联调，最终一次全通过（19.3秒）。仅验证本文的合成 MP3/FLAC 封装与错误样本。
 
+运行入口：[Server 本地运行](../../server/docs/running.md) → [NCM 插件配置](../../server/docs/ncm.md)。配置 `ncmWorkerPath` 并重启、重新扫描后，页面直接选曲；FLAC 转码需同时配齐音频 Worker、FFmpeg/ffprobe。逐项操作及预期见 [手动验收](manual-validation.md)。
+
 ## 兼容处理
 
 现有播放 DTO 接受 `effectiveProcessing` 的扩展项，`proxy`、`processed`、`byteRange` 与 `timeRestart` 均沿用现有路径。新增 `type=ncmDecrypt, gainDb=0, version=1, execution=server` 只代表服务端解密，不当作增益 DSP。

@@ -4,6 +4,8 @@ MusicFS 的浏览器界面。本期先实现简单文件列表和播放：显示
 
 已实现 TypeScript + Vite + 原生 DOM 最小页面：登录与刷新恢复、真实来源文件列表、分页与刷新、原流播放、暂停/停止、服务端处理输出与曲目时间定位。完整验证记录见 [实施记录](docs/progress.md) 和 [兼容性记录](docs/compatibility.md)；人工听音须单独确认，不由自动化结果代替。
 
+已接入 Server 的本地 NCM 解密播放：独立合成 MP3/FLAC 封装的真实 Edge 验证通过，页面区分“服务端解密输出”与“服务端解密并转码输出”。启用方式见 [Server NCM 配置](../server/docs/ncm.md)，证据与限制见 [NCM 验证记录](docs/ncm-validation.md)；这不代表在线网易云来源或全部真实 NCM 变体已兼容。
+
 ## 启动与构建
 
 固定环境：Node.js **26.3.1**、npm **11.16.0**。固定依赖为 TypeScript 5.9.3、Vite 8.3.4、Vitest 5.0.3、Playwright 1.64.0；传递依赖由 `package-lock.json` 锁定。
@@ -31,6 +33,8 @@ npm run build
 4. 点击曲目旁的“播放”，使用原生控件暂停/继续或调整音量；“停止”释放当前会话。
 5. 可勾选“服务端处理”后再次选择曲目，请求 -6 dB 效果。处理输出使用“曲目位置（秒）”跳转；原生时间轴只表示当前输出片段。
 
+首次运行的完整配置和扫描命令见 [Server 本地运行说明](../server/docs/running.md)；逐项操作及预期见 [手动验收](docs/manual-validation.md)。NCM 播放无需另勾处理选项，配置插件并重新扫描后直接选曲。
+
 ## 真实浏览器测试
 
 ```powershell
@@ -40,7 +44,7 @@ npm run test:e2e
 
 测试需要同级 Server 仓库、Go、已安装的 Microsoft Edge，以及 FFmpeg/ffprobe。使用 `MUSICFS_E2E_FFMPEG`、`MUSICFS_E2E_FFPROBE` 指定可执行文件；当前机器的已验证默认路径见测试启动器。测试构建自己的 Server 与插件，在 `127.0.0.1:18081` 启动全新实例，使用独立 `.e2e-runtime/` 数据目录与每次随机生成的临时凭据，不访问个人音乐库。
 
-样本来自 Server 的 CC0 合成音频；包含中文文件名、损坏/零字节文件、分页副本和 600 秒循环 AIFF。测试读取真实 API 与媒体，没有假列表或模拟媒体事件。浏览器记录播放进度及解码的非零 PCM 信号；人工扬声器听音不在自动化证明范围。临时目录与测试输出均忽略于 Git，不包含长期管理员凭据。
+样本来自 Server 的 CC0 合成音频；包含中文文件名、损坏/零字节文件、分页副本、600 秒循环 AIFF，以及由独立 Node 生成器封装的 NCM MP3/FLAC。仅运行 NCM 场景可用 `npm run test:e2e -- ncm.spec.ts --max-failures=1`。测试读取真实 API 与媒体，没有假列表或模拟媒体事件。浏览器记录播放进度及解码的非零 PCM 信号；人工扬声器听音不在自动化证明范围。临时目录与测试输出均忽略于 Git，不包含长期管理员凭据。
 
 ## 当前限制
 
@@ -54,8 +58,10 @@ npm run test:e2e
 ## 设计文档
 
 - [分阶段实现计划](docs/implementation.md)：P0—P8 的文件组织、逐步任务、最小页面、鉴权、播放状态和真实媒体验收。
-- [实施记录](docs/progress.md)：每步提交标识、验证结果与残留限制。
+- [实施记录](docs/progress.md)：稳定步骤编号、验证结果与残留限制。
 - [兼容性记录](docs/compatibility.md)：实际浏览器与媒体链路证据。
+- [手动验收](docs/manual-validation.md)：登录、播放、处理、定位、刷新、错误恢复及退出的操作与预期。
+- [NCM 验证记录](docs/ncm-validation.md)：独立合成样本、配置入口、真实浏览器证据及未测范围。
 - [Web 设计](docs/design.md)：浏览器职责、能力探测、播放与状态适配。
 - [Server 实现计划](../server/docs/implementation.md)：Go Server、插件与对应联调阶段。
 - [跨端架构](../docs/architecture.md)：数据语义、API、播放协商、定位和恢复。
