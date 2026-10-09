@@ -30,7 +30,11 @@ export class Application {
   async connect(): Promise<void> {
     this.ui.status.textContent = '正在连接…'; this.ui.retry.hidden = true;
     try {
-      await this.auth.ready();
+      const ready = await this.auth.ready();
+      if (!ready || ready.product !== 'MusicFS' || ready.apiVersion !== '1') {
+        this.ui.status.textContent = '版本不兼容：需要 MusicFS API v1。'; this.ui.retry.hidden = false; return;
+      }
+      if (!ready.ready) { this.ui.status.textContent = 'Server 尚未就绪，请稍后重试。'; this.ui.retry.hidden = false; return; }
       try { await this.accept(await this.auth.restore()); }
       catch (error) { if (error instanceof ApiError && error.status === 401) this.clear(); else throw error; }
     } catch (error) { this.ui.status.textContent = errorMessage(error); this.ui.retry.hidden = false; }
