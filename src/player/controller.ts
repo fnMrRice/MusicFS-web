@@ -5,6 +5,7 @@ import type { AudioFactory, AudioPort, MediaObservation } from './audio-adapter'
 import { initialState } from './state';
 import { ControlQueue, isUncertain } from './control-queue';
 import { RecoveryBudget } from './recovery';
+import { trackPosition } from './timeline';
 
 export class PlayerController {
   state = initialState();
@@ -64,7 +65,7 @@ export class PlayerController {
     else { this.state.phase = 'paused'; this.emit(); }
   }
   private observe(event: MediaObservation): void {
-    this.state.positionMs = (this.state.playback?.positionOriginMs ?? 0) + event.seconds * 1000;
+    if (this.state.playback) this.state.positionMs = trackPosition(this.state.playback, event.seconds);
     switch (event.type) {
       case 'playing': this.clearBufferingTimer(); this.state.phase = 'playing'; this.state.wantsPlay = true; this.state.message = null; break;
       case 'pause': this.clearBufferingTimer(); if (this.state.phase !== 'ended') { this.state.phase = 'paused'; this.state.wantsPlay = false; } break;
