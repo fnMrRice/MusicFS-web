@@ -33,6 +33,10 @@ export class PlayerView {
       this.position.min = String(state.playback.seekableRange.startMs / 1000);
       this.position.max = String(state.playback.seekableRange.endMs / 1000);
     } else this.position.removeAttribute('max');
-    this.note.textContent = state.playback?.deliveryMode === 'processed' ? '服务端处理输出；原生时间轴表示当前输出片段，整首曲目定位请使用上方跳转。' : '原生音频控件可播放、暂停及调整音量。';
+    const decrypted = state.playback?.effectiveProcessing.some((step) => typeof step === 'object' && step !== null
+      && 'type' in step && step.type === 'ncmDecrypt');
+    if (state.playback?.deliveryMode === 'processed') {
+      this.note.textContent = `${decrypted ? '服务端解密并转码输出' : '服务端处理输出'}；原生时间轴表示当前输出片段，整首曲目定位请使用上方跳转。`;
+    } else this.note.textContent = `${decrypted ? '服务端解密输出；' : ''}原生音频控件可播放、暂停及调整音量。`;
   }
 }

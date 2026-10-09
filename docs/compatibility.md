@@ -7,6 +7,8 @@
 | Windows / Edge 154.0.4258.62（真实无头浏览器） | WAV/PCM 通过 | AIFF→MP3/-6 dB 通过 | byteRange 与 timeRestart 通过 | 待人工确认 |
 | Firefox / Safari | 未测 | 未测 | 未测 | 未测 |
 
+NCM增量联调：同一Edge版本已验证独立合成NCM的MP3解密原流、FLAC解密转MP3、实际PCM、定位/停止与损坏输入恢复，详见 [NCM验证记录](ncm-validation.md)。当前本地原流由Server通过`proxy`交付；下文`direct`为此前验收时的描述字段，保留历史证据。
+
 真实 E2E 要求实际 Server、临时音乐目录与生成样本；不拦截 API 为假列表。记录浏览器版本、输入失败/输出成功、MIME/容器/编码、attemptId/streamUrl 变化及首音前输出未生成完的时序。只看到 currentTime 增长仍不等于人工听音完成。
 
 ## 2026-10-09 实际结果
