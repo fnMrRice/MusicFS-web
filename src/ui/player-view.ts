@@ -26,7 +26,7 @@ export class PlayerView {
     this.title.textContent = state.track?.displayName ?? '尚未选择歌曲';
     this.status.textContent = state.message ?? names[state.phase];
     this.progress.textContent = `曲目位置：${(state.positionMs / 1000).toFixed(1)} 秒`;
-    this.stop.disabled = state.phase === 'idle'; this.jump.disabled = !state.playback || state.playback.seekMode === 'none';
+    this.stop.disabled = state.phase === 'idle'; this.jump.disabled = !state.playback || state.playback.seekMode === 'none' || state.phase === 'error';
     this.restart.hidden = state.phase !== 'error';
     this.position.disabled = this.jump.disabled;
     if (state.playback?.seekableRange) {

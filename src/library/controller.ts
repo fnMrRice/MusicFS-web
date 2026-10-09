@@ -21,7 +21,7 @@ export class LibraryController {
       const providers = await this.api.providers(); if (generation !== this.generation) return;
       const previous = this.view.providers.value; this.providers = providers; this.view.setProviders(providers);
       if (providers.some((p) => p.id === previous)) this.view.providers.value = previous;
-      if (!providers.length) { this.view.status.textContent = '暂无已配置的音乐来源，请在 Server 配置音乐目录。'; return; }
+      if (!providers.length) { this.state.clear(); this.view.status.textContent = '暂无已配置的音乐来源，请在 Server 配置音乐目录。'; return; }
       await this.state.select(this.view.providers.value);
     } catch (error) { if (generation === this.generation) this.view.status.textContent = errorMessage(error); }
   }
@@ -34,7 +34,8 @@ export class LibraryController {
     if (state.stale) this.view.status.textContent += ' 内容可能不是最新。';
     if (!state.loading && !state.error && provider) {
       if (!['available', 'online'].includes(provider.availability)) this.view.status.textContent = '来源暂不可用；保留上次成功扫描的内容。';
-      else if (['pending', 'running', 'never'].includes(provider.scanState ?? '')) this.view.status.textContent = '来源扫描尚未完成，请稍后刷新。';
+      else if (['idle', 'queued', 'pending', 'running', 'never'].includes(provider.scanState ?? '')) this.view.status.textContent = '来源扫描尚未完成，请稍后刷新。';
+      else if (provider.scanState === 'failed') this.view.status.textContent = '最近扫描失败；保留上次成功扫描的内容，请检查 Server 音乐目录后重新扫描。';
       else if (!state.items.length) this.view.status.textContent = '音乐库为空。';
     }
   }

@@ -59,8 +59,10 @@ export class PlayerController {
     if (this.state.wantsPlay) void this.audio.play().catch((error: unknown) => {
       if (generation !== this.generation || this.state.playback?.attemptId !== playback.attemptId) return;
       if (error instanceof DOMException && error.name === 'AbortError') return;
-      this.state.phase = 'paused'; this.state.wantsPlay = false;
-      this.state.message = '请点击音频控件中的播放按钮。'; this.emit();
+      if (error instanceof DOMException && error.name === 'NotAllowedError') {
+        this.state.phase = 'paused'; this.state.wantsPlay = false;
+        this.state.message = '请点击音频控件中的播放按钮。'; this.emit();
+      } else this.recover('PLAY_REJECTED');
     });
     else { this.state.phase = 'paused'; this.emit(); }
   }

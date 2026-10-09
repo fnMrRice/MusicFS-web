@@ -41,4 +41,19 @@ describe('Player controller (Mock media; not decoder validation)', () => {
     const s = setup(); await s.controller.select(track); s.controller.stop(); s.event('playing');
     expect(s.controller.state.phase).toBe('idle');
   });
+  it('autoplay denial preserves the current session without reporting source failure', async () => {
+    const s = setup(); vi.mocked(s.audio.play).mockRejectedValueOnce(new DOMException('Gesture required', 'NotAllowedError'));
+    await s.controller.select(track); await Promise.resolve();
+    expect(s.controller.state.phase).toBe('paused'); expect(s.controller.state.playback).not.toBeNull();
+    expect(s.api.control).not.toHaveBeenCalled(); s.controller.stop();
+  });
+  it('processed seek while paused reloads without replaying or setting absolute output time', async () => {
+    const descriptor = { ...playback(), deliveryMode: 'processed', seekMode: 'timeRestart' } as Playback;
+    const s = setup(vi.fn().mockResolvedValue(descriptor));
+    s.api.control.mockResolvedValue({ ...descriptor, attemptId: 'a2', positionOriginMs: 12_000 });
+    await s.controller.select(track); s.event('pause', 1, true); s.controller.seek(12_000);
+    await Promise.resolve(); await Promise.resolve();
+    expect(s.controller.state.positionMs).toBe(12_000); expect(s.controller.state.phase).toBe('paused');
+    expect(s.audio.play).toHaveBeenCalledOnce(); expect(s.audio.seek).not.toHaveBeenCalled(); s.controller.stop();
+  });
 });

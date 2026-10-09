@@ -12,7 +12,7 @@ export interface RequestOptions {
 export class ApiClient {
   csrfToken: string | null = null;
   onUnauthorized: (() => void) | null = null;
-  constructor(private fetcher: typeof fetch = fetch) {}
+  constructor(private fetcher: typeof fetch = (...args) => fetch(...args)) {}
 
   async request<T>(path: string, options: RequestOptions = {}): Promise<T> {
     const controller = new AbortController();
