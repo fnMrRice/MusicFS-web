@@ -44,6 +44,10 @@ export class PlayerController {
     this.state = initialState(); this.emit();
   }
   private attach(playback: Playback, generation: number): void {
+    if (playback.resumeDecision !== 'continue') {
+      this.state.playback = playback;
+      this.fail(playback.resumeDecision === 'restartRequired' ? '无法确认续播位置，请选择从头播放或停止。' : '此来源暂不可播放，请停止或选择其他歌曲。'); return;
+    }
     this.audio?.destroy(); this.state.playback = playback; this.state.phase = 'loading'; this.state.message = null;
     this.state.positionMs = playback.positionOriginMs;
     this.audio = this.createAudio(playback.streamUrl, (event) => {
@@ -63,7 +67,7 @@ export class PlayerController {
     this.state.positionMs = (this.state.playback?.positionOriginMs ?? 0) + event.seconds * 1000;
     switch (event.type) {
       case 'playing': this.clearBufferingTimer(); this.state.phase = 'playing'; this.state.wantsPlay = true; this.state.message = null; break;
-      case 'pause': if (this.state.phase !== 'ended') { this.state.phase = 'paused'; this.state.wantsPlay = false; } break;
+      case 'pause': this.clearBufferingTimer(); if (this.state.phase !== 'ended') { this.state.phase = 'paused'; this.state.wantsPlay = false; } break;
       case 'waiting': case 'stalled':
         if (this.state.wantsPlay) {
           this.state.phase = 'buffering';
