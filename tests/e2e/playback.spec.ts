@@ -142,3 +142,19 @@ test('development proxy preserves origin, session cookies and native audio Range
     await expect(page.getByRole('button', { name: '登录', exact: true })).toBeVisible();
   } finally { await stop(); }
 });
+
+test('keyboard reaches scrollable library and final minimal player controls', async ({ page }, info) => {
+  test.setTimeout(120_000);
+  await login(page, server); await scan(page.request, server.origin);
+  await page.getByRole('button', { name: '刷新列表' }).click(); await expect(page.locator('tbody tr')).toHaveCount(100);
+  await page.getByRole('button', { name: '退出登录' }).focus();
+  await page.keyboard.press('Tab'); await expect(page.getByLabel('来源', { exact: true })).toBeFocused();
+  await page.keyboard.press('Tab'); await expect(page.getByRole('button', { name: '刷新列表' })).toBeFocused();
+  await page.keyboard.press('Tab'); await expect(page.getByRole('region', { name: '可滚动的文件列表' })).toBeFocused();
+  await page.getByRole('button', { name: '播放 markers.wav', exact: true }).click(); await waitPlaying(page);
+  await page.getByRole('button', { name: '停止', exact: true }).scrollIntoViewIfNeeded();
+  await expect(page.getByRole('button', { name: '停止', exact: true })).toBeInViewport();
+  await page.screenshot({ path: info.outputPath('minimal-web.png'), fullPage: true });
+  await page.getByRole('region', { name: '播放器', exact: true }).screenshot({ path: info.outputPath('player-detail.png') });
+  await page.getByRole('button', { name: '停止', exact: true }).click(); await expect(page.locator('audio')).toHaveCount(0);
+});

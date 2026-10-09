@@ -12,6 +12,9 @@ input[type=password] { min-width: 220px; }
 table { border-collapse: collapse; width: 100%; margin-top: .7rem; }
 th, td { text-align: left; border-bottom: 1px solid #e0e4eb; padding: .6rem; overflow-wrap: anywhere; }
 audio { width: 100%; margin: .7rem 0; }
+.file-table { max-height: 24rem; overflow: auto; }
+.file-table:focus-visible { outline: 3px solid #2a66c7; outline-offset: 2px; }
+.file-table th { position: sticky; top: 0; background: white; }
 [role=status] { min-height: 1.5em; }
 .muted { color: #5b6473; font-size: .9rem; }
 .toolbar { display: flex; gap: .3rem; align-items: center; flex-wrap: wrap; }

@@ -1,7 +1,7 @@
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
-import { resolve, join } from 'node:path';
+import { copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { dirname, resolve, join } from 'node:path';
 
 export interface TestServer { origin: string; token: string; directory: string; stop: () => Promise<void> }
 export async function startServer(): Promise<TestServer> {
@@ -34,7 +34,14 @@ export async function startServer(): Promise<TestServer> {
   });
   console.log('Waiting for isolated test server readiness');
   let output = ''; child.stdout?.on('data', (data) => { output += data.toString(); }); child.stderr?.on('data', (data) => { output += data.toString(); });
-  const stop = () => stopChild(child);
+  const stop = async () => {
+    await stopChild(child);
+    const evidence = join(web, 'test-results', 'media-evidence'); mkdirSync(evidence, { recursive: true });
+    for (const name of ['original-evidence.json', 'processed-evidence.json', 'streaming-evidence.json']) {
+      if (existsSync(join(directory, name))) copyFileSync(join(directory, name), join(evidence, name));
+    }
+    if (child.exitCode !== null && dirname(resolve(directory)) === resolve(runtime)) rmSync(directory, { recursive: true, force: true });
+  };
   try {
     for (let retry = 0; retry < 100; retry++) {
       if (child.exitCode !== null) throw new Error(`Test server exited: ${output}`);

@@ -15,7 +15,10 @@ export class FileListView {
     this.status.setAttribute('role', 'status');
     const table = element('table'); const head = element('thead'); const row = element('tr');
     for (const text of ['名称', '时长 / 格式 / 码率', '可用性', '操作']) row.append(element('th', text));
-    head.append(row); table.append(head, this.rows); root.append(title, tools, this.status, table, this.more);
+    head.append(row); table.append(head, this.rows);
+    const scroll = element('div'); scroll.className = 'file-table'; scroll.tabIndex = 0;
+    scroll.setAttribute('role', 'region'); scroll.setAttribute('aria-label', '可滚动的文件列表'); scroll.append(table);
+    root.append(title, tools, this.status, scroll, this.more);
     this.more.hidden = true;
   }
   setProviders(providers: Provider[]): void {
