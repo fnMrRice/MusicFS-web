@@ -2,29 +2,33 @@ import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, resolve, join } from 'node:path';
+import { createNcmFixtures } from '../fixtures/ncm';
 
 export interface TestServer { origin: string; token: string; directory: string; stop: () => Promise<void> }
-export async function startServer(): Promise<TestServer> {
+export async function startServer(options: { ncm?: boolean } = {}): Promise<TestServer> {
   console.log('Building isolated test server and plugins');
   const web = resolve(import.meta.dirname, '../..'); const server = resolve(web, '../server');
   const runtime = join(web, '.e2e-runtime'); mkdirSync(runtime, { recursive: true });
   const directory = mkdtempSync(join(runtime, 'run-')); const suffix = process.platform === 'win32' ? '.exe' : '';
   const binaries = ['musicfs', 'musicfs-plugin-local', 'musicfs-plugin-audio-ffmpeg'];
+  if (options.ncm) binaries.push('musicfs-plugin-ncm');
   for (const name of binaries) execFileSync('go', ['build', '-o', join(directory, name + suffix), `./src/app/${name}`], { cwd: server, stdio: 'pipe', windowsHide: true });
   const music = join(directory, 'music'); mkdirSync(music);
   const fixtures = join(server, 'tests/testdata/audio');
   for (const name of ['markers.wav', '中文 空格曲目.wav', 'processing.aiff', 'corrupt.wav', 'empty.wav']) copyFileSync(join(fixtures, name), join(music, name));
-  for (let i = 0; i < 101; i++) copyFileSync(join(fixtures, 'markers.wav'), join(music, `pagination-${String(i).padStart(3, '0')}.wav`));
+  if (options.ncm) createNcmFixtures(fixtures, music);
+  else for (let i = 0; i < 101; i++) copyFileSync(join(fixtures, 'markers.wav'), join(music, `pagination-${String(i).padStart(3, '0')}.wav`));
   const token = randomBytes(32).toString('hex'); const origin = 'http://127.0.0.1:18081';
   const ffmpeg = process.env.MUSICFS_E2E_FFMPEG ?? 'D:\\Software\\MultiMedia\\ffmpeg-6.1.1-full_build-shared\\bin\\ffmpeg.exe';
   const ffprobe = process.env.MUSICFS_E2E_FFPROBE ?? 'D:\\Software\\MultiMedia\\ffmpeg-6.1.1-full_build-shared\\bin\\ffprobe.exe';
   if (!existsSync(ffmpeg) || !existsSync(ffprobe)) throw new Error('Set MUSICFS_E2E_FFMPEG and MUSICFS_E2E_FFPROBE to installed binaries');
-  execFileSync(ffmpeg, ['-v', 'error', '-stream_loop', '99', '-i', join(fixtures, 'processing.aiff'), '-t', '600', '-c', 'copy', join(music, 'zz-long-processing.aiff')], { windowsHide: true, stdio: 'pipe' });
+  if (!options.ncm) execFileSync(ffmpeg, ['-v', 'error', '-stream_loop', '99', '-i', join(fixtures, 'processing.aiff'), '-t', '600', '-c', 'copy', join(music, 'zz-long-processing.aiff')], { windowsHide: true, stdio: 'pipe' });
   const webRoot = join(directory, 'web'); cpSync(join(web, 'dist'), webRoot, { recursive: true });
   copyFileSync(join(fixtures, 'processing.aiff'), join(webRoot, 'raw-processing.aiff'));
   const config = {
     listen: '127.0.0.1:18081', dataRoot: join(directory, 'data'), mediaRoot: join(directory, 'media'), cacheRoot: join(directory, 'cache'),
     pluginPath: join(directory, 'musicfs-plugin-local' + suffix), audioWorkerPath: join(directory, 'musicfs-plugin-audio-ffmpeg' + suffix),
+    ...(options.ncm ? { ncmWorkerPath: join(directory, 'musicfs-plugin-ncm' + suffix) } : {}),
     ffmpegPath: ffmpeg, ffprobePath: ffprobe, webRoot, allowLoopbackHttp: true, allowedOrigins: [origin, 'http://127.0.0.1:5173'],
     musicRoots: [{ id: 'local', name: '测试音乐', path: music }], maxSessions: 32,
   };
@@ -37,7 +41,7 @@ export async function startServer(): Promise<TestServer> {
   const stop = async () => {
     await stopChild(child);
     const evidence = join(web, 'test-results', 'media-evidence'); mkdirSync(evidence, { recursive: true });
-    for (const name of ['original-evidence.json', 'processed-evidence.json', 'streaming-evidence.json']) {
+    for (const name of ['original-evidence.json', 'processed-evidence.json', 'streaming-evidence.json', 'ncm-mp3-evidence.json', 'ncm-flac-evidence.json', 'ncm-error-evidence.json']) {
       if (existsSync(join(directory, name))) copyFileSync(join(directory, name), join(evidence, name));
     }
     if (child.exitCode !== null && dirname(resolve(directory)) === resolve(runtime)) rmSync(directory, { recursive: true, force: true });
