@@ -2,6 +2,8 @@
 
 先按 [Server 本地运行说明](../../server/docs/running.md) 构建、配置、启动并扫描；页面本身没有目录配置或扫描按钮。建议使用 Server 的 `tests/testdata/audio` 合成样本与独立测试数据目录，配齐 FFmpeg/ffprobe 和音频 Worker。以下结果需要实际操作后确认，不是已完成人工验收的记录。
 
+配置须使用新版 YAML，旧 JSON 不兼容；音乐目录位于 Local Files 实例的 `config.musicRoots`，FFmpeg/ffprobe 位于音频实例配置。插件和对应实例都需显式 `enabled: true`，编辑后重启 Server，详见 [配置说明](../../server/docs/configuration.md)。本轮配置迁移不包含动态启停或 Web 管理入口。
+
 | 操作 | 明确预期 |
 | --- | --- |
 | 1. 登录后点击“刷新列表” | 登录令牌输入清空；显示扫描得到的文件及中文文件名。“可用”表示来源可读取，损坏文件也可能显示该状态，不保证能解码 |

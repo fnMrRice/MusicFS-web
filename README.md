@@ -17,6 +17,8 @@ npm run dev
 
 开发页面为 `http://127.0.0.1:5173`，默认代理至 `http://127.0.0.1:8080`。Server 必须显式允许开发页面的 Origin。需要其他 Server 端口时，在启动开发服务前设置 `$env:MUSICFS_DEV_SERVER`；该地址仅用于开发服务器，不写入浏览器制品。
 
+Server 配置采用 `configVersion: 1` 的 YAML；插件及实例在 `plugins` 中显式配置并启用，旧 JSON 配置不兼容。配置模型与读写边界见 [Server YAML 配置](../server/docs/configuration.md)。修改后按运行说明重启应用；Web 本期不提供插件动态启停界面。
+
 ```powershell
 npm run typecheck
 npm test
@@ -42,7 +44,7 @@ npm run build
 npm run test:e2e
 ```
 
-测试需要同级 Server 仓库、Go、已安装的 Microsoft Edge，以及 FFmpeg/ffprobe。使用 `MUSICFS_E2E_FFMPEG`、`MUSICFS_E2E_FFPROBE` 指定可执行文件；当前机器的已验证默认路径见测试启动器。测试构建自己的 Server 与插件，在 `127.0.0.1:18081` 启动全新实例，使用独立 `.e2e-runtime/` 数据目录与每次随机生成的临时凭据，不访问个人音乐库。
+测试需要同级 Server 仓库、Go、已安装的 Microsoft Edge，以及 FFmpeg/ffprobe。使用 `MUSICFS_E2E_FFMPEG`、`MUSICFS_E2E_FFPROBE` 指定可执行文件；当前机器的已验证默认路径见测试启动器。测试构建自己的 Server 与插件，在 `127.0.0.1:18081` 启动全新实例，使用独立 `.e2e-runtime/` 数据目录、临时 `config.yaml` 与每次随机生成的临时凭据，不访问个人音乐库。YAML 为实际缩进映射和序列；管理员令牌只通过环境变量传给 Server，不写入配置。
 
 样本来自 Server 的 CC0 合成音频；包含中文文件名、损坏/零字节文件、分页副本、600 秒循环 AIFF，以及由独立 Node 生成器封装的 NCM MP3/FLAC。仅运行 NCM 场景可用 `npm run test:e2e -- ncm.spec.ts --max-failures=1`。测试读取真实 API 与媒体，没有假列表或模拟媒体事件。浏览器记录播放进度及解码的非零 PCM 信号；人工扬声器听音不在自动化证明范围。临时目录与测试输出均忽略于 Git，不包含长期管理员凭据。
 
@@ -64,6 +66,7 @@ npm run test:e2e
 - [NCM 验证记录](docs/ncm-validation.md)：独立合成样本、配置入口、真实浏览器证据及未测范围。
 - [Web 设计](docs/design.md)：浏览器职责、能力探测、播放与状态适配。
 - [Server 实现计划](../server/docs/implementation.md)：Go Server、插件与对应联调阶段。
+- [Server YAML 配置](../server/docs/configuration.md)：配置版本、插件/实例模型、读写服务及应用边界。
 - [跨端架构](../docs/architecture.md)：数据语义、API、播放协商、定位和恢复。
 - [Server 音频处理](../server/docs/audio-processing.md)：服务端输出能力与约束。
 - [工作约定](AGENTS.md)：仓库工作约定。

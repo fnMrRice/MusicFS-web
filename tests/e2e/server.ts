@@ -2,6 +2,7 @@ import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, resolve, join } from 'node:path';
+import { yamlFixture, type FixtureConfig } from '../fixtures/config-yaml';
 import { createNcmFixtures } from '../fixtures/ncm';
 
 export interface TestServer { origin: string; token: string; directory: string; stop: () => Promise<void> }
@@ -25,14 +26,21 @@ export async function startServer(options: { ncm?: boolean } = {}): Promise<Test
   if (!options.ncm) execFileSync(ffmpeg, ['-v', 'error', '-stream_loop', '99', '-i', join(fixtures, 'processing.aiff'), '-t', '600', '-c', 'copy', join(music, 'zz-long-processing.aiff')], { windowsHide: true, stdio: 'pipe' });
   const webRoot = join(directory, 'web'); cpSync(join(web, 'dist'), webRoot, { recursive: true });
   copyFileSync(join(fixtures, 'processing.aiff'), join(webRoot, 'raw-processing.aiff'));
-  const config = {
+  const config: FixtureConfig = {
+    configVersion: 1,
     listen: '127.0.0.1:18081', dataRoot: join(directory, 'data'), mediaRoot: join(directory, 'media'), cacheRoot: join(directory, 'cache'),
-    pluginPath: join(directory, 'musicfs-plugin-local' + suffix), audioWorkerPath: join(directory, 'musicfs-plugin-audio-ffmpeg' + suffix),
-    ...(options.ncm ? { ncmWorkerPath: join(directory, 'musicfs-plugin-ncm' + suffix) } : {}),
-    ffmpegPath: ffmpeg, ffprobePath: ffprobe, webRoot, allowLoopbackHttp: true, allowedOrigins: [origin, 'http://127.0.0.1:5173'],
-    musicRoots: [{ id: 'local', name: '测试音乐', path: music }], maxSessions: 32,
+    webRoot, allowLoopbackHttp: true, allowedOrigins: [origin, 'http://127.0.0.1:5173'], maxSessions: 32,
+    plugins: [
+      { pluginId: 'musicfs.localfiles', executable: join(directory, 'musicfs-plugin-local' + suffix), enabled: true,
+        instances: [{ instanceId: 'local', name: '测试音乐', role: 'provider', enabled: true,
+          config: { musicRoots: [{ id: 'local', name: '测试音乐', path: music }] } }] },
+      { pluginId: 'musicfs.audio.ffmpeg', executable: join(directory, 'musicfs-plugin-audio-ffmpeg' + suffix), enabled: true,
+        instances: [{ instanceId: 'audio-default', role: 'audio', enabled: true, config: { ffmpegPath: ffmpeg, ffprobePath: ffprobe } }] },
+      ...(options.ncm ? [{ pluginId: 'musicfs.ncm', executable: join(directory, 'musicfs-plugin-ncm' + suffix), enabled: true,
+        instances: [{ instanceId: 'ncm-default', role: 'audio', enabled: true, config: {} }] }] : []),
+    ],
   };
-  const configPath = join(directory, 'config.json'); writeFileSync(configPath, JSON.stringify(config, null, 2));
+  const configPath = join(directory, 'config.yaml'); writeFileSync(configPath, yamlFixture(config));
   const child = spawn(join(directory, 'musicfs' + suffix), ['serve', '--config', configPath], {
     cwd: directory, env: { ...process.env, MUSICFS_ADMIN_TOKEN: token }, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'],
   });

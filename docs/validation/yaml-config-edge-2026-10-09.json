@@ -1,0 +1,225 @@
+{
+  "date": "2026-10-09",
+  "purpose": "YAML configuration migration regression",
+  "platform": "Windows",
+  "browser": "Microsoft Edge 154.0.4258.62 headless",
+  "ffmpeg": "6.1.1",
+  "command": "npm run test:e2e -- ncm.spec.ts --max-failures=1",
+  "result": "3 passed",
+  "durationSeconds": 20.4,
+  "build": "npm run build passed including strict TypeScript",
+  "unitTests": "npm test: 23 passed in 6 files",
+  "config": {
+    "filename": "config.yaml",
+    "format": "YAML block mapping and sequences",
+    "configVersion": 1,
+    "plugins": [
+      {
+        "instanceEnabled": true,
+        "role": "provider",
+        "instanceId": "local",
+        "pluginId": "musicfs.localfiles",
+        "enabled": true
+      },
+      {
+        "instanceEnabled": true,
+        "role": "audio",
+        "instanceId": "audio-default",
+        "pluginId": "musicfs.audio.ffmpeg",
+        "enabled": true
+      },
+      {
+        "instanceEnabled": true,
+        "role": "audio",
+        "instanceId": "ncm-default",
+        "pluginId": "musicfs.ncm",
+        "enabled": true
+      }
+    ],
+    "credentials": "Administrator token passed only through MUSICFS_ADMIN_TOKEN environment variable"
+  },
+  "fixtureManifest": {
+    "license": "CC0-1.0 synthetic source audio",
+    "generation": "Independent Node.js AES-128-ECB/PKCS#7 and NCM byte mask writer; no private media",
+    "records": [
+      {
+        "original": "vbr-untagged.mp3",
+        "output": "synthetic-mp3.ncm",
+        "format": "mp3",
+        "duration": 8040,
+        "bitrate": 33265,
+        "sourceSha512": "9854183dd49f0d2a65c5947e74125dd43e526a805efb51c6b8315e5c69778357b487d0efdb82908be7df7d4e01e99369a4aeb534acb7fec024d83c78b033f436",
+        "ncmSha512": "39af8d955dba6333c0a2eef8d12ab6bd180b2d5e98cd1940c119540a79abb8e178f56425233cb4db4e08ff5c26f70683fada7e3118b880023a64c9930d3efe19",
+        "payloadBytes": 33432,
+        "ncmBytes": 33797
+      },
+      {
+        "original": "lossless.flac",
+        "output": "synthetic-flac.ncm",
+        "format": "flac",
+        "duration": 6000,
+        "bitrate": 116162,
+        "sourceSha512": "6e6f61ac9d89a501976c0b9240fe58a928f81acba7e3f3ceab2444f55b12ea9044ba6603c61889389f1aa85b2af7c7440da56da392b0b105bfbab4afc9c0a718",
+        "ncmSha512": "08375d9fcc1d83e3b175cc3ccb08057b396cee7ef43c1ff0dd0ac627e683271e9268b12e81e3b2cb9e7c8d0c8312dc96b2f74aa126486c9c52694f1cb77b6c56",
+        "payloadBytes": 87122,
+        "ncmBytes": 87487
+      }
+    ]
+  },
+  "mp3": {
+    "browser": "154.0.4258.62",
+    "descriptor": {
+      "sessionId": "dc032c48bbdb99f4edab6e96f861d01f92f915d499b4f946",
+      "attemptId": "d4ab637e59ad5113f400535df1d01e42652d0b3afd9e84a6",
+      "assetId": "cefeba20a319c630008df7eb67225e4e311d6cf72e9335b8",
+      "representationId": "d93b0a7ea4d2599f9c3a02f565a5901dbed026de60450105",
+      "deliveryMode": "proxy",
+      "outputProfile": {
+        "mime": "audio/mpeg",
+        "codec": "mp3",
+        "container": "mp3",
+        "transport": "htmlAudio"
+      },
+      "streamUrl": "/api/v1/playback/sessions/dc032c48bbdb99f4edab6e96f861d01f92f915d499b4f946/attempts/d4ab637e59ad5113f400535df1d01e42652d0b3afd9e84a6/stream",
+      "expiresAt": "2026-10-09T10:27:56.2894273Z",
+      "seekMode": "byteRange",
+      "seekableRange": {
+        "startMs": 0,
+        "endMs": 8040
+      },
+      "positionOriginMs": 0,
+      "effectiveProcessing": [
+        {
+          "type": "ncmDecrypt",
+          "gainDb": 0,
+          "version": "1",
+          "execution": "server"
+        }
+      ],
+      "resumeDecision": "continue"
+    },
+    "sourceSha512": "9854183dd49f0d2a65c5947e74125dd43e526a805efb51c6b8315e5c69778357b487d0efdb82908be7df7d4e01e99369a4aeb534acb7fec024d83c78b033f436",
+    "range": "bytes 257-768/33432",
+    "decodedSignal": {
+      "rms": 0.04514368220461192,
+      "peakHz": 445.3125
+    },
+    "seekTargetMs": 4500
+  },
+  "flac": {
+    "browser": "154.0.4258.62",
+    "descriptor": {
+      "sessionId": "8150de87a20f08359425ee3a05930442d7ff734f7436cb41",
+      "attemptId": "f48da5eb0ca54cf7f7d78dcf7dbb1621d0e2c8d2ee513bc6",
+      "assetId": "d5c0bcad6b40ef03acfa0adecd99d254111f243148a8ee56",
+      "representationId": "b4782f8647e2b26b657a9b35191d7737cda44006cc4c444a",
+      "deliveryMode": "processed",
+      "outputProfile": {
+        "mime": "audio/mpeg",
+        "codec": "mp3",
+        "container": "mp3",
+        "transport": "htmlAudio"
+      },
+      "streamUrl": "/api/v1/playback/sessions/8150de87a20f08359425ee3a05930442d7ff734f7436cb41/attempts/f48da5eb0ca54cf7f7d78dcf7dbb1621d0e2c8d2ee513bc6/stream",
+      "expiresAt": "2026-10-09T10:27:59.3800083Z",
+      "seekMode": "timeRestart",
+      "seekableRange": {
+        "startMs": 0,
+        "endMs": 6000
+      },
+      "positionOriginMs": 0,
+      "effectiveProcessing": [
+        {
+          "type": "ncmDecrypt",
+          "gainDb": 0,
+          "version": "1",
+          "execution": "server"
+        },
+        {
+          "type": "gain",
+          "gainDb": 0,
+          "version": "1",
+          "execution": "server"
+        }
+      ],
+      "resumeDecision": "continue"
+    },
+    "located": {
+      "sessionId": "8150de87a20f08359425ee3a05930442d7ff734f7436cb41",
+      "attemptId": "6cc2e02b600ce9d2b0bdee75ee982bdc8b16ce8c359841be",
+      "assetId": "d5c0bcad6b40ef03acfa0adecd99d254111f243148a8ee56",
+      "representationId": "7bd20d48d2a6b0256e7ff4e53351022dd07ba42937e78505",
+      "deliveryMode": "processed",
+      "outputProfile": {
+        "mime": "audio/mpeg",
+        "codec": "mp3",
+        "container": "mp3",
+        "transport": "htmlAudio"
+      },
+      "streamUrl": "/api/v1/playback/sessions/8150de87a20f08359425ee3a05930442d7ff734f7436cb41/attempts/6cc2e02b600ce9d2b0bdee75ee982bdc8b16ce8c359841be/stream",
+      "expiresAt": "2026-10-09T10:27:59.3800083Z",
+      "seekMode": "timeRestart",
+      "seekableRange": {
+        "startMs": 0,
+        "endMs": 6000
+      },
+      "positionOriginMs": 4000,
+      "effectiveProcessing": [
+        {
+          "type": "ncmDecrypt",
+          "gainDb": 0,
+          "version": "1",
+          "execution": "server"
+        },
+        {
+          "type": "gain",
+          "gainDb": 0,
+          "version": "1",
+          "execution": "server"
+        }
+      ],
+      "resumeDecision": "continue"
+    },
+    "decodedSignal": {
+      "rms": 0.08415904046796185,
+      "peakHz": 656.25
+    }
+  },
+  "malformedNcm": {
+    "browser": "154.0.4258.62",
+    "status": 415,
+    "code": "UNSUPPORTED",
+    "errorShownByWeb": true,
+    "invalidAvailability": "available",
+    "recoveredOriginal": {
+      "sessionId": "b6c999dc3c9333dfb2e324ae7d314c09d114bdf16bfdc2ad",
+      "attemptId": "0f9cda19cde90122124aac752c1229c8c4dd40a32c0f36b8",
+      "assetId": "99193b916cf626e73bfb9abcc8c0eea7f233fa6d5862c2c4",
+      "representationId": "c86183d90e3960f4d9c091c4d43cde315b430f5207627ffb",
+      "deliveryMode": "proxy",
+      "outputProfile": {
+        "mime": "audio/wav",
+        "codec": "pcm_s16le",
+        "container": "wav",
+        "transport": "htmlAudio"
+      },
+      "streamUrl": "/api/v1/playback/sessions/b6c999dc3c9333dfb2e324ae7d314c09d114bdf16bfdc2ad/attempts/0f9cda19cde90122124aac752c1229c8c4dd40a32c0f36b8/stream",
+      "expiresAt": "2026-10-09T10:28:02.4416972Z",
+      "seekMode": "byteRange",
+      "seekableRange": {
+        "startMs": 0,
+        "endMs": 6000
+      },
+      "positionOriginMs": 0,
+      "effectiveProcessing": [],
+      "resumeDecision": "continue"
+    },
+    "decodedSignal": {
+      "rms": 0.04443773869602594,
+      "peakHz": 210.9375
+    }
+  },
+  "physicalListening": "Not performed",
+  "cleanup": "Test server stopped and generated runtime removed; tokens and cookies omitted",
+  "scope": "Three targeted NCM browser cases, not the complete browser suite"
+}

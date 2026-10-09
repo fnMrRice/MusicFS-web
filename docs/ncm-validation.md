@@ -2,7 +2,7 @@
 
 状态：2026-10-09，Windows / Edge 154.0.4258.62 真实无头浏览器完成3项联调，最终一次全通过（19.3秒）。仅验证本文的合成 MP3/FLAC 封装与错误样本。
 
-运行入口：[Server 本地运行](../../server/docs/running.md) → [NCM 插件配置](../../server/docs/ncm.md)。配置 `ncmWorkerPath` 并重启、重新扫描后，页面直接选曲；FLAC 转码需同时配齐音频 Worker、FFmpeg/ffprobe。逐项操作及预期见 [手动验收](manual-validation.md)。
+运行入口：[Server 本地运行](../../server/docs/running.md) → [YAML 配置模型](../../server/docs/configuration.md)与[NCM 插件配置](../../server/docs/ncm.md)。在 `plugins` 中配置 `musicfs.ncm` 的 `executable` 和音频实例，插件及实例均显式启用；重启、重新扫描后，页面直接选曲。FLAC 转码需同时配齐音频实例的 FFmpeg/ffprobe。逐项操作及预期见 [手动验收](manual-validation.md)。
 
 ## 兼容处理
 
@@ -24,6 +24,19 @@
 
 验证命令：`npm run build`、`npm run typecheck`、`npm test`、`npm run test:e2e -- ncm.spec.ts --max-failures=1`。构建和类型检查通过，既有23项单测通过；NCM联调最终3项通过。首次联调前两项通过，第三项误将普通WAV传输模式预期写为direct，修正为当前Server的proxy后定向通过，再执行上述最终一轮保留完整证据。
 
-NCM 专用启动器构建自己的临时 Server/Local Files/音频/NCM 工作进程，以 `ncmWorkerPath` 显式启用插件，使用FFmpeg 6.1.1，其他既有 E2E 维持原样。本机端口、随机测试凭据和清理规则与原有测试一致；临时运行目录已清理，证据不包含令牌/Cookie。独立Node封装还由Go核心逐字节验证得到原始MP3 33432字节、FLAC 87122字节。
+NCM 专用启动器构建自己的临时 Server/Local Files/音频/NCM 工作进程，使用FFmpeg 6.1.1。当前启动器生成 `configVersion: 1` 的 `config.yaml`，通过 `plugins` 显式注册与启用三个插件及实例；本页上述19.3秒结果是配置迁移前的历史验收。YAML 迁移回归结果单列如下，不把历史测量改写为新配置的实测。本机端口、随机测试凭据和清理规则与原有测试一致；历史临时运行目录已清理，证据不包含令牌/Cookie。独立Node封装还由Go核心逐字节验证得到原始MP3 33432字节、FLAC 87122字节。
 
 限制：非零PCM与频率是实际解码证据，尚未人工通过扬声器试听。测试仅证明其覆盖的合成格式与浏览器；真实NCM文件变体、其他浏览器不能由该结果推断。未在这一轮重复整套原有E2E；其历史结果见 [媒体兼容性](compatibility.md)。
+
+## YAML 配置迁移回归
+
+2026-10-09，`npm run build`（含严格类型检查）、`npm test` 的23项单测通过；`npm run test:e2e -- ncm.spec.ts --max-failures=1` 在真实Windows Edge 154.0.4258.62一次通过3项（20.4秒）。启动器使用实际YAML块映射和序列，包含中文名称、Windows路径、显式布尔开关和空NCM实例配置；不使用改后缀的JSON，也不增加npm依赖。管理员令牌仅经环境变量传入。
+
+| 本轮场景 | 实际结果 |
+| --- | --- |
+| 新配置启动与扫描 | Local Files、音频处理、NCM三个插件及实例按YAML注册并启用，真实登录、扫描和列表加载通过 |
+| MP3解密播放 | 完整摘要与原始MP3一致，Range为bytes 257-768/33432；4.5秒定位后PCM RMS 0.045144，停止通过 |
+| FLAC解密转码 | timeRestart到4000ms返回新attempt/URL，PCM RMS 0.084159，主峰656.25Hz，停止通过 |
+| 损坏NCM恢复 | 415 UNSUPPORTED并显示错误；随后普通WAV解码RMS 0.044438，停止通过 |
+
+本轮独立证据见 [YAML配置迁移记录](validation/yaml-config-edge-2026-10-09.json)。测试服务和临时运行目录已清理。原有19.3秒JSON证据及两张截图保留为历史；本轮未重跑无关完整浏览器套件、未进行人工听音，也不验证后续插件动态启停。
