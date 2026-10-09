@@ -37,3 +37,4 @@
 | W4.8 | Windows Edge 154.0.4258.62 六项真实 E2E 全通过，23 项单元测试与构建通过；AIFF直放错误4→MP3/DSP解码，连续timeRestart到4秒主峰656.25Hz；600秒输出未结束已有非零PCM | 人工扬声器听音未代验；HTTP未完成时已有解码证据，不等同物理首音 |
 | W8.1 | 独立 dist 与 version.json 构建成功；Web 0.1.0 / API 1，运行时使用同源相对地址 | dist 为本机构建制品，不提交生成文件 |
 | W8.2 | 真实 Edge 经 Server静态托管和Vite代理均通过登录、cookie、Origin、原流Range206与退出；未知API不由静态首页替代 | 独立第三方反向代理部署未测，不作支持宣称 |
+| W8.3 | 已发布实际Windows Edge环境、MIME/容器/编码、原始失败与处理成功、定位频率、渐进解码时序及未测组合 | 人工听音仍待确认；详见compatibility.md |

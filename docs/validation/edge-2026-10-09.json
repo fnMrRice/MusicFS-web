@@ -1,0 +1,144 @@
+{
+  "environment": {
+    "browser": "Microsoft Edge 154.0.4258.62",
+    "physicalListening": "Not performed",
+    "os": "Windows"
+  },
+  "original": {
+    "browser": "154.0.4258.62",
+    "responses": [
+      {
+        "status": 206,
+        "range": "bytes 0-1152043/1152044",
+        "contentType": "audio/wav"
+      },
+      {
+        "status": 206,
+        "range": "bytes 0-1152043/1152044",
+        "contentType": "audio/wav"
+      },
+      {
+        "status": 206,
+        "range": "bytes 0-1152043/1152044",
+        "contentType": "audio/wav"
+      },
+      {
+        "status": 206,
+        "range": "bytes 0-1152043/1152044",
+        "contentType": "audio/wav"
+      }
+    ],
+    "decodedRms": 0.04437822420756256,
+    "physicalListening": "Not performed"
+  },
+  "processed": {
+    "browser": "154.0.4258.62",
+    "rawAIFFErrorCode": 4,
+    "initial": {
+      "sessionId": "16d3796337d4e4972b4a3fcb66d029952fef0a34adf72af4",
+      "attemptId": "45303545f47677b5cbdcfc79644c72273ca11b7f3a49207d",
+      "assetId": "1a606626e48208edbd3f65212288bee6dc72b71a2b8f4262",
+      "representationId": "108ae36ba08f02461f6b15c74aedaedfd080579ff207d372",
+      "deliveryMode": "processed",
+      "outputProfile": {
+        "mime": "audio/mpeg",
+        "codec": "mp3",
+        "container": "mp3",
+        "transport": "htmlAudio"
+      },
+      "streamUrl": "/api/v1/playback/sessions/16d3796337d4e4972b4a3fcb66d029952fef0a34adf72af4/attempts/45303545f47677b5cbdcfc79644c72273ca11b7f3a49207d/stream",
+      "expiresAt": "2026-10-09T09:16:20.3776922Z",
+      "seekMode": "timeRestart",
+      "seekableRange": {
+        "startMs": 0,
+        "endMs": 6000
+      },
+      "positionOriginMs": 0,
+      "effectiveProcessing": [
+        {
+          "type": "gain",
+          "gainDb": -6,
+          "version": "1",
+          "execution": "server"
+        }
+      ],
+      "resumeDecision": "continue"
+    },
+    "attempts": [
+      {
+        "sessionId": "16d3796337d4e4972b4a3fcb66d029952fef0a34adf72af4",
+        "attemptId": "a9b7fcc36f9bcdc600cdde3b735571296a0f6ba968dafd79",
+        "assetId": "1a606626e48208edbd3f65212288bee6dc72b71a2b8f4262",
+        "representationId": "288d2c9226b9b1f88101fcf378c7d4b4a09b871165f6f220",
+        "deliveryMode": "processed",
+        "outputProfile": {
+          "mime": "audio/mpeg",
+          "codec": "mp3",
+          "container": "mp3",
+          "transport": "htmlAudio"
+        },
+        "streamUrl": "/api/v1/playback/sessions/16d3796337d4e4972b4a3fcb66d029952fef0a34adf72af4/attempts/a9b7fcc36f9bcdc600cdde3b735571296a0f6ba968dafd79/stream",
+        "expiresAt": "2026-10-09T09:16:20.3776922Z",
+        "seekMode": "timeRestart",
+        "seekableRange": {
+          "startMs": 0,
+          "endMs": 6000
+        },
+        "positionOriginMs": 2000,
+        "effectiveProcessing": [
+          {
+            "type": "gain",
+            "gainDb": -6,
+            "version": "1",
+            "execution": "server"
+          }
+        ],
+        "resumeDecision": "continue"
+      },
+      {
+        "sessionId": "16d3796337d4e4972b4a3fcb66d029952fef0a34adf72af4",
+        "attemptId": "d01bb8ae4b9a53d65f32441b49db4258d9fbcf3d3a1210ec",
+        "assetId": "1a606626e48208edbd3f65212288bee6dc72b71a2b8f4262",
+        "representationId": "013546306d0e55feb3aaacb52f407a9e28648592206bc745",
+        "deliveryMode": "processed",
+        "outputProfile": {
+          "mime": "audio/mpeg",
+          "codec": "mp3",
+          "container": "mp3",
+          "transport": "htmlAudio"
+        },
+        "streamUrl": "/api/v1/playback/sessions/16d3796337d4e4972b4a3fcb66d029952fef0a34adf72af4/attempts/d01bb8ae4b9a53d65f32441b49db4258d9fbcf3d3a1210ec/stream",
+        "expiresAt": "2026-10-09T09:16:20.3776922Z",
+        "seekMode": "timeRestart",
+        "seekableRange": {
+          "startMs": 0,
+          "endMs": 6000
+        },
+        "positionOriginMs": 4000,
+        "effectiveProcessing": [
+          {
+            "type": "gain",
+            "gainDb": -6,
+            "version": "1",
+            "execution": "server"
+          }
+        ],
+        "resumeDecision": "continue"
+      }
+    ],
+    "decodedSeekSignal": {
+      "rms": 0.04217870405765356,
+      "peakHz": 656.25
+    },
+    "physicalListening": "Not performed"
+  },
+  "streaming": {
+    "browser": "154.0.4258.62",
+    "startedAt": 1791535583751,
+    "firstResponseAt": 1791535584219,
+    "decodedAt": 1791535585125,
+    "decodedRms": 0.02115489501171666,
+    "finishedAtFirstDecodedSample": false,
+    "physicalListening": "Not performed"
+  }
+}
