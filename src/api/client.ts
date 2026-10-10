@@ -108,7 +108,8 @@ export function errorMessage(error: unknown): string {
     INVALID_RESPONSE: "Server 返回了无法识别的数据。",
     PAGINATION_STALLED: "列表未能继续加载，请刷新后重试。",
     UNSUPPORTED: "当前来源尚不支持此功能。",
-    AUTH_REQUIRED: "此来源需要登录，目前尚未开放账号接入。",
+    AUTH_REQUIRED: "登录已失效，请重新登录。",
+    PLATFORM_AUTH_REQUIRED: "请先在设置中登录此音乐平台；已保存的账号需要校验登录状态。",
     REVISION_CONFLICT: "内容已发生变化，请刷新后重新编辑。",
     RECOVERY_EXHAUSTED: "自动恢复已用尽，请重新播放。",
     ATTEMPT_CONFLICT: "播放状态已改变，请重新播放。",
@@ -116,7 +117,9 @@ export function errorMessage(error: unknown): string {
     SOURCE_UNAVAILABLE: "来源暂不可用，请检查音乐目录。",
   };
   const message =
-    error.status === 401
+    error.code === "PLATFORM_AUTH_REQUIRED"
+      ? messages.PLATFORM_AUTH_REQUIRED
+      : error.status === 401
       ? "登录已失效，请重新登录。"
       : error.status === 403
         ? "无权执行此操作。"

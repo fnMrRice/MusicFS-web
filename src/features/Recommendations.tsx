@@ -34,7 +34,7 @@ export function Recommendations() {
         <section key={source.instanceId} className="source-section">
           <div className="section-title">
             <h3>{source.name}</h3>
-            <span className="muted">公共推荐 · 匿名</span>
+            <span className="muted">平台推荐 · 需登录</span>
           </div>
           {source.stale && (
             <p className="notice">
@@ -45,7 +45,7 @@ export function Recommendations() {
           )}
           {source.error && (
             <p className="notice">
-              此来源暂时无法获取推荐（{source.error.code}）。
+              {source.error.code === "PLATFORM_AUTH_REQUIRED" ? <>请先到<Link to="/settings">设置</Link>登录此音乐平台。</> : <>此来源暂时无法获取推荐（{source.error.code}）。</>}
               <button onClick={() => setRefresh((v) => v + 1)}>重试</button>
             </p>
           )}

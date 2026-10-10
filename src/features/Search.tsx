@@ -164,10 +164,12 @@ function SearchSource({
       <div className="section-title">
         <h2>{provider.name}</h2>
         <span className="badge">
-          {provider.availability === "available" ? "在线来源" : "来源离线"}
+          {provider.availability === "available" ? "在线来源" : provider.availability === "loginRequired" ? "需要平台登录" : "来源离线"}
         </span>
       </div>
-      {!supported?.supported ? (
+      {provider.availability === "loginRequired" ? (
+        <p className="notice">请先到<a href="#/settings">设置</a>登录此音乐平台，再使用在线搜索。</p>
+      ) : !supported?.supported ? (
         <p className="notice">此来源尚不支持曲目搜索。</p>
       ) : provider.availability !== "available" ? (
         <p className="notice">来源暂时离线，请稍后重试。</p>

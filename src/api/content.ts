@@ -288,15 +288,17 @@ export class ContentApi {
         (r.nextAfter === null || string(r.nextAfter)),
     );
   }
-  importRemote(
+  async importRemote(
     instanceId: string,
     externalId: string,
   ): Promise<{ playlist: RemotePlaylist; merged: boolean }> {
-    return this.write("/remote-playlists", {
-      instanceId,
-      externalId,
-      accountId: "",
-    });
+    const account = await this.client.request<{ state: string; accountId?: string }>(
+      '/online-instances/' + id(instanceId) + '/account',
+    );
+    if (account.state !== "signedIn" || !account.accountId) {
+      throw new ApiError("PLATFORM_AUTH_REQUIRED", "Sign in to the music platform", 403);
+    }
+    return this.write("/remote-playlists", { instanceId, externalId, accountId: account.accountId });
   }
   async sync(p: RemotePlaylist): Promise<SyncJob> {
     const receipt = await this.write<{ jobId: string }>(

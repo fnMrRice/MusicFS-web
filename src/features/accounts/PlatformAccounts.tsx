@@ -19,7 +19,7 @@ export function PlatformAccounts() {
   const s = useServices();
   const list = useResource("platform-account-instances", (signal) => s.client.request<{ items: OnlineInstance[] }>("/online-instances", { signal }));
   return <div className="settings-card"><h3>音乐平台账号</h3>
-    <p className="muted">分别登录音乐平台账号。登录接入尚待真实账号验收，不表示已支持完整在线播放。</p>
+    <p className="muted">使用在线来源前请先登录对应音乐平台。登录不表示拥有会员或完整在线播放权限。</p>
     {list.error && <p role="alert">{list.error}</p>}
     {list.data?.items.map((instance) => <AccountCard key={instance.instanceId} instance={instance} />)}
     {list.data?.items.length === 0 && <p>尚未配置在线音乐来源。</p>}
@@ -107,7 +107,7 @@ function AccountCard({ instance }: { instance: OnlineInstance }) {
     {options && !options.configured && <p>请先在服务端配置 Apple Music 开发者授权。</p>}
     {qr && pending && <img src={qr} width={224} height={224} alt={`${name}登录二维码`} />}
     {pending && <p>请使用{instance.platform === "qqmusic" ? "手机 QQ" : name}扫码或完成授权。二维码和授权会话有效期为三分钟。</p>}
-    {!pending && !bound && <button disabled={busy || !options?.configured || instance.availability !== "available"} onClick={() => { void (options?.method === "musicKit" ? prepareApple() : operation("begin")); }}>登录{name}</button>}
+    {!pending && !bound && <button disabled={busy || !options?.configured || instance.availability === "offline"} onClick={() => { void (options?.method === "musicKit" ? prepareApple() : operation("begin")); }}>登录{name}</button>}
     {pending && account?.method === "musicKit" && <button disabled={busy || !musicKit} onClick={() => { void authorizeApple(); }}>打开 Apple 授权</button>}
     {pending && account?.method === "qr" && <button disabled={busy} onClick={() => { void operation("poll"); }}>刷新扫码状态</button>}
     {pending && <button disabled={busy} onClick={() => { void operation("cancel"); }}>取消登录</button>}
