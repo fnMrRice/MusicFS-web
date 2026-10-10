@@ -26,7 +26,7 @@ test("settings show pending, disabled and ready plugins and refresh their state"
     ] };
     return route.fulfill({ json });
   });
-  await page.goto(`${origin}/#/settings`);
+  await page.goto(`${origin}/#/settings?tab=plugins`);
   const card = page.locator(".settings-card").filter({ has: page.getByRole("heading", { name: "插件状态" }) });
   await expect(card.getByText("待配置", { exact: true })).toBeVisible();
   await expect(card.getByText("已禁用", { exact: true })).toBeVisible();

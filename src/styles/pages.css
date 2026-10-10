@@ -144,6 +144,22 @@
 .settings-page {
   max-width: 900px;
 }
+.settings-tabs {
+  margin-top: 24px;
+}
+.settings-tabs button {
+  flex-shrink: 0;
+}
+.settings-tabs button:focus-visible {
+  outline-offset: -3px;
+}
+.settings-page .check-label {
+  white-space: normal;
+  line-height: 1.7;
+}
+.settings-page .check-label input {
+  flex-shrink: 0;
+}
 .settings-card {
   background: var(--panel);
   border: 1px solid var(--line);
@@ -319,6 +335,13 @@
   }
   .settings-card {
     padding: 18px;
+  }
+  .settings-page .settings-tabs {
+    gap: 12px;
+  }
+  .settings-tabs button {
+    font-size: 14px;
+    padding-inline: 3px;
   }
   .settings-card dl > div {
     flex-direction: column;

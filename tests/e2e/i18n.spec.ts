@@ -169,7 +169,7 @@ test("live language changes preserve search drafts, selections and metadata and 
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
     await page.goto(`${origin}/#/library`);
-    await settings.goto(`${origin}/#/settings`);
+    await settings.goto(`${origin}/#/settings?tab=other`);
     await page
       .getByRole("checkbox", {
         name: `Select ${track.displayName}`,
@@ -218,10 +218,11 @@ test("live language changes preserve search drafts, selections and metadata and 
     );
     await page.getByRole("button", { name: "Settings", exact: true }).click();
     await expect(page.getByRole("alert")).toContainText("Request ID: req-i18n");
-    await selector(page).selectOption("ja");
+    await selector(settings).selectOption("ja");
     await expect(page.getByRole("alert")).toContainText(
       "リクエスト ID：req-i18n",
     );
+    await page.getByRole("tab").last().click();
     await page.getByRole("button", { name: "ログアウト", exact: true }).click();
     await expect(page.locator(".login-page")).toBeVisible();
     await expect(selector(page)).toHaveValue("ja");
@@ -242,7 +243,7 @@ test("all four languages fit settings and search at narrow widths", async ({
     await mock(context);
     const page = await context.newPage();
     for (const language of ["en", "zh-CN", "zh-TW", "ja"]) {
-      await page.goto(`${origin}/#/settings`);
+      await page.goto(`${origin}/#/settings?tab=other`);
       await selector(page).selectOption(language);
       await selector(page).scrollIntoViewIfNeeded();
       await expect(selector(page)).toBeInViewport();
@@ -254,6 +255,12 @@ test("all four languages fit settings and search at narrow widths", async ({
       await page.screenshot({
         path: info.outputPath(`settings-${language}.png`),
       });
+      for (const tab of await page.getByRole("tab").all()) {
+        await tab.click();
+        await expect(tab).toBeInViewport();
+        await expect(page.getByRole("tabpanel")).toBeVisible();
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+      }
       await page.goto(`${origin}/#/search`);
       await expect(page.locator(".search-form input")).toBeVisible();
       expect(

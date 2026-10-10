@@ -18,6 +18,7 @@ export async function seekTo(page: Page, seconds: number): Promise<void> {
 }
 export async function setProcessing(page: Page, enabled: boolean): Promise<void> {
   await page.getByRole('button', { name: '设置', exact: true }).click();
+  await page.getByRole('tab', { name: '播放配置', exact: true }).click();
   await page.getByLabel('服务端处理（降低 6 dB，下一首生效）').setChecked(enabled);
   await page.getByRole('link', { name: '曲目列表', exact: true }).click();
 }

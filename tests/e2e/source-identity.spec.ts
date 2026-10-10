@@ -76,10 +76,14 @@ test("one music-source settings section uses arbitrary plugin translations and k
   await expect(page.getByRole("heading", { name: "Excluded decoder" })).toHaveCount(0);
   await expect(page.locator("h4")).toHaveCount(3);
   await expect(page.locator(".settings-page").getByText(/Private|Duplicate|qq-public/)).toHaveCount(0);
+  await page.getByRole("tab", { name: "其他配置", exact: true }).click();
   await page.locator(".language-select select").selectOption("zh-TW");
+  await page.getByRole("tab").first().click();
   await expect(page.getByRole("heading", { name: "自訂節拍", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "目錄音樂", exact: true })).toBeVisible();
+  await page.getByRole("tab").last().click();
   await page.locator(".language-select select").selectOption("en");
+  await page.getByRole("tab", { name: "Music sources", exact: true }).click();
   await expect(page.getByRole("heading", { name: "搜索", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Folder library", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "登录搜索", exact: true }).click();

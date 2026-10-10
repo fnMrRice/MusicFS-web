@@ -32,6 +32,7 @@ test('real shell, custom transport, themes and playlist writes survive route cha
   await page.getByRole('slider', { name: '音量', exact: true }).fill('0.35');
   await expect.poll(() => page.locator('audio').evaluate((a: HTMLAudioElement) => a.volume)).toBe(.35);
   await page.getByRole('button', { name: '设置', exact: true }).click();
+  await page.getByRole('tab', { name: '其他配置', exact: true }).click();
   const language = page.locator('.language-select select');
   await language.selectOption('en');
   await expect(page.getByRole('heading', { name: 'Your listening preferences' })).toBeVisible();
