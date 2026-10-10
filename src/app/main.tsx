@@ -14,6 +14,7 @@ import {
 } from "../features/Recommendations";
 import { Playlists } from "../features/playlists/Playlists";
 import { PlaylistDetail } from "../features/playlists/PlaylistDetail";
+import { SourcePlaylists } from "../features/playlists/SourcePlaylists";
 import { AlbumDetail } from "../features/AlbumDetail";
 import { Settings } from "../features/Settings";
 import { Empty } from "../components/ui";
@@ -38,6 +39,7 @@ function Application() {
         <Route path="/recommendations" element={<Recommendations />} />
         <Route path="/playlists" element={<Playlists />} />
         <Route path="/playlists/:id" element={<PlaylistDetail />} />
+        <Route path="/sources/:instance/playlists" element={<SourcePlaylists />} />
         <Route
           path="/discover/:instance/:external"
           element={<DiscoveryPlaylist />}

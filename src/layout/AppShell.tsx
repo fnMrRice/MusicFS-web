@@ -6,6 +6,7 @@ import { ErrorNotice, Icon, IconButton } from "../components/ui";
 import { PlayerBar } from "../player/PlayerBar";
 import styles from "./Shell.module.css";
 import { ErrorBoundary } from "../app/ErrorBoundary";
+import { useMusicSources, useSourceName } from "../components/use-source-name";
 
 const links = [
   ["/search", "search", "搜索"],
@@ -19,6 +20,9 @@ export function AppShell() {
   const auth = useStore(s.auth);
   const prefs = useStore(s.preferences);
   const playlists = useStore(s.playlists);
+  const sources = useMusicSources();
+  const sourcePlaylists = useStore(s.sourcePlaylists.pages);
+  const sourceName = useSourceName();
   const location = useLocation();
   const navigate = useNavigate();
   const scroll = useRef<HTMLDivElement>(null);
@@ -102,7 +106,7 @@ export function AppShell() {
           ? "最近播放"
           : location.pathname.startsWith("/albums")
             ? "专辑"
-            : "歌单详情");
+            : location.pathname.startsWith("/sources/") ? "来源歌单" : "歌单详情");
   const nav = (path: string, icon: string, label: string) => (
     <NavLink
       key={path}
@@ -163,7 +167,7 @@ export function AppShell() {
               </span>
               {tr("歌单")}
               {!prefs.playlists &&
-                location.pathname.startsWith("/playlists/") && (
+                (location.pathname.startsWith("/playlists/") || location.pathname.startsWith("/sources/")) && (
                   <span className={styles.dot} />
                 )}
             </button>
@@ -185,6 +189,11 @@ export function AppShell() {
             ) : (
               <p className={styles.hint}>{tr("把喜欢的音乐放在一起")}</p>
             ))}
+          {prefs.playlists && sources.filter((source) => sourcePlaylists[source.id]?.items.length).map((source) => nav(
+            `/sources/${encodeURIComponent(source.id)}/playlists`,
+            "folder",
+            tr("{0} 的歌单", { 0: sourceName(source.online ?? source.provider!) }),
+          ))}
         </nav>
         <div
           className={styles.account}

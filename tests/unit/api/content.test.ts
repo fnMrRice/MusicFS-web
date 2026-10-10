@@ -3,6 +3,17 @@ import { ApiClient } from '../../../src/api/client';
 import { ContentApi } from '../../../src/api/content';
 
 describe('Content adapters follow current Server contracts', () => {
+  it('reads account playlists with the original instance and opaque cursor and validates list consistency', async () => {
+    const fetcher = vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({ items: [], nextCursor: null, consistency: 'unversioned', observedAt: '2026-10-10T08:00:00Z' })))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ items: [], nextCursor: null })));
+    const api = new ContentApi(new ApiClient(fetcher));
+    await api.accountPlaylists('custom/private', 'opaque/next+page');
+    const url = new URL(fetcher.mock.calls[0][0], 'https://example.test');
+    expect(url.pathname).toBe('/api/v1/online-instances/custom%2Fprivate/playlists');
+    expect(url.searchParams.get('cursor')).toBe('opaque/next+page');
+    expect(url.searchParams.get('limit')).toBe('30');
+    await expect(api.accountPlaylists('custom/private', null)).rejects.toMatchObject({ code: 'INVALID_RESPONSE' });
+  });
   it('reads the sync job after the accepted receipt instead of treating it as completion', async () => {
     const fetcher = vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({ jobId: 'job', merged: false }), { status: 202 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ jobId: 'job', state: 'running', resultRevision: null, error: null })));

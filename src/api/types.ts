@@ -1,7 +1,11 @@
+export interface PluginIdentity {
+  id: string; name: string; localizedNames: Record<string, string>; features: string[];
+}
 export interface Ready { product: string; instanceId: string; apiVersion: string; ready: boolean }
 export interface AuthSession { user: { id: string; role: string }; csrfToken: string; expiresAt: string }
 export interface Provider {
   id: string; name: string; capabilities: string[]; availability: string; scanState?: string;
+  plugin?: PluginIdentity;
 }
 export interface SourceTrack {
   sourceTrackId: string; providerInstanceId: string; displayName: string;

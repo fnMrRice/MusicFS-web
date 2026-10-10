@@ -6,9 +6,10 @@ import { ErrorNotice, Sentinel } from "../../components/ui";
 import { Modal } from "../../components/Modal";
 import { errorMessage } from "../../api/client";
 import type { RemotePlaylist, SyncJob } from "../../api/content";
-import { sourceName } from "../../components/source-name";
+import { useSourceName } from "../../components/use-source-name";
 export function RemotePlaylists() {
   useLocale();
+  const sourceName = useSourceName();
   const s = useServices();
   const [version, setVersion] = useState(0);
   const [open, setOpen] = useState(false);

@@ -1,24 +1,18 @@
 import { tr, useLocale } from "../i18n";
 import { useServices, useStore } from "../app/services";
-import { useResource } from "../components/query";
-import { ErrorNotice } from "../components/ui";
-import { sourceName } from "../components/source-name";
 import { LanguageSelect } from "../i18n/LanguageSelect";
-import { PlatformAccounts } from "./accounts/PlatformAccounts";
+import { MusicSources } from "./MusicSources";
 import { PluginStatus } from "./PluginStatus";
 export function Settings() {
   useLocale();
   const s = useServices();
   const auth = useStore(s.auth);
   const prefs = useStore(s.preferences);
-  const providers = useResource("settings-providers", (signal) =>
-    s.libraryApi.providers(signal),
-  );
   return (
     <section className="settings-page">
       <p className="eyebrow">{tr("MAKE YOURSELF AT HOME")}</p>
       <h2>{tr("你的聆听偏好")}</h2>
-      <PlatformAccounts />
+      <MusicSources />
       {auth.session?.user.role === "admin" && <PluginStatus />}
       <div className="settings-card">
         <LanguageSelect />
@@ -111,23 +105,6 @@ export function Settings() {
             onChange={(e) => s.preference({ volume: Number(e.target.value) })}
           />
         </label>
-      </div>
-      <div className="settings-card">
-        <h3>{tr("音乐来源")}</h3>
-        <ErrorNotice error={providers.error} retry={providers.reload} />
-        {providers.loading && <p>{tr("正在读取来源…")}</p>}
-        {providers.data?.map((p) => (
-          <div className="setting-row" key={p.id}>
-            <strong>{sourceName(p)}</strong>
-            <span className="muted">
-              {p.availability === "available" ? tr("可用") : tr("暂不可用")}
-            </span>
-          </div>
-        ))}
-        {providers.data?.length === 0 && (
-          <p className="muted">{tr("暂无音乐来源")}</p>
-        )}
-        <p className="muted">{tr("音乐目录、插件与平台账号由服务端管理。")}</p>
       </div>
     </section>
   );

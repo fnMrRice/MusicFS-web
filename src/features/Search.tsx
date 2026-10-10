@@ -5,7 +5,7 @@ import { useServices } from "../app/services";
 import { SearchHistory } from "./SearchHistory";
 import { usePages, useResource } from "../components/query";
 import type { OnlineInstance } from "../api/content";
-import { sourceName } from "../components/source-name";
+import { useSourceName } from "../components/use-source-name";
 import {
   Cover,
   duration,
@@ -18,6 +18,7 @@ import {
 export function Search() {
   useLocale();
   const s = useServices();
+  const sourceName = useSourceName();
   const [params, setParams] = useSearchParams();
   const q = params.get("q") || "";
   const type = params.get("type") || "曲目";
@@ -163,6 +164,7 @@ function SearchSource({
   query: string;
 }) {
   useLocale();
+  const sourceName = useSourceName();
   const supported = provider.capabilities.find(
     (c) => c.name === "search.tracks",
   );

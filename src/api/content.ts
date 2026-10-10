@@ -1,9 +1,15 @@
 import { ApiClient, ApiError, type RequestOptions } from "./client";
+import { Store } from "../app/store";
+import type { PluginIdentity } from "./types";
+export type { PluginIdentity } from "./types";
 
 export interface OnlineInstance {
   instanceId: string;
   name: string;
   platform: string;
+  plugin?: PluginIdentity;
+  accountId?: string;
+  accountRevision?: string;
   availability: string;
   capabilities: { name: string; supported: boolean; reason: string }[];
 }
@@ -20,6 +26,12 @@ export interface OnlinePlaylist {
   title: string;
   sourceUrl: string;
   trackCount: number | null;
+}
+export interface AccountPlaylistPage {
+  items: OnlinePlaylist[];
+  nextCursor: string | null;
+  consistency: "unversioned";
+  observedAt: string;
 }
 export interface Observation {
   playlist: OnlinePlaylist;
@@ -123,7 +135,15 @@ const isPlaylist = (p: Playlist) =>
   list(p.bindings);
 
 export class ContentApi {
+  readonly onlineInstances = new Store<OnlineInstance[]>([]);
+  private onlineEpoch = 0;
+  private onlineRequest = 0;
+  private onlineApplied = 0;
   constructor(private client: ApiClient) {}
+  clearOnlineInstances(): void {
+    ++this.onlineEpoch;
+    this.onlineInstances.set([]);
+  }
   private async write<T>(path: string, body: unknown, method = "POST"): Promise<T> {
     const options = { method, body, idempotencyKey: crypto.randomUUID() };
     try { return await this.client.request<T>(path, options); }
@@ -133,11 +153,13 @@ export class ContentApi {
     }
   }
   async online(signal?: AbortSignal): Promise<OnlineInstance[]> {
+    const epoch = this.onlineEpoch;
+    const request = ++this.onlineRequest;
     const v = await this.client.request<{ items: OnlineInstance[] }>(
       "/online-instances",
       { signal },
     );
-    return checked(
+    const items = checked(
       v,
       (r) =>
         list(r.items) &&
@@ -145,6 +167,11 @@ export class ContentApi {
           (p) => object(p) && string(p.instanceId) && list(p.capabilities),
         ),
     ).items;
+    if (epoch === this.onlineEpoch && request > this.onlineApplied && !signal?.aborted) {
+      this.onlineApplied = request;
+      this.onlineInstances.set(items);
+    }
+    return items;
   }
   async search(
     instance: string,
@@ -196,6 +223,15 @@ export class ContentApi {
             ),
         ),
     ).sources;
+  }
+  async accountPlaylists(instance: string, cursor: string | null, signal?: AbortSignal): Promise<AccountPlaylistPage> {
+    const query = new URLSearchParams({ limit: "30" });
+    if (cursor) query.set("cursor", cursor);
+    return checked(
+      await this.client.request<AccountPlaylistPage>(`/online-instances/${id(instance)}/playlists?${query}`, { signal }),
+      (r) => list(r.items) && r.items.every((p) => object(p) && string(p.externalId) && string(p.title)) &&
+        (r.nextCursor === null || string(r.nextCursor)) && r.consistency === "unversioned" && string(r.observedAt),
+    );
   }
   async observation(
     instance: string,

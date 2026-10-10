@@ -40,10 +40,10 @@ describe("Language selection and messages", () => {
       "Play 搜索 <script>{0}</script>",
     );
     expect(sourceName({ platform: "netease", name: "网易云公开资料" })).toBe(
-      "NetEase Cloud Music",
+      "Unknown source",
     );
     expect(sourceName({ id: "custom", name: "我的音乐目录" })).toBe(
-      "我的音乐目录",
+      "Unknown source",
     );
   });
 

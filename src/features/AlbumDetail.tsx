@@ -5,11 +5,12 @@ import { useResource } from "../components/query";
 import { useCatalog } from "./catalog";
 import { Cover, Empty, ErrorNotice } from "../components/ui";
 import { TrackTable } from "./TrackTable";
-import { sourceName } from "../components/source-name";
+import { useSourceName } from "../components/use-source-name";
 export function AlbumDetail() {
   useLocale();
   const { id = "" } = useParams();
   const s = useServices();
+  const sourceName = useSourceName();
   const album = useResource(id, (signal) => s.content.album(id, { signal }));
   const catalog = useCatalog();
   const tracks =

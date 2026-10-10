@@ -5,9 +5,10 @@ import { useServices } from "../app/services";
 import { useResource } from "../components/query";
 import { Cover, Empty, ErrorNotice, IconButton } from "../components/ui";
 import { errorMessage } from "../api/client";
-import { sourceName } from "../components/source-name";
+import { useSourceName } from "../components/use-source-name";
 export function Recommendations() {
   useLocale();
+  const sourceName = useSourceName();
   const s = useServices();
   const [refresh, setRefresh] = useState(0);
   const query = useResource(`recommendations:${refresh}`, (signal) =>

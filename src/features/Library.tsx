@@ -12,11 +12,12 @@ import {
 } from "../components/ui";
 import { TrackTable } from "./TrackTable";
 import { scanStatusMessage } from "../library/scan-state";
-import { sourceName } from "../components/source-name";
+import { useSourceName } from "../components/use-source-name";
 
 export function Library() {
   useLocale();
   const s = useServices();
+  const sourceName = useSourceName();
   const [params, setParams] = useSearchParams();
   const provider = params.get("source") || "all";
   const category = params.get("category") || "全部曲目";
@@ -181,6 +182,7 @@ export function Library() {
 function Albums() {
   useLocale();
   const s = useServices();
+  const sourceName = useSourceName();
   const pages = usePages(
     "albums",
     async (after, signal) => {

@@ -2,6 +2,16 @@ import { describe, expect, it, vi } from 'vitest';
 import { ApiClient, ApiError, errorMessage } from '../../../src/api/client';
 
 describe('API boundary (Mock fetch)', () => {
+  it('does not clear a newer session when an old request returns unauthorized', async () => {
+    let finish!: (response: Response) => void;
+    const client = new ApiClient(vi.fn(() => new Promise<Response>((resolve) => { finish = resolve; })));
+    client.csrfToken = 'old-session'; client.onUnauthorized = vi.fn();
+    const old = client.request('/online-instances');
+    client.csrfToken = 'new-session';
+    finish(new Response(JSON.stringify({ error: { code: 'AUTH_REQUIRED' } }), { status: 401 }));
+    await expect(old).rejects.toMatchObject({ status: 401 });
+    expect(client.onUnauthorized).not.toHaveBeenCalled();
+  });
   it('normalizes a structured unauthorized response and clears identity', async () => {
     const client = new ApiClient(vi.fn(async () => new Response(JSON.stringify({ error: { code: 'AUTH_REQUIRED', message: 'Auth required', requestId: 'r1' } }), { status: 401 })));
     client.onUnauthorized = vi.fn();

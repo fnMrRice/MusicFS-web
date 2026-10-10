@@ -3,6 +3,9 @@ const affectedResources = new Set([
   "settings-providers",
   "search-instances",
   "import-providers",
+  "platform-account-instances",
+  "source-playlist-providers",
+  "source-playlist-instances",
 ]);
 
 /** Invalidates only capability-bearing reads, never playback or paged results. */

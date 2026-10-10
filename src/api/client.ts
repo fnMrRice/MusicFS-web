@@ -27,6 +27,7 @@ export class ApiClient {
   constructor(private fetcher: typeof fetch = (...args) => fetch(...args)) {}
 
   async request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+    const csrfToken = this.csrfToken;
     const controller = new AbortController();
     const cancel = () => controller.abort(options.signal?.reason);
     if (options.signal?.aborted) cancel();
@@ -61,7 +62,8 @@ export class ApiClient {
           error?: Record<string, unknown>;
         } | null;
         const detail = data?.error;
-        if (response.status === 401 && !options.bearer) this.onUnauthorized?.();
+        if (response.status === 401 && !options.bearer && !options.signal?.aborted && csrfToken === this.csrfToken)
+          this.onUnauthorized?.();
         throw new ApiError(
           typeof detail?.code === "string" ? detail.code : "HTTP_ERROR",
           typeof detail?.message === "string"

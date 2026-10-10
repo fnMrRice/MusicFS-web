@@ -52,7 +52,7 @@ test("StrictMode uses one real event stream and refreshes authorized capabilitie
   await login(page, { ...server, origin });
   await expect.poll(() => page.evaluate(() => window.capabilityStreamProbe.changed)).toBeGreaterThan(0);
   await expect.poll(() => providerReads).toBeGreaterThan(0);
-  await expect(page.getByRole("option", { name: "测试音乐", exact: true })).toHaveCount(1);
+  await expect(page.getByRole("option", { name: "本地音乐文件", exact: true })).toHaveCount(1);
   expect(await page.evaluate(() => window.capabilityStreamProbe.created)).toBe(1);
 
   const sessionResponse = await page.request.get(`${origin}/api/v1/auth/session`);

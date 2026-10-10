@@ -66,8 +66,6 @@ export default {
   "暂不可用": ["Unavailable", "暫不可用", "利用不可"],
   "暂无音乐来源": ["No music sources", "暫無音樂來源", "音楽ソースがありません"],
   "音乐目录、插件与平台账号由服务端管理。": ["Music folders, plugins, and platform accounts are managed on the server.", "音樂目錄、外掛與平台帳號由伺服器管理。", "音楽フォルダー、プラグイン、各サービスのアカウントはサーバーで管理します。"],
-  "网易云音乐": ["NetEase Cloud Music", "網易雲音樂", "NetEase Cloud Music"],
-  "QQ音乐": ["QQ Music", "QQ音樂", "QQ Music"],
   "未知来源": ["Unknown source", "未知來源", "不明なソース"],
   "关闭": ["Close", "關閉", "閉じる"],
   "重试": ["Retry", "重試", "再試行"],

@@ -1,5 +1,6 @@
 import { ApiClient, ApiError } from "./client";
 import type { Provider, SourceTrack, TrackPage } from "./types";
+import { Store } from "../app/store";
 
 function isTrack(value: SourceTrack): boolean {
   return (
@@ -13,8 +14,18 @@ function isTrack(value: SourceTrack): boolean {
   );
 }
 export class LibraryApi {
+  readonly providerInstances = new Store<Provider[]>([]);
+  private providerEpoch = 0;
+  private providerRequest = 0;
+  private providerApplied = 0;
   constructor(private client: ApiClient) {}
+  clearProviderInstances(): void {
+    ++this.providerEpoch;
+    this.providerInstances.set([]);
+  }
   async providers(signal?: AbortSignal): Promise<Provider[]> {
+    const epoch = this.providerEpoch;
+    const request = ++this.providerRequest;
     const response = await this.client.request<{ items: Provider[] }>(
       "/provider-instances",
       { signal },
@@ -27,6 +38,10 @@ export class LibraryApi {
       )
     )
       throw new ApiError("INVALID_RESPONSE", "Invalid provider list");
+    if (epoch === this.providerEpoch && request > this.providerApplied && !signal?.aborted) {
+      this.providerApplied = request;
+      this.providerInstances.set(response.items);
+    }
     return response.items;
   }
   async page(

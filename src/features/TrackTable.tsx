@@ -4,7 +4,7 @@ import type { SourceTrack, Provider } from "../api/types";
 import { useServices, useStore } from "../app/services";
 import { Cover, duration, IconButton } from "../components/ui";
 import { AddToPlaylist } from "./playlists/AddToPlaylist";
-import { sourceName } from "../components/source-name";
+import { useSourceName } from "../components/use-source-name";
 
 export function TrackTable({
   tracks,
@@ -18,6 +18,7 @@ export function TrackTable({
   complete?: boolean;
 }) {
   useLocale();
+  const sourceName = useSourceName();
   const s = useServices();
   const [selected, setSelected] = useState(new Set<string>());
   const [add, setAdd] = useState<SourceTrack[] | null>(null);

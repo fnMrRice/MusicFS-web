@@ -17,6 +17,7 @@ import { Store } from "./store";
 import { LibraryState } from "../library/state";
 import { CapabilityEvents } from "./capability-events";
 import { capabilityResources } from "./capability-resources";
+import { SourcePlaylistCatalog } from "./source-playlists";
 
 interface AuthState {
   session: AuthSession | null;
@@ -43,8 +44,12 @@ export class Services {
   authApi = new AuthApi(this.client);
   libraryApi = new LibraryApi(this.client);
   content = new ContentApi(this.client);
+  sourcePlaylists = new SourcePlaylistCatalog((instance, signal) => this.content.accountPlaylists(instance, null, signal));
   private capabilityEvents = new CapabilityEvents(
-    capabilityResources.invalidate,
+    () => {
+      capabilityResources.invalidate();
+      if (this.auth.value.session) this.reloadSourceNames();
+    },
     (signal) => this.client.request("/auth/session", { signal }),
   );
   auth = new Store<AuthState>({
@@ -64,6 +69,7 @@ export class Services {
   playerState: Store<PlayerController["state"]>;
   currentTrack = new Store<string | null>(null);
   private generation = 0;
+  private sourceRequest: AbortController | null = null;
   private playlistRequest: AbortController | null = null;
   private libraries = new Map<string, LibraryState>();
   library(provider: string): LibraryState {
@@ -77,6 +83,7 @@ export class Services {
     return this.libraries.get(provider)!;
   }
   constructor(root: HTMLElement) {
+    this.content.onlineInstances.subscribe(() => this.sourcePlaylists.update(this.content.onlineInstances.value));
     this.player = new PlayerController(
       new PlaybackApi(this.client),
       audioFactory(root),
@@ -104,7 +111,11 @@ export class Services {
       : null;
   }
   private accept(session: AuthSession): void {
+    this.sourcePlaylists.clear();
+    this.content.clearOnlineInstances();
+    this.libraryApi.clearProviderInstances();
     this.auth.set({ ...this.auth.value, session, busy: false, error: null });
+    this.reloadSourceNames();
     this.capabilityEvents.start(session.csrfToken);
     let saved: Partial<PreferencesState> = {};
     try {
@@ -197,6 +208,10 @@ export class Services {
   }
   clear(): void {
     this.capabilityEvents.stop();
+    this.sourceRequest?.abort();
+    this.sourcePlaylists.clear();
+    this.content.clearOnlineInstances();
+    this.libraryApi.clearProviderInstances();
     this.libraries.forEach((library) => library.clear());
     this.libraries.clear();
     ++this.generation;
@@ -223,6 +238,18 @@ export class Services {
       } catch {
         /* Preferences remain in memory. */
       }
+  }
+  private async reloadSourceNames(): Promise<void> {
+    this.sourceRequest?.abort();
+    const request = new AbortController();
+    this.sourceRequest = request;
+    await Promise.allSettled([this.content.online(request.signal), this.libraryApi.providers(request.signal)]);
+  }
+  async platformAccountChanged(instance: string, signedIn: boolean): Promise<void> {
+    this.sourcePlaylists.invalidate(instance);
+    const generation = this.generation;
+    await this.reloadSourceNames();
+    if (generation === this.generation && signedIn) this.sourcePlaylists.refresh(instance);
   }
   async reloadPlaylists(): Promise<void> {
     this.playlistRequest?.abort();

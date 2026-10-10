@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import QRCode from "qrcode";
 import { useServices } from "../../app/services";
-import { useResource } from "../../components/query";
 import { errorMessage } from "../../api/client";
 import type { OnlineInstance } from "../../api/content";
 import { loadMusicKit, type MusicKitInstance } from "./musickit";
+import { useSourceName } from "../../components/use-source-name";
 
 interface Account {
   state: string; accountId?: string; displayName?: string;
@@ -12,23 +12,12 @@ interface Account {
   expiresAt?: string; pollAfterSeconds?: number;
 }
 interface Options { method: string; configured: boolean; developerToken?: string }
-const names: Record<string, string> = { netease: "网易云音乐", qqmusic: "QQ 音乐", applemusic: "Apple Music" };
 const states: Record<string, string> = { signedOut: "未登录", waiting: "等待授权", scanned: "已扫码，请在手机确认", signedIn: "已登录", unverified: "已保存，待校验", expired: "已过期，请重新登录", canceled: "已取消" };
 
-export function PlatformAccounts() {
-  const s = useServices();
-  const list = useResource("platform-account-instances", (signal) => s.client.request<{ items: OnlineInstance[] }>("/online-instances", { signal }));
-  return <div className="settings-card"><h3>音乐平台账号</h3>
-    <p className="muted">使用在线来源前请先登录对应音乐平台。登录不表示拥有会员或完整在线播放权限。</p>
-    {list.error && <p role="alert">{list.error}</p>}
-    {list.data?.items.map((instance) => <AccountCard key={instance.instanceId} instance={instance} />)}
-    {list.data?.items.length === 0 && <p>尚未配置在线音乐来源。</p>}
-  </div>;
-}
-function AccountCard({ instance }: { instance: OnlineInstance }) {
+export function PlatformAccount({ instance }: { instance: OnlineInstance }) {
   const s = useServices();
   const path = `/online-instances/${encodeURIComponent(instance.instanceId)}/account`;
-  const name = names[instance.platform] ?? instance.name;
+  const name = useSourceName()(instance);
   const [account, setAccount] = useState<Account | null>(null);
   const [options, setOptions] = useState<Options | null>(null);
   const [error, setError] = useState("");
@@ -65,15 +54,25 @@ function AccountCard({ instance }: { instance: OnlineInstance }) {
   }, [account?.qrImage, account?.qrUrl]);
   async function operation(action: string, userToken?: string) {
     if (locked.current) return;
+    const session = s.auth.value.session;
     locked.current = true; setBusy(true); setError("");
+    if (action === "logout") s.sourcePlaylists.invalidate(instance.instanceId);
     try {
       const view = await s.client.request<Account>(path, { method: "POST", body: { action, loginId: active.current?.loginId ?? "", userToken: userToken ?? "" } });
+      if (s.auth.value.session !== session || !alive.current) return;
       setCurrent(view);
+      if (!view.loginId)
+        void s.platformAccountChanged(instance.instanceId, view.state === "signedIn");
       if (action === "logout" && musicKit) await musicKit.unauthorize();
     } catch (e) {
       if (alive.current) setError(errorMessage(e));
       // A lost response does not undo the server operation. Recover its state.
-      try { setCurrent(await s.client.request<Account>(path)); } catch { /* Keep the actionable error. */ }
+      try {
+        const recovered = await s.client.request<Account>(path);
+        if (s.auth.value.session !== session || !alive.current) return;
+        setCurrent(recovered);
+        void s.platformAccountChanged(instance.instanceId, recovered.state === "signedIn");
+      } catch { /* Keep the actionable error. */ }
     } finally { locked.current = false; if (alive.current) setBusy(false); }
   }
   useEffect(() => {
@@ -101,7 +100,7 @@ function AccountCard({ instance }: { instance: OnlineInstance }) {
   const pending = !!account?.loginId;
   const bound = !!account?.accountId;
   return <section aria-label={`${name}账号`} style={{ marginBlock: 20 }}>
-    <h4>{name} · {instance.name}</h4>
+    <h4>{name}</h4>
     <p aria-live="polite">{account ? states[account.state] ?? account.state : "正在读取账号状态…"}{account?.displayName ? ` · ${account.displayName}` : ""}</p>
     {error && <p role="alert">{error}</p>}
     {options && !options.configured && <p>请先在服务端配置 Apple Music 开发者授权。</p>}
