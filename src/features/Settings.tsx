@@ -2,6 +2,7 @@ import { useServices, useStore } from "../app/services";
 import { useResource } from "../components/query";
 import { ErrorNotice } from "../components/ui";
 import { PlatformAccounts } from "./accounts/PlatformAccounts";
+import { PluginStatus } from "./PluginStatus";
 export function Settings() {
   const s = useServices();
   const auth = useStore(s.auth);
@@ -14,6 +15,7 @@ export function Settings() {
       <p className="eyebrow">MAKE YOURSELF AT HOME</p>
       <h2>你的聆听偏好</h2>
       <PlatformAccounts />
+      {auth.session?.user.role === "admin" && <PluginStatus />}
       <div className="settings-card">
         <h3>连接与账号</h3>
         <dl>
