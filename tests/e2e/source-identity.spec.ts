@@ -83,7 +83,8 @@ test("one music-source settings section uses arbitrary plugin translations and k
   await expect(page.getByRole("heading", { name: "搜索", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Folder library", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "登录搜索", exact: true }).click();
-  await expect(page.getByText("已登录 · Actual account listener")).toBeVisible();
+  await expect(page.getByText("Actual account listener", { exact: true })).toBeVisible();
+  await expect(page.getByRole("img", { name: "默认头像", exact: true }).first()).toBeVisible();
   await expect(page.getByRole("link", { name: "搜索 playlists", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "退出搜索账号", exact: true }).click();
   await expect(page.getByRole("link", { name: "搜索 playlists", exact: true })).toHaveCount(0);
