@@ -25,7 +25,7 @@ interface AuthState {
   error: string | null;
 }
 interface PreferencesState {
-  theme: "dark" | "light";
+  theme: "dark" | "light" | "system";
   volume: number;
   mine: boolean;
   playlists: boolean;
@@ -67,7 +67,13 @@ export class Services {
   private playlistRequest: AbortController | null = null;
   private libraries = new Map<string, LibraryState>();
   library(provider: string): LibraryState {
-    if (!this.libraries.has(provider)) this.libraries.set(provider, new LibraryState((p, cursor, signal) => this.libraryApi.page(p, cursor, signal)));
+    if (!this.libraries.has(provider))
+      this.libraries.set(
+        provider,
+        new LibraryState((p, cursor, signal) =>
+          this.libraryApi.page(p, cursor, signal),
+        ),
+      );
     return this.libraries.get(provider)!;
   }
   constructor(root: HTMLElement) {
@@ -107,7 +113,10 @@ export class Services {
       /* Storage may be unavailable. */
     }
     this.preferences.set({
-      theme: saved?.theme === "light" ? "light" : "dark",
+      theme:
+        saved?.theme === "light" || saved?.theme === "system"
+          ? saved.theme
+          : "dark",
       volume:
         typeof saved?.volume === "number" &&
         saved.volume >= 0 &&
@@ -188,7 +197,7 @@ export class Services {
   }
   clear(): void {
     this.capabilityEvents.stop();
-    this.libraries.forEach(library => library.clear());
+    this.libraries.forEach((library) => library.clear());
     this.libraries.clear();
     ++this.generation;
     this.playlistRequest?.abort();

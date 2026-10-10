@@ -1,10 +1,11 @@
+import { tr, useLocale } from "../i18n";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useServices, useStore } from "../app/services";
 import { ErrorNotice, Icon, IconButton } from "../components/ui";
 import { PlayerBar } from "../player/PlayerBar";
 import styles from "./Shell.module.css";
-import { ErrorBoundary } from '../app/ErrorBoundary';
+import { ErrorBoundary } from "../app/ErrorBoundary";
 
 const links = [
   ["/search", "search", "搜索"],
@@ -13,6 +14,7 @@ const links = [
   ["/playlists", "folder", "歌单管理"],
 ];
 export function AppShell() {
+  useLocale();
   const s = useServices();
   const auth = useStore(s.auth);
   const prefs = useStore(s.preferences);
@@ -27,8 +29,20 @@ export function AppShell() {
   const accountRoot = useRef<HTMLDivElement>(null);
   const accountButton = useRef<HTMLButtonElement>(null);
   const themeRoot = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    document.documentElement.dataset.theme = prefs.theme;
+  useLayoutEffect(() => {
+    const systemTheme = window.matchMedia("(prefers-color-scheme: dark)");
+    const applyTheme = () => {
+      document.documentElement.dataset.theme =
+        prefs.theme === "system"
+          ? systemTheme.matches
+            ? "dark"
+            : "light"
+          : prefs.theme;
+    };
+    applyTheme();
+    if (prefs.theme !== "system") return;
+    systemTheme.addEventListener("change", applyTheme);
+    return () => systemTheme.removeEventListener("change", applyTheme);
   }, [prefs.theme]);
   useLayoutEffect(() => {
     const root = scroll.current;
@@ -43,11 +57,15 @@ export function AppShell() {
     restore();
     const observer = new ResizeObserver(restore);
     if (content.current) observer.observe(content.current);
-    const cancel = () => { restored = true; };
-    root.addEventListener('wheel', cancel, { passive: true });
-    root.addEventListener('pointerdown', cancel);
+    const cancel = () => {
+      restored = true;
+    };
+    root.addEventListener("wheel", cancel, { passive: true });
+    root.addEventListener("pointerdown", cancel);
     return () => {
-      observer.disconnect(); root.removeEventListener('wheel', cancel); root.removeEventListener('pointerdown', cancel);
+      observer.disconnect();
+      root.removeEventListener("wheel", cancel);
+      root.removeEventListener("pointerdown", cancel);
       positions.current.set(location.key, restored ? root.scrollTop : target);
     };
   }, [location.key]);
@@ -101,17 +119,17 @@ export function AppShell() {
   );
   return (
     <div className={styles.shell}>
-      <aside className={styles.sidebar} aria-label="侧栏">
+      <aside className={styles.sidebar} aria-label={tr("侧栏")}>
         <a className="brand" href="#/library">
           <Icon name="music" size={32} />
           <strong>MusicFS</strong>
         </a>
         <nav
           className={styles.navigation}
-          aria-label="主导航"
+          aria-label={tr("主导航")}
           onScroll={() => setAccount(false)}
         >
-          {links.map(([path, icon, label]) => nav(path, icon, label))}
+          {links.map(([path, icon, label]) => nav(path, icon, tr(label)))}
           <div className={styles.group}>
             <button
               className={styles.groupToggle}
@@ -121,7 +139,7 @@ export function AppShell() {
               <span className={!prefs.mine ? styles.collapsed : ""}>
                 <Icon name="chevron" size={16} />
               </span>
-              我的
+              {tr("我的")}
               {!prefs.mine &&
                 ["/favorites", "/recent"].includes(location.pathname) && (
                   <span className={styles.dot} />
@@ -130,8 +148,8 @@ export function AppShell() {
           </div>
           {prefs.mine && (
             <>
-              {nav("/favorites", "heart", "我的收藏")}
-              {nav("/recent", "clock", "最近播放")}
+              {nav("/favorites", "heart", tr("我的收藏"))}
+              {nav("/recent", "clock", tr("最近播放"))}
             </>
           )}
           <div className={styles.group}>
@@ -143,7 +161,7 @@ export function AppShell() {
               <span className={!prefs.playlists ? styles.collapsed : ""}>
                 <Icon name="chevron" size={16} />
               </span>
-              歌单
+              {tr("歌单")}
               {!prefs.playlists &&
                 location.pathname.startsWith("/playlists/") && (
                   <span className={styles.dot} />
@@ -151,7 +169,7 @@ export function AppShell() {
             </button>
             <IconButton
               icon="plus"
-              label="新建歌单"
+              label={tr("新建歌单")}
               onClick={() => navigate("/playlists?new=1")}
             />
           </div>
@@ -165,7 +183,7 @@ export function AppShell() {
                 ),
               )
             ) : (
-              <p className={styles.hint}>把喜欢的音乐放在一起</p>
+              <p className={styles.hint}>{tr("把喜欢的音乐放在一起")}</p>
             ))}
         </nav>
         <div
@@ -180,13 +198,13 @@ export function AppShell() {
             <Icon name="user" />
           </span>
           <div>
-            <strong>我的账号</strong>
+            <strong>{tr("我的账号")}</strong>
             <small>{auth.session?.user.id}</small>
           </div>
           <button
             ref={accountButton}
             className="icon-button"
-            aria-label="账号菜单"
+            aria-label={tr("账号菜单")}
             aria-expanded={account}
             onClick={() => setAccount(!account)}
           >
@@ -195,14 +213,14 @@ export function AppShell() {
           {account && (
             <div
               className={`${styles.accountMenu} popover`}
-              aria-label="账号操作"
+              aria-label={tr("账号操作")}
             >
               <button
                 onClick={() => {
                   navigate("/settings");
                 }}
               >
-                设置
+                {tr("设置")}
               </button>
               <button
                 disabled={auth.busy}
@@ -210,7 +228,7 @@ export function AppShell() {
                   void s.logout();
                 }}
               >
-                退出登录
+                {tr("退出登录")}
               </button>
             </div>
           )}
@@ -220,44 +238,48 @@ export function AppShell() {
         <header className={styles.header}>
           <IconButton
             icon="back"
-            label="返回"
+            label={tr("返回")}
             onClick={() =>
               window.history.state?.idx > 0
                 ? navigate(-1)
                 : navigate("/library")
             }
           />
-          <h1>{title}</h1>
-          <span className={styles.connection}>已连接</span>
+          <h1>{tr(title)}</h1>
+          <span className={styles.connection}>{tr("已连接")}</span>
           <div className={styles.tools}>
             <IconButton
               icon="settings"
-              label="设置"
+              label={tr("设置")}
               onClick={() => navigate("/settings")}
             />
             <div ref={themeRoot}>
               <IconButton
                 icon="theme"
-                label="换肤"
+                label={tr("换肤")}
                 aria-expanded={theme}
                 onClick={() => setTheme(!theme)}
               />
               {theme && (
                 <div
                   className={`${styles.themeMenu} popover`}
-                  aria-label="选择主题"
+                  aria-label={tr("选择主题")}
                 >
-                  <strong>为音乐换个心情</strong>
-                  {(["dark", "light"] as const).map((t) => (
+                  <strong>{tr("为音乐换个心情")}</strong>
+                  {(["dark", "light", "system"] as const).map((t) => (
                     <button
                       key={t}
                       aria-pressed={prefs.theme === t}
                       onClick={() => s.preference({ theme: t })}
                     >
                       <span
-                        className={`${styles.swatch} ${t === "light" ? styles.light : ""}`}
+                        className={`${styles.swatch} ${t === "system" ? styles.system : t === "light" ? styles.light : ""}`}
                       />
-                      {t === "dark" ? "深夜 · 深色" : "晨光 · 浅色"}
+                      {t === "dark"
+                        ? tr("深夜 · 深色")
+                        : t === "light"
+                          ? tr("晨光 · 浅色")
+                          : tr("跟随系统")}
                     </button>
                   ))}
                 </div>
@@ -270,10 +292,14 @@ export function AppShell() {
           id="page-scroll"
           className={styles.content}
           tabIndex={0}
-          aria-label="页面内容"
+          aria-label={tr("页面内容")}
         >
           <ErrorNotice error={auth.error} />
-          <div ref={content}><ErrorBoundary key={location.pathname}><Outlet /></ErrorBoundary></div>
+          <div ref={content}>
+            <ErrorBoundary key={location.pathname}>
+              <Outlet />
+            </ErrorBoundary>
+          </div>
         </div>
       </section>
       <PlayerBar />

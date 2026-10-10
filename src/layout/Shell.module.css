@@ -179,6 +179,9 @@
 .swatch.light {
   background: #faf7f5;
 }
+.swatch.system {
+  background: linear-gradient(90deg, #151a20 50%, #faf7f5 50%);
+}
 .content {
   overflow: auto;
   min-height: 0;

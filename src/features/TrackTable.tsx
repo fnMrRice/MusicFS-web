@@ -1,8 +1,10 @@
+import { tr, useLocale, statusText } from "../i18n";
 import { useEffect, useRef, useState } from "react";
 import type { SourceTrack, Provider } from "../api/types";
 import { useServices, useStore } from "../app/services";
 import { Cover, duration, IconButton } from "../components/ui";
 import { AddToPlaylist } from "./playlists/AddToPlaylist";
+import { sourceName } from "../components/source-name";
 
 export function TrackTable({
   tracks,
@@ -15,6 +17,7 @@ export function TrackTable({
   queryKey: string;
   complete?: boolean;
 }) {
+  useLocale();
   const s = useServices();
   const [selected, setSelected] = useState(new Set<string>());
   const [add, setAdd] = useState<SourceTrack[] | null>(null);
@@ -41,17 +44,17 @@ export function TrackTable({
       <div className="list-actions">
         {chosen.length ? (
           <>
-            <strong>已选择 {chosen.length} 首</strong>
-            <button onClick={() => enqueue(chosen)}>加入队列</button>
-            <button onClick={() => setAdd(chosen)}>添加到歌单</button>
-            <button disabled title="收藏接口尚未提供">
-              收藏
+            <strong>{tr("已选择 {0} 首", { 0: chosen.length })}</strong>
+            <button onClick={() => enqueue(chosen)}>{tr("加入队列")}</button>
+            <button onClick={() => setAdd(chosen)}>{tr("添加到歌单")}</button>
+            <button disabled title={tr("收藏接口尚未提供")}>
+              {tr("收藏")}
             </button>
             <button
               className="text-button"
               onClick={() => setSelected(new Set())}
             >
-              清空选择
+              {tr("清空选择")}
             </button>
           </>
         ) : (
@@ -61,29 +64,35 @@ export function TrackTable({
               disabled={!complete || !playable.length}
               title={
                 !complete
-                  ? "完整结果读取结束后可播放全部；也可以勾选曲目播放"
+                  ? tr("完整结果读取结束后可播放全部；也可以勾选曲目播放")
                   : undefined
               }
               onClick={() => s.play(playable[0], playable)}
             >
-              播放全部
+              {tr("播放全部")}
             </button>
             <button
               disabled={!complete || !playable.length}
               onClick={() => enqueue(playable)}
             >
-              加入队列
+              {tr("加入队列")}
             </button>
             <span className="muted action-hint">
-              {!complete ? "可选择曲目加入队列" : "按来源原始顺序"}
+              {!complete ? tr("可选择曲目加入队列") : tr("按来源原始顺序")}
             </span>
-            <select aria-label="曲目排序" disabled title="等待服务端提供完整查询排序能力"><option>默认顺序</option></select>
+            <select
+              aria-label={tr("曲目排序")}
+              disabled
+              title={tr("等待服务端提供完整查询排序能力")}
+            >
+              <option>{tr("默认顺序")}</option>
+            </select>
           </>
         )}
       </div>
       {message && (
         <p className="feedback" role="status">
-          {message}
+          {statusText(message)}
         </p>
       )}
       <div className="table-wrap">
@@ -94,8 +103,8 @@ export function TrackTable({
                 <input
                   ref={check}
                   type="checkbox"
-                  aria-label="全选当前已返回曲目"
-                  title="仅选择当前已返回的曲目，后续追加项不会自动选中"
+                  aria-label={tr("全选当前已返回曲目")}
+                  title={tr("仅选择当前已返回的曲目，后续追加项不会自动选中")}
                   checked={all}
                   disabled={!tracks.length}
                   onChange={() =>
@@ -108,14 +117,14 @@ export function TrackTable({
                 />
               </th>
               <th className="row-number">#</th>
-              <th>曲名</th>
-              <th>歌手</th>
-              <th>专辑</th>
-              <th>来源</th>
-              <th>格式</th>
-              <th>时长</th>
+              <th>{tr("曲名")}</th>
+              <th>{tr("歌手")}</th>
+              <th>{tr("专辑")}</th>
+              <th>{tr("来源")}</th>
+              <th>{tr("格式")}</th>
+              <th>{tr("时长")}</th>
               <th>
-                <span className="sr-only">操作</span>
+                <span className="sr-only">{tr("操作")}</span>
               </th>
             </tr>
           </thead>
@@ -125,10 +134,10 @@ export function TrackTable({
                 key={t.sourceTrackId}
                 track={t}
                 number={i + 1}
-                provider={
-                  providers.find((p) => p.id === t.providerInstanceId)?.name ??
-                  t.providerInstanceId
-                }
+                provider={sourceName(
+                  providers.find((p) => p.id === t.providerInstanceId) ??
+                    t.providerInstanceId,
+                )}
                 checked={selected.has(t.sourceTrackId)}
                 toggle={() =>
                   setSelected((old) => {
@@ -163,6 +172,7 @@ function TrackRow({
   toggle: () => void;
   add: () => void;
 }) {
+  useLocale();
   const s = useServices();
   const playing = useStore(s.currentTrack) === t.sourceTrackId;
   return (
@@ -174,7 +184,7 @@ function TrackRow({
           type="checkbox"
           checked={checked}
           onChange={toggle}
-          aria-label={`选择 ${t.title || t.displayName}`}
+          aria-label={tr("选择 {0}", { "0": t.title || t.displayName })}
         />
       </td>
       <td className="row-number">
@@ -186,7 +196,7 @@ function TrackRow({
           <div>
             <button
               className="track-play"
-              aria-label={`播放 ${t.displayName}`}
+              aria-label={tr("播放 {0}", { "0": t.displayName })}
               disabled={t.availability !== "available"}
               onClick={() => s.play(t)}
             >
@@ -195,10 +205,10 @@ function TrackRow({
             {t.availability !== "available" && (
               <small className="availability">
                 {t.availability === "offline"
-                  ? "来源离线"
+                  ? tr("来源离线")
                   : t.availability === "missing"
-                    ? "文件缺失"
-                    : "可用性未知"}
+                    ? tr("文件缺失")
+                    : tr("可用性未知")}
               </small>
             )}
           </div>
@@ -216,7 +226,7 @@ function TrackRow({
       <td>
         <IconButton
           icon="plus"
-          label={`将 ${t.displayName} 添加到歌单`}
+          label={tr("将 {0} 添加到歌单", { "0": t.displayName })}
           onClick={add}
         />
       </td>

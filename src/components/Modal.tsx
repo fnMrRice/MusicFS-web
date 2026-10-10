@@ -1,3 +1,4 @@
+import { tr, useLocale } from "../i18n";
 import { useEffect, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { IconButton } from "./ui";
@@ -10,6 +11,7 @@ export function Modal({
   close: () => void;
   children: ReactNode;
 }) {
+  useLocale();
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
@@ -33,7 +35,7 @@ export function Modal({
     >
       <div className="section-title">
         <h2>{title}</h2>
-        <IconButton icon="close" label="关闭" onClick={close} />
+        <IconButton icon="close" label={tr("关闭")} onClick={close} />
       </div>
       {children}
     </dialog>,

@@ -169,11 +169,31 @@
 }
 .theme-choices {
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
 }
 .theme-choices button[aria-pressed="true"] {
   border-color: var(--accent);
   color: var(--accent);
+}
+.language-select {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.language-select select {
+  max-width: 100%;
+  min-width: 150px;
+}
+.login-panel > .language-select {
+  justify-content: flex-end;
+  margin-bottom: 32px;
+  color-scheme: dark;
+}
+.login-panel > .language-select select {
+  background: #191f25;
+  color: #edf0f2;
 }
 .login-page {
   min-height: 100dvh;

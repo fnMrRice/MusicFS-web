@@ -1,7 +1,10 @@
+import { tr, useLocale } from "../i18n";
 import { useState } from "react";
 import { useServices, useStore } from "./services";
 import { ErrorNotice, Icon } from "../components/ui";
+import { LanguageSelect } from "../i18n/LanguageSelect";
 export function Login() {
+  useLocale();
   const s = useServices();
   const state = useStore(s.auth);
   const [token, setToken] = useState("");
@@ -11,21 +14,22 @@ export function Login() {
         <div className="record">
           <span />
         </div>
-        <p>YOUR MUSIC. YOUR SPACE.</p>
+        <p>{tr("YOUR MUSIC. YOUR SPACE.")}</p>
         <h1>
-          让音乐，
+          {tr("让音乐，")}
           <br />
-          回到你身边。
+          {tr("回到你身边。")}
         </h1>
-        <p>连接你的音乐库，聆听每一份收藏。</p>
+        <p>{tr("连接你的音乐库，聆听每一份收藏。")}</p>
       </div>
       <div className="login-panel">
+        <LanguageSelect />
         <div className="brand">
           <Icon name="music" size={34} />
           <strong>MusicFS</strong>
         </div>
-        <h2>连接你的音乐世界</h2>
-        <p className="muted">使用管理员提供的令牌登录此音乐服务。</p>
+        <h2>{tr("连接你的音乐世界")}</h2>
+        <p className="muted">{tr("使用管理员提供的令牌登录此音乐服务。")}</p>
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -34,7 +38,7 @@ export function Login() {
             void s.login(value);
           }}
         >
-          <label htmlFor="login-token">管理员登录令牌</label>
+          <label htmlFor="login-token">{tr("管理员登录令牌")}</label>
           <input
             id="login-token"
             type="password"
@@ -42,14 +46,14 @@ export function Login() {
             required
             value={token}
             onChange={(e) => setToken(e.target.value)}
-            placeholder="输入登录令牌"
+            placeholder={tr("输入登录令牌")}
             disabled={state.busy || !state.ready}
           />
           <button
             className="primary"
             disabled={state.busy || !state.ready || !token.trim()}
           >
-            {state.busy ? "正在连接…" : "登录"}
+            {state.busy ? tr("正在连接…") : tr("登录")}
           </button>
         </form>
         <ErrorNotice
@@ -59,9 +63,11 @@ export function Login() {
           }}
         />
         <p className="login-foot">
-          {state.ready ? "已连接 MusicFS · 安全会话" : "正在检查音乐服务"}
+          {state.ready
+            ? tr("已连接 MusicFS · 安全会话")
+            : tr("正在检查音乐服务")}
           <br />
-          凭据仅用于本次登录，不保存在浏览器中。
+          {tr("凭据仅用于本次登录，不保存在浏览器中。")}
         </p>
       </div>
     </div>

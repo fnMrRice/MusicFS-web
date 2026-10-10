@@ -1,3 +1,4 @@
+import { tr, useLocale, statusText } from "../i18n";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useServices } from "../app/services";
@@ -11,8 +12,10 @@ import {
 } from "../components/ui";
 import { TrackTable } from "./TrackTable";
 import { scanStatusMessage } from "../library/scan-state";
+import { sourceName } from "../components/source-name";
 
 export function Library() {
+  useLocale();
   const s = useServices();
   const [params, setParams] = useSearchParams();
   const provider = params.get("source") || "all";
@@ -43,11 +46,11 @@ export function Library() {
   };
   const statuses = (providers.data ?? [])
     .filter((p) => provider === "all" || p.id === provider)
-    .map((p) => [p.name, scanStatusMessage(p)])
+    .map((p) => [sourceName(p), scanStatusMessage(p)])
     .filter(([, message]) => message);
   return (
-    <section aria-label="音乐文件">
-      <div className="tabs" aria-label="曲目分类">
+    <section aria-label={tr("音乐文件")}>
+      <div className="tabs" aria-label={tr("曲目分类")}>
         {["全部曲目", "歌手", "专辑", "流派", "文件夹"].map((c) => (
           <button
             key={c}
@@ -59,7 +62,7 @@ export function Library() {
               setParams(next);
             }}
           >
-            {c}
+            {tr(c)}
           </button>
         ))}
       </div>
@@ -67,16 +70,18 @@ export function Library() {
         <Albums />
       ) : category !== "全部曲目" ? (
         <Empty
-          title={`${category}分类待支持`}
+          title={tr("{0}分类待支持", { "0": tr(category) })}
           icon={category === "歌手" ? "user" : "folder"}
         >
-          服务端尚未提供完整的{category}分类接口。你仍可浏览全部曲目。
+          {tr("服务端尚未提供完整的{0}分类接口。你仍可浏览全部曲目。", {
+            0: tr(category),
+          })}
         </Empty>
       ) : (
         <>
           <div className="filters">
             <select
-              aria-label="来源"
+              aria-label={tr("来源")}
               value={provider}
               onChange={(e) => {
                 const next = new URLSearchParams(params);
@@ -84,45 +89,52 @@ export function Library() {
                 setParams(next);
               }}
             >
-              <option value="all">全部来源</option>
+              <option value="all">{tr("全部来源")}</option>
               {providers.data?.map((p) => (
                 <option value={p.id} key={p.id}>
-                  {p.name}
+                  {sourceName(p)}
                 </option>
               ))}
             </select>
             <select
-              aria-label="格式筛选"
+              aria-label={tr("格式筛选")}
               disabled
-              title="等待服务端提供全库格式筛选"
+              title={tr("等待服务端提供全库格式筛选")}
             >
-              <option>全部格式</option>
+              <option>{tr("全部格式")}</option>
             </select>
-            <label className="check-label" title="等待收藏接口">
+            <label className="check-label" title={tr("等待收藏接口")}>
               <input type="checkbox" disabled />
-              仅收藏
+              {tr("仅收藏")}
             </label>
-            <label className="check-label" title="等待服务端提供全库可播放过滤">
+            <label
+              className="check-label"
+              title={tr("等待服务端提供全库可播放过滤")}
+            >
               <input type="checkbox" disabled />
-              仅可播放
+              {tr("仅可播放")}
             </label>
-            <button disabled title="等待服务端提供组合筛选">
-              更多筛选
+            <button disabled title={tr("等待服务端提供组合筛选")}>
+              {tr("更多筛选")}
             </button>
             <div className="filter-end">
               <input
-                placeholder="搜索当前列表"
-                aria-label="搜索当前列表"
+                placeholder={tr("搜索当前列表")}
+                aria-label={tr("搜索当前列表")}
                 disabled
-                title="等待服务端提供全库关键词查询"
+                title={tr("等待服务端提供全库关键词查询")}
               />
-              <IconButton icon="refresh" label="刷新列表" onClick={refresh} />
+              <IconButton
+                icon="refresh"
+                label={tr("刷新列表")}
+                onClick={refresh}
+              />
             </div>
           </div>
           <ErrorNotice error={providers.error} retry={providers.reload} />
           {statuses.map(([name, message]) => (
             <p className="notice" key={name}>
-              {name}：{message}
+              {name}: {statusText(message ?? "")}
             </p>
           ))}
           {snapshot.items.length > 0 && (
@@ -144,14 +156,14 @@ export function Library() {
           />
           {snapshot.loading && (
             <div className="loading" role="status">
-              正在加载…
+              {tr("正在加载…")}
             </div>
           )}
           {!snapshot.loading && !snapshot.items.length && !snapshot.error && (
-            <Empty title="音乐库还很安静">
-              将音乐目录接入服务并完成扫描后，曲目会出现在这里。
+            <Empty title={tr("音乐库还很安静")}>
+              {tr("将音乐目录接入服务并完成扫描后，曲目会出现在这里。")}
               <p>
-                <button onClick={refresh}>刷新音乐库</button>
+                <button onClick={refresh}>{tr("刷新音乐库")}</button>
               </p>
             </Empty>
           )}
@@ -167,6 +179,7 @@ export function Library() {
   );
 }
 function Albums() {
+  useLocale();
   const s = useServices();
   const pages = usePages(
     "albums",
@@ -188,15 +201,20 @@ function Albums() {
             <Cover large />
             <strong>{a.name}</strong>
             <small>
-              {a.sourceTrackIds.length} 首 · {a.providerInstanceId}
+              {tr("{0} 首 · {1}", {
+                0: a.sourceTrackIds.length,
+                1: sourceName(a.providerInstanceId),
+              })}
             </small>
           </Link>
         ))}
       </div>
       <ErrorNotice error={pages.error} retry={pages.retry} />
-      {pages.loading && <p className="loading">正在加载…</p>}
+      {pages.loading && <p className="loading">{tr("正在加载…")}</p>}
       {!pages.loading && !pages.error && !pages.items.length && (
-        <Empty title="暂无专辑">服务端尚未整理可浏览的专辑。</Empty>
+        <Empty title={tr("暂无专辑")}>
+          {tr("服务端尚未整理可浏览的专辑。")}
+        </Empty>
       )}
       <Sentinel
         active={!!pages.cursor && !pages.loading && !pages.error}

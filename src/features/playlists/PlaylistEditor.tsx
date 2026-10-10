@@ -1,3 +1,4 @@
+import { tr, useLocale } from "../../i18n";
 import { useState } from "react";
 import { useServices, useStore } from "../../app/services";
 import type { Binding, Playlist } from "../../api/content";
@@ -14,6 +15,7 @@ export function PlaylistEditor({
   close: () => void;
   saved: () => void;
 }) {
+  useLocale();
   const s = useServices();
   const personal = useStore(s.playlists);
   const [name, setName] = useState(playlist.name);
@@ -54,7 +56,7 @@ export function PlaylistEditor({
       return next;
     });
   return (
-    <Modal title="编辑歌单" close={close}>
+    <Modal title={tr("编辑歌单")} close={close}>
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -62,7 +64,7 @@ export function PlaylistEditor({
         }}
       >
         <label>
-          歌单名称
+          {tr("歌单名称")}
           <input
             required
             maxLength={256}
@@ -70,34 +72,34 @@ export function PlaylistEditor({
             onChange={(e) => setName(e.target.value)}
           />
         </label>
-        <h3>按以下顺序聚合</h3>
+        <h3>{tr("按以下顺序聚合")}</h3>
         <ol className="rule-list">
           {bindings.map((b, i) => (
             <li key={b.bindingId ?? `${b.kind}:${b.targetId}:${i}`}>
               <span>
                 {b.kind === "local"
-                  ? `已选曲目 · ${b.entries?.length ?? 0} 首`
+                  ? tr("已选曲目 · {0} 首", { "0": b.entries?.length ?? 0 })
                   : b.kind === "remote"
                     ? remote.data?.find((p) => p.playlistId === b.targetId)
-                        ?.title || `远程歌单 ${b.targetId}`
+                        ?.title || tr("远程歌单 {0}", { "0": b.targetId ?? "" })
                     : personal.find((p) => p.playlistId === b.targetId)?.name ||
                       b.targetId}
               </span>
               <button
                 type="button"
-                aria-label={`上移规则 ${i + 1}`}
+                aria-label={tr("上移规则 {0}", { "0": i + 1 })}
                 disabled={i === 0}
                 onClick={() => move(i, -1)}
               >
-                上移
+                {tr("上移")}
               </button>
               <button
                 type="button"
-                aria-label={`下移规则 ${i + 1}`}
+                aria-label={tr("下移规则 {0}", { "0": i + 1 })}
                 disabled={i === bindings.length - 1}
                 onClick={() => move(i, 1)}
               >
-                下移
+                {tr("下移")}
               </button>
               <button
                 type="button"
@@ -105,15 +107,15 @@ export function PlaylistEditor({
                   setBindings((old) => old.filter((_, n) => n !== i))
                 }
               >
-                移除
+                {tr("移除")}
               </button>
             </li>
           ))}
         </ol>
         <label>
-          添加聚合来源
+          {tr("添加聚合来源")}
           <select value={choice} onChange={(e) => setChoice(e.target.value)}>
-            <option value="">选择歌单</option>
+            <option value="">{tr("选择歌单")}</option>
             {personal
               .filter((p) => p.playlistId !== playlist.playlistId)
               .map((p) => (
@@ -123,7 +125,7 @@ export function PlaylistEditor({
               ))}
             {remote.data?.map((p) => (
               <option key={p.playlistId} value={`remote:${p.playlistId}`}>
-                远程 · {p.title || p.externalId}
+                {tr("远程 · {0}", { 0: p.title || p.externalId })}
               </option>
             ))}
           </select>
@@ -144,14 +146,16 @@ export function PlaylistEditor({
             setChoice("");
           }}
         >
-          添加规则
+          {tr("添加规则")}
         </button>
         <p className="muted">
-          保存时检查修订；冲突后请关闭并刷新歌单。编辑仅影响本地聚合，不写回平台。
+          {tr(
+            "保存时检查修订；冲突后请关闭并刷新歌单。编辑仅影响本地聚合，不写回平台。",
+          )}
         </p>
         <ErrorNotice error={error || remote.error} />
         <button className="primary" disabled={busy || !name.trim()}>
-          {busy ? "正在保存…" : "保存修改"}
+          {busy ? tr("正在保存…") : tr("保存修改")}
         </button>
       </form>
     </Modal>

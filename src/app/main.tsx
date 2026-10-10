@@ -1,3 +1,4 @@
+import { tr, useLocale } from "../i18n";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
@@ -25,6 +26,7 @@ audioRoot.hidden = true;
 document.body.append(audioRoot);
 const services = new Services(audioRoot);
 function Application() {
+  useLocale();
   const s = useServices();
   const auth = useStore(s.auth);
   if (!auth.session) return <Login />;
@@ -45,16 +47,16 @@ function Application() {
         <Route
           path="/favorites"
           element={
-            <Empty title="把喜欢的音乐留在身边" icon="heart">
-              收藏接口尚未提供，此页面将在服务端能力就绪后接入。
+            <Empty title={tr("把喜欢的音乐留在身边")} icon="heart">
+              {tr("收藏接口尚未提供，此页面将在服务端能力就绪后接入。")}
             </Empty>
           }
         />
         <Route
           path="/recent"
           element={
-            <Empty title="每一次聆听，都值得回味" icon="clock">
-              播放历史接口尚未提供，当前不会上传或持久化你的聆听记录。
+            <Empty title={tr("每一次聆听，都值得回味")} icon="clock">
+              {tr("播放历史接口尚未提供，当前不会上传或持久化你的聆听记录。")}
             </Empty>
           }
         />

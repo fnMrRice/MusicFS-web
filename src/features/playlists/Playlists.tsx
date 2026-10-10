@@ -1,3 +1,4 @@
+import { tr, useLocale } from "../../i18n";
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useServices, useStore } from "../../app/services";
@@ -7,6 +8,7 @@ import { Modal } from "../../components/Modal";
 import { errorMessage } from "../../api/client";
 import { RemotePlaylists } from "./RemotePlaylists";
 export function Playlists() {
+  useLocale();
   const s = useServices();
   const [params, setParams] = useSearchParams();
   const [name, setName] = useState("");
@@ -46,15 +48,17 @@ export function Playlists() {
     <section>
       <div className="section-title">
         <div>
-          <p className="eyebrow">MADE BY YOU</p>
-          <h2>把喜欢，收藏成一张歌单。</h2>
+          <p className="eyebrow">{tr("MADE BY YOU")}</p>
+          <h2>{tr("把喜欢，收藏成一张歌单。")}</h2>
         </div>
         <button className="primary" onClick={() => setParams({ new: "1" })}>
           <Icon name="plus" size={16} />
-          新建歌单
+          {tr("新建歌单")}
         </button>
       </div>
-      <p className="muted">将本地曲目、远程歌单与个人歌单按顺序聚合。</p>
+      <p className="muted">
+        {tr("将本地曲目、远程歌单与个人歌单按顺序聚合。")}
+      </p>
       <div className="cards">
         {page.items.map((p) => (
           <Link
@@ -65,16 +69,19 @@ export function Playlists() {
             <Cover large />
             <strong>{p.name}</strong>
             <small>
-              {p.bindings.length} 个来源规则 · {p.stale ? "待更新" : "已更新"}
+              {tr("{0} 个来源规则 · {1}", {
+                0: p.bindings.length,
+                1: p.stale ? tr("待更新") : tr("已更新"),
+              })}
             </small>
           </Link>
         ))}
       </div>
       <ErrorNotice error={page.error} retry={page.retry} />
-      {page.loading && <p className="loading">正在读取歌单…</p>}
+      {page.loading && <p className="loading">{tr("正在读取歌单…")}</p>}
       {!page.loading && !page.items.length && !page.error && (
-        <Empty title="创建你的第一张歌单" icon="folder">
-          在曲目列表中勾选音乐，即可添加到歌单。
+        <Empty title={tr("创建你的第一张歌单")} icon="folder">
+          {tr("在曲目列表中勾选音乐，即可添加到歌单。")}
         </Empty>
       )}
       <Sentinel
@@ -83,7 +90,7 @@ export function Playlists() {
       />
       <RemotePlaylists />
       {params.get("new") && (
-        <Modal title="新建歌单" close={close}>
+        <Modal title={tr("新建歌单")} close={close}>
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -91,19 +98,19 @@ export function Playlists() {
             }}
           >
             <label>
-              歌单名称
+              {tr("歌单名称")}
               <input
                 value={name}
                 maxLength={256}
                 required
                 autoFocus
                 onChange={(e) => setName(e.target.value)}
-                placeholder="给这份喜欢起个名字"
+                placeholder={tr("给这份喜欢起个名字")}
               />
             </label>
             <ErrorNotice error={error} />
             <button className="primary" disabled={busy || !name.trim()}>
-              {busy ? "正在创建…" : "创建歌单"}
+              {busy ? tr("正在创建…") : tr("创建歌单")}
             </button>
           </form>
         </Modal>

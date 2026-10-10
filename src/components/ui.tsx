@@ -1,3 +1,4 @@
+import { tr, useLocale, statusText } from "../i18n";
 import {
   useEffect,
   useRef,
@@ -111,6 +112,7 @@ const paths: Record<string, ReactNode> = {
   ),
 };
 export function Icon({ name, size = 20 }: { name: string; size?: number }) {
+  useLocale();
   return (
     <svg
       width={size}
@@ -132,6 +134,7 @@ export function IconButton({
   label,
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & { icon: string; label: string }) {
+  useLocale();
   const [dismissed, setDismissed] = useState(false);
   return (
     <span className="tip-wrap" onMouseLeave={() => setDismissed(false)}>
@@ -168,6 +171,7 @@ export function Empty({
   children?: ReactNode;
   icon?: string;
 }) {
+  useLocale();
   return (
     <div className="empty">
       <div className="empty-icon">
@@ -185,10 +189,11 @@ export function ErrorNotice({
   error: string | null;
   retry?: () => void;
 }) {
+  useLocale();
   return error ? (
     <div className="notice error" role="alert">
-      {error}
-      {retry && <button onClick={retry}>重试</button>}
+      {statusText(error)}
+      {retry && <button onClick={retry}>{tr("重试")}</button>}
     </div>
   ) : null;
 }
@@ -199,6 +204,7 @@ export function Sentinel({
   active: boolean;
   load: () => void;
 }) {
+  useLocale();
   const ref = useRef<HTMLDivElement>(null);
   const callback = useRef(load);
   callback.current = load;
@@ -216,6 +222,7 @@ export function Sentinel({
   return <div ref={ref} className="sentinel" aria-hidden="true" />;
 }
 export function Cover({ large = false }: { large?: boolean }) {
+  useLocale();
   return (
     <span className={`cover ${large ? "large" : ""}`}>
       <Icon name="music" size={large ? 46 : 22} />

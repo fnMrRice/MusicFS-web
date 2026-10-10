@@ -1,3 +1,4 @@
+import { tr, useLocale } from "../i18n";
 import { useEffect, useState } from "react";
 import { useServices } from "../app/services";
 import type { SourceTrack } from "../api/types";
@@ -10,6 +11,7 @@ interface Binding {
   state: string;
 }
 export function MediaPanel({ track }: { track: SourceTrack | null }) {
+  useLocale();
   const s = useServices();
   const [state, setState] = useState({
     lyrics: "",
@@ -63,22 +65,24 @@ export function MediaPanel({ track }: { track: SourceTrack | null }) {
     <>
       <ErrorNotice error={state.error} />
       {state.loading ? (
-        <p>正在读取内容…</p>
+        <p>{tr("正在读取内容…")}</p>
       ) : (
         <>
           {state.artwork && (
             <img
               className="media-artwork"
               src={state.artwork}
-              alt="当前曲目封面"
+              alt={tr("当前曲目封面")}
             />
           )}
           {state.lyrics ? (
             <pre className="lyrics">{state.lyrics}</pre>
           ) : (
-            <p className="muted">此曲目暂无可用歌词。</p>
+            <p className="muted">{tr("此曲目暂无可用歌词。")}</p>
           )}
-          <p className="muted">展示当前来源已选用的歌词；暂不进行逐句定位。</p>
+          <p className="muted">
+            {tr("展示当前来源已选用的歌词；暂不进行逐句定位。")}
+          </p>
         </>
       )}
     </>

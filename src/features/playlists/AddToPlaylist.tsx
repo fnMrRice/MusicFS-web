@@ -1,3 +1,4 @@
+import { tr, useLocale } from "../../i18n";
 import { useState } from "react";
 import { useServices, useStore } from "../../app/services";
 import type { SourceTrack } from "../../api/types";
@@ -11,6 +12,7 @@ export function AddToPlaylist({
   tracks: SourceTrack[];
   close: () => void;
 }) {
+  useLocale();
   const s = useServices();
   const playlists = useStore(s.playlists);
   const [target, setTarget] = useState("");
@@ -40,8 +42,10 @@ export function AddToPlaylist({
     }
   };
   return (
-    <Modal title="添加到歌单" close={close}>
-      <p className="muted">将 {tracks.length} 首曲目保存为歌单引用。</p>
+    <Modal title={tr("添加到歌单")} close={close}>
+      <p className="muted">
+        {tr("将 {0} 首曲目保存为歌单引用。", { 0: tracks.length })}
+      </p>
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -49,9 +53,9 @@ export function AddToPlaylist({
         }}
       >
         <label>
-          目标歌单
+          {tr("目标歌单")}
           <select value={target} onChange={(e) => setTarget(e.target.value)}>
-            <option value="">新建歌单</option>
+            <option value="">{tr("新建歌单")}</option>
             {playlists.map((p) => (
               <option value={p.playlistId} key={p.playlistId}>
                 {p.name}
@@ -61,7 +65,7 @@ export function AddToPlaylist({
         </label>
         {!target && (
           <label>
-            歌单名称
+            {tr("歌单名称")}
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -76,7 +80,7 @@ export function AddToPlaylist({
           className="primary"
           disabled={busy || (!target && !name.trim())}
         >
-          {busy ? "正在保存…" : "保存"}
+          {busy ? tr("正在保存…") : tr("保存")}
         </button>
       </form>
     </Modal>

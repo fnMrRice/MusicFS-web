@@ -29,6 +29,8 @@ npm run build
 
 ## 最短播放步骤
 
+界面默认跟随浏览器语言，支持英文、简体中文、繁体中文和日语。登录页或设置页可手动切换；选择保存在当前浏览器。详见[多语言说明](docs/internationalization.md)。
+
 1. 按 Server 文档配置音乐目录、FFmpeg/插件、鉴权及允许的 Origin，启动 Server。
 2. 在页面输入显式配置的管理员登录令牌。成功后输入会清空，刷新依靠 HttpOnly cookie 恢复；令牌不写浏览器持久存储。
 3. 使用 Server 管理 API 对音乐目录执行扫描，返回页面点击“刷新列表”。目录与扫描均由 Server 管理。

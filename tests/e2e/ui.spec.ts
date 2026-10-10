@@ -31,6 +31,17 @@ test('real shell, custom transport, themes and playlist writes survive route cha
   await page.getByRole('button', { name: '播放', exact: true }).click(); await waitPlaying(page);
   await page.getByRole('slider', { name: '音量', exact: true }).fill('0.35');
   await expect.poll(() => page.locator('audio').evaluate((a: HTMLAudioElement) => a.volume)).toBe(.35);
+  await page.getByRole('button', { name: '设置', exact: true }).click();
+  const language = page.locator('.language-select select');
+  await language.selectOption('en');
+  await expect(page.getByRole('heading', { name: 'Your listening preferences' })).toBeVisible();
+  await language.selectOption('ja');
+  await expect(page.getByRole('heading', { name: 'リスニング設定' })).toBeVisible();
+  await expect(page.locator('audio')).toHaveCount(1);
+  expect(await page.locator('audio').getAttribute('src')).toBe(source);
+  await expect.poll(() => page.locator('audio').evaluate((a: HTMLAudioElement) => a.volume)).toBe(.35);
+  await waitPlaying(page);
+  await language.selectOption('zh-CN');
   await page.getByRole('link', { name: '搜索', exact: true }).click();
   await expect(page.locator('audio')).toHaveCount(1); expect(await page.locator('audio').getAttribute('src')).toBe(source);
   await page.getByRole('button', { name: '专辑', exact: true }).click();

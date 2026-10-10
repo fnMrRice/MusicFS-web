@@ -2,7 +2,7 @@
 @import "./player.css";
 @import "./pages.css";
 :root {
-  font-family: Inter, "Microsoft YaHei", "PingFang SC", sans-serif;
+  font-family: Inter, "Microsoft YaHei", "PingFang SC", "Yu Gothic", "Meiryo", sans-serif;
   color: var(--text);
   background: var(--bg);
   font-synthesis: none;

@@ -1,3 +1,4 @@
+import { tr, useLocale, statusText } from "../i18n";
 import { useEffect, useState } from "react";
 import { useServices, useStore } from "../app/services";
 import { Cover, duration, IconButton } from "../components/ui";
@@ -16,6 +17,7 @@ const phase: Record<string, string> = {
   error: "播放失败",
 };
 export function PlayerBar() {
+  useLocale();
   const s = useServices();
   const state = useStore(s.playerState);
   const q = useStore(s.queue);
@@ -50,11 +52,11 @@ export function PlayerBar() {
     setSeek(null);
   };
   return (
-    <section className="player" aria-label="播放器">
+    <section className="player" aria-label={tr("播放器")}>
       <input
         className="timeline"
         type="range"
-        aria-label="曲目进度"
+        aria-label={tr("曲目进度")}
         min={range?.startMs ?? 0}
         max={range?.endMs || state.track?.durationMs || 1}
         step={100}
@@ -80,42 +82,42 @@ export function PlayerBar() {
         <Cover />
         <div>
           <strong>
-            {state.track?.title || state.track?.displayName || "尚未播放"}
+            {state.track?.title || state.track?.displayName || tr("尚未播放")}
           </strong>
           <small>
             {state.track
-              ? state.track.artists?.join(" / ") || "未知歌手"
-              : "你的音乐，随时相伴"}
+              ? state.track.artists?.join(" / ") || tr("未知歌手")
+              : tr("你的音乐，随时相伴")}
           </small>
           <small className="player-status">
-            {phase[state.phase]}
-            {playback && ` · ${output}`}
+            {tr(phase[state.phase])}
+            {playback && ` · ${tr(output)}`}
           </small>
         </div>
       </div>
       <div className="transport">
         <IconButton
           icon="repeat"
-          label={q.repeat ? "关闭列表循环" : "列表循环"}
+          label={q.repeat ? tr("关闭列表循环") : tr("列表循环")}
           aria-pressed={q.repeat}
           onClick={() => s.queue.set({ ...q, repeat: !q.repeat })}
         />
         <IconButton
           icon="previous"
-          label="上一首"
+          label={tr("上一首")}
           disabled={!q.items.length || (!q.repeat && q.index <= 0)}
           onClick={() => s.next(-1)}
         />
         <IconButton
           className="play-main"
           icon={state.wantsPlay ? "pause" : "play"}
-          label={state.wantsPlay ? "暂停" : "播放"}
+          label={state.wantsPlay ? tr("暂停") : tr("播放")}
           disabled={!playback || state.phase === "error"}
           onClick={() => s.player.toggle()}
         />
         <IconButton
           icon="next"
-          label="下一首"
+          label={tr("下一首")}
           disabled={
             !q.items.length || (!q.repeat && q.index >= q.items.length - 1)
           }
@@ -129,29 +131,29 @@ export function PlayerBar() {
       <div className="player-extras">
         <IconButton
           icon="stop"
-          label="停止"
+          label={tr("停止")}
           disabled={!state.track}
           onClick={() => s.player.stop()}
         />
         <IconButton
           icon="queue"
-          label="播放队列"
+          label={tr("播放队列")}
           aria-expanded={panel === "queue"}
           onClick={() => setPanel(panel === "queue" ? null : "queue")}
         />
         <IconButton
           icon="lyrics"
-          label="歌词与封面"
+          label={tr("歌词与封面")}
           disabled={!state.track}
           onClick={() => setPanel(panel === "media" ? null : "media")}
         />
         <IconButton
           icon="volume"
-          label={prefs.volume ? "静音" : "取消静音"}
+          label={prefs.volume ? tr("静音") : tr("取消静音")}
           onClick={() => s.preference({ volume: prefs.volume ? 0 : 0.8 })}
         />
         <input
-          aria-label="音量"
+          aria-label={tr("音量")}
           type="range"
           min="0"
           max="1"
@@ -162,7 +164,7 @@ export function PlayerBar() {
       </div>
       {state.message && (
         <div className="playback-message" role="alert">
-          {state.message}
+          {statusText(state.message)}
           {state.phase === "error" && (
             <button
               onClick={() => {
@@ -170,25 +172,27 @@ export function PlayerBar() {
                   void s.player.select(state.track, s.playbackPreferences());
               }}
             >
-              从头播放
+              {tr("从头播放")}
             </button>
           )}
-          <button onClick={() => s.player.stop()}>停止播放</button>
+          <button onClick={() => s.player.stop()}>{tr("停止播放")}</button>
         </div>
       )}
       {panel && (
         <div className="player-panel">
           <div className="section-title">
-            <h2>{panel === "queue" ? "播放队列" : "歌词与封面"}</h2>
+            <h2>{panel === "queue" ? tr("播放队列") : tr("歌词与封面")}</h2>
             <IconButton
               icon="close"
-              label="关闭面板"
+              label={tr("关闭面板")}
               onClick={() => setPanel(null)}
             />
           </div>
           {panel === "queue" ? (
             <>
-              <p className="muted">当前浏览器会话 · {q.items.length} 首</p>
+              <p className="muted">
+                {tr("当前浏览器会话 · {0} 首", { 0: q.items.length })}
+              </p>
               {q.items.length ? (
                 <ol className="queue-list">
                   {q.items.map((t, i) => (
@@ -206,7 +210,7 @@ export function PlayerBar() {
                   ))}
                 </ol>
               ) : (
-                <p className="muted">还没有加入曲目</p>
+                <p className="muted">{tr("还没有加入曲目")}</p>
               )}
             </>
           ) : (
