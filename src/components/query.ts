@@ -1,10 +1,15 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { ApiError, errorMessage } from "../api/client";
+import { capabilityResources } from "../app/capability-resources";
 
 export function useResource<T>(
   key: string,
   loader: (signal: AbortSignal) => Promise<T>,
 ) {
+  const capabilityRevision = useSyncExternalStore(
+    capabilityResources.subscribe,
+    () => capabilityResources.snapshot(key),
+  );
   const [state, setState] = useState<{
     data: T | null;
     loading: boolean;
@@ -27,7 +32,7 @@ export function useResource<T>(
       },
     );
     return () => controller.abort();
-  }, [key, revision]);
+  }, [key, revision, capabilityRevision]);
   return { ...state, reload: () => setRevision((v) => v + 1) };
 }
 export function usePages<T>(

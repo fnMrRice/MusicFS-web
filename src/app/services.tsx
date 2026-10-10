@@ -15,6 +15,8 @@ import { audioFactory } from "../player/audio-adapter";
 import { capabilities } from "../player/capabilities";
 import { Store } from "./store";
 import { LibraryState } from "../library/state";
+import { CapabilityEvents } from "./capability-events";
+import { capabilityResources } from "./capability-resources";
 
 interface AuthState {
   session: AuthSession | null;
@@ -41,6 +43,10 @@ export class Services {
   authApi = new AuthApi(this.client);
   libraryApi = new LibraryApi(this.client);
   content = new ContentApi(this.client);
+  private capabilityEvents = new CapabilityEvents(
+    capabilityResources.invalidate,
+    (signal) => this.client.request("/auth/session", { signal }),
+  );
   auth = new Store<AuthState>({
     session: null,
     ready: null,
@@ -93,6 +99,7 @@ export class Services {
   }
   private accept(session: AuthSession): void {
     this.auth.set({ ...this.auth.value, session, busy: false, error: null });
+    this.capabilityEvents.start(session.csrfToken);
     let saved: Partial<PreferencesState> = {};
     try {
       saved = JSON.parse(localStorage.getItem(this.key()!) ?? "{}");
@@ -127,7 +134,9 @@ export class Services {
       )
         throw new Error("Incompatible server");
       this.auth.set({ ...this.auth.value, ready });
-      this.accept(await this.authApi.restore());
+      const session = await this.authApi.restore();
+      if (generation !== this.generation) return;
+      this.accept(session);
     } catch (e) {
       this.auth.set({
         ...this.auth.value,
@@ -143,9 +152,12 @@ export class Services {
   }
   async login(token: string): Promise<void> {
     if (!this.auth.value.ready) return;
+    const generation = ++this.generation;
     this.auth.set({ ...this.auth.value, busy: true, error: null });
     try {
-      this.accept(await this.authApi.login(token));
+      const session = await this.authApi.login(token);
+      if (generation !== this.generation) return;
+      this.accept(session);
     } catch (e) {
       this.auth.set({
         ...this.auth.value,
@@ -155,12 +167,18 @@ export class Services {
     }
   }
   async logout(): Promise<void> {
+    const generation = ++this.generation;
+    this.capabilityEvents.stop();
     this.player.stop();
     this.auth.set({ ...this.auth.value, busy: true, error: null });
     try {
       await this.authApi.logout();
+      if (generation !== this.generation) return;
       this.clear();
     } catch (e) {
+      if (generation !== this.generation) return;
+      const session = this.auth.value.session;
+      if (session) this.capabilityEvents.start(session.csrfToken);
       this.auth.set({
         ...this.auth.value,
         busy: false,
@@ -169,6 +187,7 @@ export class Services {
     }
   }
   clear(): void {
+    this.capabilityEvents.stop();
     this.libraries.forEach(library => library.clear());
     this.libraries.clear();
     ++this.generation;
