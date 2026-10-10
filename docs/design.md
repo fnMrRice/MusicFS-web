@@ -2,7 +2,9 @@
 
 当前阶段：已实现最小页面，覆盖本地来源列表、原流与处理输出播放；状态与验证范围见 [实施记录](progress.md)。具体任务及后续范围见 [分阶段实现计划](implementation.md)。
 
-本期最小范围为文件列表与播放，采用 TypeScript + Vite + 原生 DOM，使用普通 HTML 和音频控件，不进行复杂界面设计。已接入 Go Server 的 Local Files Provider，原流及服务端处理输出在实际 Edge 浏览器中的播放和定位已验证，范围见 [兼容性记录](compatibility.md)。目录设置、扫描和插件通过 Server 配置/管理工具完成；下文的搜索、歌单、推荐、平台账号及刮削交互属于长期职责，不是本期已实现页面能力。
+下一阶段以 [TypeScript + React 开发方案](react-development.md)为实施入口，按[共享 UI 设计](../../docs/ui-design.md)实现 Web。Web 顶部只保留设置与换肤，不含迷你模式／小窗、最小化、最大化、关闭及对应分隔线；Client 等 Web 完成后再安排。当前 React 尚未接入，接口准备见[依赖清单](react-api-readiness.md)。
+
+已交付的最小范围为文件列表与播放，采用 TypeScript + Vite + 原生 DOM，使用普通 HTML 和音频控件。已接入 Go Server 的 Local Files Provider，原流及服务端处理输出在实际 Edge 浏览器中的播放和定位已验证，范围见 [兼容性记录](compatibility.md)。目录设置、扫描和插件通过 Server 配置/管理工具完成；下文的搜索、歌单、推荐、平台账号及刮削交互不代表当前已实现页面能力。
 
 Server 与客户端共同约定由 [MusicFS 跨端架构](../../docs/architecture.md) 管理；[Server 内部设计](../../server/docs/architecture.md)与[音频处理](../../server/docs/audio-processing.md)由 Server 仓库维护。本文件负责 Web 内部职责，OpenAPI、事件协议与协议 SDK 由 Server 发布。
 

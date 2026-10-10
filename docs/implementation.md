@@ -1,5 +1,7 @@
 # MusicFS Web 分阶段实现计划
 
+后续界面开发已选择 TypeScript + React，见 [React 界面开发方案](react-development.md)。本文保留最小页面 W0—W4/W8 的历史计划与协议验收；下文“不引入框架”“无需无限滚动”等限制仅属于该历史阶段，不限制新方案。新界面采用动态加载，Web 不含桌面窗口控制，Client 待 Web 完成后另行安排。
+
 状态：2026-10-09 已按 W0—W4 实施最小页面，并执行适用的 W8 交付工作；逐步提交、已验证证据及未完成人工验收见 [实施记录](progress.md) 和 [兼容性记录](compatibility.md)。下文保留原计划与验收标准；P5—P7 尚未开展。阶段编号与 [跨端架构](../../docs/architecture.md)、[Server 实现计划](../../server/docs/implementation.md) 对齐。
 
 ## 1. 本期交付范围

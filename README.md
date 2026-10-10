@@ -1,6 +1,6 @@
 # MusicFS-web
 
-MusicFS 的浏览器界面。本期先实现简单文件列表和播放：显示 Server 扫描得到的文件，支持播放、暂停、定位和停止；无需特别设计界面。
+MusicFS 的浏览器界面。当前已交付最小文件列表与播放链路；下一阶段按已确认的界面设计迁移为 TypeScript + React，开发顺序和验收标准见 [React 界面开发方案](docs/react-development.md)。Web 顶部只保留设置、换肤，不提供小窗／迷你模式或窗口控制按钮；桌面 Client 后续再实施。
 
 已实现 TypeScript + Vite + 原生 DOM 最小页面：登录与刷新恢复、真实来源文件列表、分页与刷新、原流播放、暂停/停止、服务端处理输出与曲目时间定位。完整验证记录见 [实施记录](docs/progress.md) 和 [兼容性记录](docs/compatibility.md)；人工听音须单独确认，不由自动化结果代替。
 
@@ -55,10 +55,12 @@ npm run test:e2e
 - Windows Edge 的实测结果不代表 Firefox、Safari 或全部设备支持；见兼容性记录。
 - 页面关闭通知只能尽力发送，Server 负责会话超时与进程回收。
 
-长期设计仍包含搜索、音乐库与歌单、来源和推荐展示、刮削结果交互；这些完整管理界面不纳入本期最小页面。与桌面端的组件复用方式尚待确定。
+下一阶段包括共享外壳、曲目列表、四类搜索、来源与推荐、歌单及个人区；接口依赖见 [React UI 接口清单](docs/react-api-readiness.md)。当前最小页面并未实现这些完整界面，React 迁移也尚未开始；与桌面端的复用方式不在本轮定稿。
 
 ## 设计文档
 
+- [React 界面开发方案](docs/react-development.md)：确认的 Web 差异、TS/React 迁移、组件与路由、动态加载、播放接入和分阶段验收。
+- [React UI 接口清单](docs/react-api-readiness.md)：当前可复用契约、待补接口和能力不足时的界面行为。
 - [分阶段实现计划](docs/implementation.md)：P0—P8 的文件组织、逐步任务、最小页面、鉴权、播放状态和真实媒体验收。
 - [实施记录](docs/progress.md)：稳定步骤编号、验证结果与残留限制。
 - [兼容性记录](docs/compatibility.md)：实际浏览器与媒体链路证据。
