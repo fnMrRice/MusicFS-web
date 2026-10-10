@@ -193,7 +193,7 @@ export function ErrorNotice({
   return error ? (
     <div className="notice error" role="alert">
       {statusText(error)}
-      {retry && <button onClick={retry}>{tr("重试")}</button>}
+      {retry && <button type="button" onClick={retry}>{tr("重试")}</button>}
     </div>
   ) : null;
 }

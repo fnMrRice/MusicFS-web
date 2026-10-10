@@ -3,7 +3,7 @@ import { ApiError } from "../../api/client";
 import { DirectoriesApi, type DirectoryPage } from "../../api/directories";
 import { directoryError } from "./errors";
 
-export function useDirectoryListing(api: DirectoriesApi) {
+export function useDirectoryListing(api: DirectoriesApi, path: string | null = null) {
   const [page, setPage] = useState<DirectoryPage | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -40,8 +40,8 @@ export function useDirectoryListing(api: DirectoriesApi) {
     } finally { if (!controller.signal.aborted) setLoading(false); }
   }
   useEffect(() => {
-    void browse(null);
+    void browse(path);
     return () => request.current?.abort();
-  }, [api]);
+  }, [api, path]);
   return { page, loading, error, browse, retry: () => retry.current() };
 }

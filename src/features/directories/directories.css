@@ -1,23 +1,41 @@
-.local-directories { border-top: 1px solid var(--line); padding-top: 20px; margin-top: 20px; }
+.local-music-source { margin-block: 22px; }
 .directory-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
 .directory-actions h4 { margin: 0; margin-right: auto; }
-.directory-browser { border: 1px solid var(--line); border-radius: 10px; padding: 18px; margin-top: 20px; }
-.allowed-directories { border: 1px solid var(--line); border-radius: 10px; padding: 18px; margin: 20px 0; }
-.directory-candidate { display: flex; flex-direction: column; gap: 6px; margin: 18px 0; }
-.directory-candidate code { overflow-wrap: anywhere; font-size: 12px; }
-.directory-modal-actions { justify-content: flex-end; }
+.directory-saved-list { list-style: none; padding: 0; margin-bottom: 0; }
+.directory-saved-list li { padding: 7px 0; overflow-wrap: anywhere; }
+.directory-manager { display: block; }
+.directory-modal-actions { justify-content: flex-end; margin-top: 20px; }
+.directory-tree { border: 1px solid var(--line); border-radius: 10px; padding: 8px; max-height: 34dvh; min-height: 110px; overflow: auto; }
+.directory-tree-branch { list-style: none; padding: 0; margin: 0; }
+.directory-tree-branch [role="group"] { padding-left: 24px; }
+.directory-tree-row { display: flex; align-items: center; gap: 5px; padding: 8px 5px; border-radius: 6px; }
+.directory-manager .directory-tree-choice { display: flex; flex-direction: row; align-items: center; gap: 9px; flex: 1; min-width: 0; cursor: pointer; }
+.directory-tree-choice > input, .directory-tree-choice > svg { flex-shrink: 0; }
+.directory-expand { display: grid; place-items: center; flex-shrink: 0; border: 0; background: transparent; padding: 5px; }
+.directory-expand svg { transform: rotate(-90deg); }
+.directory-expand.expanded svg { transform: none; }
+.directory-tree [role="treeitem"]:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 6px; }
+.directory-tree-message { font-size: 12px; margin: 8px 12px; }
+.directory-tree-more { margin: 8px 12px; }
 .directory-selected { background: var(--hover); }
-.directory-list button[aria-pressed="true"], .directory-current button[aria-pressed="true"] { border-color: var(--accent); }
-.directory-list { list-style: none; padding: 0; margin: 14px 0; }
-.directory-list li, .directory-current { display: flex; justify-content: space-between; align-items: center; gap: 14px; padding: 12px 0; }
-.directory-list li + li { border-top: 1px solid var(--line); }
 .directory-detail { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
-.directory-detail code, .directory-current code { overflow-wrap: anywhere; font-size: 12px; color: var(--muted); }
-.directory-list button, .directory-current button { flex-shrink: 0; }
-.directory-save { margin-top: 20px; }
-.music-source-row { flex-wrap: wrap; align-items: center; }
-.music-source-row > strong { margin-right: auto; }
+.directory-detail span, .directory-detail code { overflow-wrap: anywhere; }
+.directory-detail code { font-size: 11px; color: var(--muted); }
+.directory-selected-summary { display: flex; gap: 8px; flex-wrap: wrap; padding: 0; margin: 12px 0; list-style: none; }
+.directory-selected-summary li { display: flex; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 7px; padding: 3px 5px 3px 10px; max-width: 100%; }
+.directory-selected-summary li span { overflow-wrap: anywhere; }
+.directory-selected-summary button { padding: 2px 6px; border: 0; }
+.directory-recursion { border: 0; border-top: 1px solid var(--line); padding: 15px 0 0; margin: 18px 0 0; min-width: 0; }
+.directory-recursion legend { padding: 0 10px 0 0; font-weight: 600; }
+.directory-recursion .check-label { flex-direction: row; align-items: center; gap: 9px; }
+.directory-depth { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; margin-top: 16px; }
+.directory-manager .directory-depth-value { display: flex; flex-direction: row; align-items: center; gap: 10px; font-size: 13px; }
+.directory-depth-value input { width: 76px; }
+.directory-recursion p { font-size: 12px; margin-bottom: 0; }
+.directory-advanced { margin-top: 18px; }
+.directory-advanced summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+.directory-advanced > .check-label { margin-top: 16px; }
 @media (max-width: 700px) {
-  .directory-browser, .allowed-directories { padding: 12px; }
-  .directory-list li, .directory-current { align-items: flex-start; flex-direction: column; }
+  .directory-tree { padding: 4px; }
+  .directory-tree-branch [role="group"] { padding-left: 17px; }
 }

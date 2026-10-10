@@ -1,13 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 import { ApiError } from "../../src/api/client";
-import { DirectoriesApi, type PluginOperation } from "../../src/api/directories";
+import { DirectoriesApi, type LocalConfiguration, type PluginOperation } from "../../src/api/directories";
 import { DirectorySettingsState } from "../../src/features/directories/state";
 
 const operation = (status: PluginOperation["status"]): PluginOperation => ({ operationId: "operation-1", status, errorCode: null });
+const defaultOptions = { recursive: true, maxDepth: 0, importLyrics: false, excludePatterns: [], skipHidden: true, respectNoMedia: true };
 function fixture(savedId: string | null = null) {
   let id = savedId;
   const api = {
-    configuration: vi.fn(async () => ({ revision: "r1", roots: [{ id: "existing", name: "Saved", pathConfigured: true }] })),
+    configuration: vi.fn(async (): Promise<LocalConfiguration> => ({ revision: "r1", roots: [{ id: "existing", name: "Saved", pathConfigured: true }] })),
     save: vi.fn(async () => operation("applying")),
     operation: vi.fn(async () => operation("succeeded")),
   };
@@ -54,7 +55,7 @@ describe("Music folder configuration state", () => {
     await state.save();
     expect(api.save).toHaveBeenCalledWith([
       { id: "existing", name: "Saved" }, { id: "new", name: "New", path: "/Music/New" },
-    ], "r1", expect.any(String), undefined);
+    ], defaultOptions, "r1", expect.any(String), undefined);
     expect(storage.get()).toBe("operation-1");
     expect(state.value.saved).toBe(false);
     expect(state.locked).toBe(true);
@@ -90,7 +91,7 @@ describe("Music folder configuration state", () => {
     expect(state.value.conflict).toBe(false);
     state.edit([{ id: "new", name: "New", path: "/Music/New" }]);
     await state.save();
-    expect(api.save).toHaveBeenLastCalledWith(expect.any(Array), "r2", expect.any(String), undefined);
+    expect(api.save).toHaveBeenLastCalledWith(expect.any(Array), defaultOptions, "r2", expect.any(String), undefined);
   });
 
   it("resumes a persisted operation after page reload and only reports success after completion", async () => {
@@ -112,7 +113,7 @@ describe("Music folder configuration state", () => {
     await state.start();
     state.edit([]);
     await state.save();
-    expect(api.save).toHaveBeenCalledWith([], "r1", expect.any(String), undefined);
+    expect(api.save).toHaveBeenCalledWith([], defaultOptions, "r1", expect.any(String), undefined);
     api.operation.mockResolvedValueOnce(operation("failed"));
     await state.resume();
     expect(state.value.saved).toBe(false);
@@ -133,5 +134,72 @@ describe("Music folder configuration state", () => {
     await state.reload();
     expect(state.value.loaded).toBe(true);
     expect(state.value.conflict).toBe(false);
+  });
+  it("saves recursive limits with roots while retaining lyric and exclusion settings", async () => {
+    const { state, api } = fixture();
+    const options = { ...defaultOptions, recursive: true, maxDepth: 3, importLyrics: true, excludePatterns: ["private/**"] };
+    api.configuration.mockResolvedValueOnce({ revision: "r1", roots: [], importOptions: { importDefaults: options, schemaRevision: "local-import-v5" } });
+    await state.start();
+    expect(state.value.importDefaults).toEqual(options);
+    expect(state.dirty).toBe(false);
+    state.editRecursion(true, 0);
+    expect(state.dirty).toBe(true);
+    await state.save();
+    expect(api.save).toHaveBeenCalledWith([], { ...options, maxDepth: 0 }, "r1", expect.any(String), undefined);
+  });
+  it("normalizes non-recursive scans to zero and rejects invalid finite depths", async () => {
+    const { state, api } = fixture();
+    await state.start();
+    for (const invalid of [-1, 65, 1.5, NaN]) state.editRecursion(true, invalid);
+    expect(state.dirty).toBe(false);
+    state.editRecursion(true, 2);
+    state.editRecursion(false, 2);
+    expect(state.value.importDefaults).toEqual({ ...defaultOptions, recursive: false, maxDepth: 0 });
+    await state.save();
+    expect(api.save).toHaveBeenCalledWith([{ id: "existing", name: "Saved" }], { ...defaultOptions, recursive: false }, "r1", expect.any(String), undefined);
+  });
+  it("toggles selected folders independently and treats reselected saved roots as unchanged", async () => {
+    const { state, api } = fixture();
+    api.configuration.mockResolvedValueOnce({ revision: "r1", roots: [
+      { id: "first", name: "First", pathConfigured: true }, { id: "second", name: "Second", pathConfigured: true },
+    ] });
+    await state.start();
+    const first = { name: "Renamed basename", path: "/music/first", available: true, configuredRootId: "first" };
+    state.toggle(first);
+    expect(state.value.roots.map((root) => root.id)).toEqual(["second"]);
+    state.toggle(first);
+    expect(state.value.roots.find((root) => root.id === "first")).toEqual({ id: "first", name: "First" });
+    expect(state.dirty).toBe(false);
+    const child = { name: "Child", path: "/music/first/child", available: true, configuredRootId: null };
+    state.toggle(child);
+    expect(state.value.roots).toHaveLength(3);
+    state.toggle(child);
+    expect(state.dirty).toBe(false);
+  });
+  it("persists hidden and nomedia choices without changing recursion or other import options", async () => {
+    const { state, api } = fixture();
+    await state.start();
+    expect(state.value.importDefaults).toEqual(defaultOptions);
+    state.editRecursion(true, 4);
+    state.editAdvanced({ skipHidden: false, respectNoMedia: false });
+    await state.save();
+    expect(api.save).toHaveBeenCalledWith([{ id: "existing", name: "Saved" }],
+      { ...defaultOptions, maxDepth: 4, skipHidden: false, respectNoMedia: false }, "r1", expect.any(String), undefined);
+  });
+  it("preserves explicit false advanced settings when reloading the server configuration", async () => {
+    const { state, api } = fixture();
+    const options = { ...defaultOptions, skipHidden: false, respectNoMedia: false };
+    api.configuration.mockResolvedValue({ revision: "r1", roots: [], importOptions: {
+      importDefaults: options, schemaRevision: "local-import-v5",
+    } });
+    await state.start();
+    expect(state.value.importDefaults).toEqual(options);
+    expect(state.dirty).toBe(false);
+    state.editRecursion(true, 2);
+    await state.save();
+    expect(api.save).toHaveBeenCalledWith([], { ...options, maxDepth: 2 }, "r1", expect.any(String), undefined);
+    await state.resume();
+    expect(state.value.importDefaults.skipHidden).toBe(false);
+    expect(state.value.importDefaults.respectNoMedia).toBe(false);
   });
 });

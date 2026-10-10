@@ -3,6 +3,7 @@ import { useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import type { ManagedInstance, PluginSnapshot } from "../api/directories";
 import { LocalDirectories } from "./directories/LocalDirectories";
+import { LocalMusicSource } from "./directories/LocalMusicSource";
 import { useResource } from "../components/query";
 import { ErrorNotice } from "../components/ui";
 import { useSourceName } from "../components/use-source-name";
@@ -41,17 +42,15 @@ export function MusicSources() {
     {(providers.loading || online.loading) && <p>{tr("正在读取来源…")}</p>}
     {[...sources].map(([id, source]) => source.online
       ? <PlatformAccount key={id} instance={source.online} />
-      : <section key={id} aria-label={sourceName(source.provider!)} style={{ marginBlock: 20 }}>
+      : admin && local.some((instance) => instance.instanceId === id)
+        ? <LocalMusicSource key={id} instance={local.find((instance) => instance.instanceId === id)!}
+          name={sourceName(source.provider!)} manage={() => choose(id)} />
+        : <section key={id} aria-label={sourceName(source.provider!)} style={{ marginBlock: 20 }}>
         <h4>{sourceName(source.provider!)}</h4>
-        <p className="muted">{local.find((instance) => instance.instanceId === id)?.runtimeState === "pending_configuration"
-          ? tr("待选择音乐目录") : source.provider!.availability === "available" ? tr("可用") : tr("暂不可用")}</p>
-        {admin && local.some((instance) => instance.instanceId === id) && <button onClick={() => choose(id)}>{tr("管理音乐目录")}</button>}
+        <p className="muted">{tr(source.provider!.availability === "available" ? "可用" : "暂不可用")}</p>
       </section>)}
-    {local.filter((instance) => !sources.has(instance.instanceId)).map((instance) => <section key={instance.instanceId} style={{ marginBlock: 20 }}>
-      <h4>{sourceName(instance.instanceId)}</h4>
-      <p className="muted">{tr(instance.runtimeState === "pending_configuration" ? "待选择音乐目录" : "暂不可用")}</p>
-      <button onClick={() => choose(instance.instanceId)}>{tr("管理音乐目录")}</button>
-    </section>)}
+    {local.filter((instance) => !sources.has(instance.instanceId)).map((instance) => <LocalMusicSource key={instance.instanceId}
+      instance={instance} name={sourceName(instance.instanceId)} manage={() => choose(instance.instanceId)} />)}
     {!providers.loading && !online.loading && !sources.size && !local.length && !providers.error && !online.error &&
       <p className="muted">{tr("暂无音乐来源")}</p>}
     {admin && chosen && <LocalDirectories key={chosen.instanceId} instance={chosen} close={() => choose(null)} />}

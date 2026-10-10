@@ -1,6 +1,14 @@
 import { ApiClient } from "./client";
 
 export interface MusicRoot { id: string; name: string; path?: string }
+export interface ImportDefaults {
+  recursive: boolean;
+  maxDepth: number;
+  importLyrics: boolean;
+  excludePatterns: string[];
+  skipHidden: boolean;
+  respectNoMedia: boolean;
+}
 export interface DirectoryItem { name: string; path: string; available: boolean; configuredRootId: string | null }
 export interface DirectoryPage {
   revision: string;
@@ -13,6 +21,7 @@ export interface DirectoryPage {
 export interface LocalConfiguration {
   revision: string;
   roots: { id: string; name: string; pathConfigured: boolean }[];
+  importOptions?: { importDefaults: ImportDefaults; schemaRevision: string };
 }
 export interface PluginOperation {
   operationId: string;
@@ -43,9 +52,9 @@ export class DirectoriesApi {
     if (cursor !== null) query.set("cursor", cursor);
     return this.client.request<DirectoryPage>(`${this.path}/directories?${query}`, { signal });
   }
-  save(musicRoots: MusicRoot[], revision: string, key: string, signal?: AbortSignal) {
+  save(musicRoots: MusicRoot[], importDefaults: ImportDefaults, revision: string, key: string, signal?: AbortSignal) {
     return this.client.request<PluginOperation>(`${this.path}/configuration`, {
-      method: "PUT", body: { musicRoots }, ifMatch: revision, idempotencyKey: key, signal,
+      method: "PUT", body: { musicRoots, importDefaults }, ifMatch: revision, idempotencyKey: key, signal,
     });
   }
   operation(id: string, signal?: AbortSignal) {

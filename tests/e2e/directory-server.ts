@@ -9,6 +9,8 @@ import { stopChild, type TestServer } from './server';
 export interface DirectoryTestServer extends TestServer {
   allowedRoot: string;
   selectedRoot: string;
+  secondAllowedRoot: string;
+  secondSelectedRoot: string;
   outsideRoot: string;
   configPath: string;
   configuration: string;
@@ -50,10 +52,19 @@ export async function startDirectoryServer(): Promise<DirectoryTestServer> {
     }
     const allowedRoot = join(directory, 'Allowed Music');
     const selectedRoot = join(allowedRoot, '精选 子目录');
+    const secondAllowedRoot = join(directory, 'Second Music');
+    const secondSelectedRoot = join(secondAllowedRoot, '第二专辑');
     const outsideRoot = join(directory, 'Outside Music');
-    for (const path of [selectedRoot, outsideRoot]) mkdirSync(path, { recursive: true });
+    for (const path of [join(selectedRoot, '一级', '二级'), join(selectedRoot, '.Hidden album'), join(selectedRoot, 'No media'), secondSelectedRoot, outsideRoot]) mkdirSync(path, { recursive: true });
     const wave = join(source, 'tests/testdata/audio/markers.wav');
     copyFileSync(wave, join(selectedRoot, 'selected.wav'));
+    copyFileSync(wave, join(selectedRoot, '一级', 'depth-one.wav'));
+    copyFileSync(wave, join(selectedRoot, '一级', '二级', 'depth-two.wav'));
+    copyFileSync(wave, join(selectedRoot, '.hidden.wav'));
+    copyFileSync(wave, join(selectedRoot, '.Hidden album', 'hidden-child.wav'));
+    copyFileSync(wave, join(selectedRoot, 'No media', 'nomedia.wav'));
+    writeFileSync(join(selectedRoot, 'No media', '.nomedia'), '');
+    copyFileSync(wave, join(secondSelectedRoot, 'second-selected.wav'));
     copyFileSync(wave, join(allowedRoot, 'unselected.wav'));
     copyFileSync(wave, join(outsideRoot, 'outside.wav'));
     const webRoot = join(directory, 'web');
@@ -69,7 +80,7 @@ export async function startDirectoryServer(): Promise<DirectoryTestServer> {
         pluginId: 'musicfs.localfiles', executable: join(directory, 'musicfs-plugin-local' + suffix), enabled: true,
         instances: [{
           instanceId: 'local', name: '目录管理测试', role: 'provider', enabled: true,
-          permissions: { readDirectories: [allowedRoot] }, config: {},
+          permissions: { readDirectories: [allowedRoot, secondAllowedRoot] }, config: {},
         }],
       }],
     };
@@ -95,7 +106,7 @@ export async function startDirectoryServer(): Promise<DirectoryTestServer> {
     };
     await start();
     return {
-      origin, token, directory, allowedRoot, selectedRoot, outsideRoot, configPath, configuration, stop,
+      origin, token, directory, allowedRoot, selectedRoot, secondAllowedRoot, secondSelectedRoot, outsideRoot, configPath, configuration, stop,
       restart: async () => { if (child) await stopChild(child); await start(); },
     };
   } catch (error) { await stop(); throw error; }
