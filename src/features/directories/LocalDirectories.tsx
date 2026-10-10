@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { DirectoriesApi, type ManagedInstance } from "../../api/directories";
 import { useServices, useStore } from "../../app/services";
 import { capabilityResources } from "../../app/capability-resources";
 import { ErrorNotice } from "../../components/ui";
 import { tr, useLocale } from "../../i18n";
-import { DirectoryBrowser } from "./DirectoryBrowser";
+import { AddDirectory } from "./AddDirectory";
+import { AllowedDirectories } from "./AllowedDirectories";
 import { DirectorySettingsState } from "./state";
 import "./directories.css";
 
@@ -13,6 +14,7 @@ export function LocalDirectories({ instance, close }: { instance: ManagedInstanc
   const s = useServices();
   const auth = useStore(s.auth);
   const panel = useRef<HTMLDivElement>(null);
+  const [adding, setAdding] = useState(false);
   const api = useMemo(() => new DirectoriesApi(s.client, instance.instanceId), [s, instance.instanceId]);
   const state = useMemo(() => {
     const key = `musicfs:${encodeURIComponent(auth.ready?.instanceId ?? "")}:${encodeURIComponent(auth.session!.user.id)}:directories:${encodeURIComponent(instance.instanceId)}`;
@@ -52,7 +54,11 @@ export function LocalDirectories({ instance, close }: { instance: ManagedInstanc
     {value.saved && <p role="status">{tr("音乐目录已保存。")}{" "}
       {value.roots.length === 0 && tr("尚未选择音乐目录，已有曲库记录会保留。")}</p>}
     {value.loaded && <>
-      <h4>{tr("已选音乐目录")}</h4>
+      <AllowedDirectories key={value.revision} api={api} />
+      <div className="directory-actions">
+        <h4>{tr("已选音乐目录")}</h4>
+        <button disabled={locked || value.conflict} onClick={() => setAdding(true)}>{tr("添加本地目录")}</button>
+      </div>
       {value.roots.length === 0 && <p className="muted">{tr("尚未选择音乐目录，已有曲库记录会保留。")}</p>}
       <ul className="directory-list" aria-label={tr("已选音乐目录")}>
         {value.roots.map((root) => <li key={root.id}>
@@ -62,10 +68,8 @@ export function LocalDirectories({ instance, close }: { instance: ManagedInstanc
             onClick={() => state.edit(value.roots.filter((r) => r.id !== root.id))}>{tr("移除目录")}</button>
         </li>)}
       </ul>
-      <DirectoryBrowser key={value.revision} api={api} disabled={locked || value.conflict}
-        selectedPaths={value.roots.flatMap((root) => root.path ? [root.path] : [])}
-        selectedIds={value.roots.map((root) => root.id)}
-        select={(item) => state.select(item)} />
+      {adding && <AddDirectory key={value.revision} api={api} roots={value.roots} disabled={locked || value.conflict}
+        add={(item) => state.select(item)} close={() => setAdding(false)} />}
       <div className="directory-actions directory-save">
         <button className="primary" disabled={locked || !state.dirty && value.operation?.status !== "failed" || value.conflict} onClick={() => void state.save()}>{tr("保存音乐目录")}</button>
         <button disabled={locked || !value.roots.length} onClick={() => state.edit([])}>{tr("清空选择")}</button>

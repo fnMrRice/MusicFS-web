@@ -17,6 +17,20 @@ function fixture(savedId: string | null = null) {
 }
 
 describe("Music folder configuration state", () => {
+  it("keeps an empty configuration empty until a directory is explicitly selected", async () => {
+    const { state, api } = fixture();
+    api.configuration.mockResolvedValueOnce({ revision: "r1", roots: [] });
+    await state.start();
+    expect(state.value.roots).toEqual([]);
+    expect(state.dirty).toBe(false);
+    expect(api.save).not.toHaveBeenCalled();
+    state.select({ name: "Music", path: "/Music", available: false, configuredRootId: null });
+    expect(state.value.roots).toEqual([]);
+    state.select({ name: "Selected", path: "/Music/Selected", available: true, configuredRootId: null });
+    expect(state.value.roots).toEqual([{ id: expect.any(String), name: "Selected", path: "/Music/Selected" }]);
+    expect(state.dirty).toBe(true);
+    expect(api.save).not.toHaveBeenCalled();
+  });
   it("recognizes saved directories after reload and restores their original identity when reselected", async () => {
     const { state } = fixture();
     await state.start();

@@ -2,6 +2,12 @@
 .directory-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
 .directory-actions h4 { margin: 0; margin-right: auto; }
 .directory-browser { border: 1px solid var(--line); border-radius: 10px; padding: 18px; margin-top: 20px; }
+.allowed-directories { border: 1px solid var(--line); border-radius: 10px; padding: 18px; margin: 20px 0; }
+.directory-candidate { display: flex; flex-direction: column; gap: 6px; margin: 18px 0; }
+.directory-candidate code { overflow-wrap: anywhere; font-size: 12px; }
+.directory-modal-actions { justify-content: flex-end; }
+.directory-selected { background: var(--hover); }
+.directory-list button[aria-pressed="true"], .directory-current button[aria-pressed="true"] { border-color: var(--accent); }
 .directory-list { list-style: none; padding: 0; margin: 14px 0; }
 .directory-list li, .directory-current { display: flex; justify-content: space-between; align-items: center; gap: 14px; padding: 12px 0; }
 .directory-list li + li { border-top: 1px solid var(--line); }
@@ -12,6 +18,6 @@
 .music-source-row { flex-wrap: wrap; align-items: center; }
 .music-source-row > strong { margin-right: auto; }
 @media (max-width: 700px) {
-  .directory-browser { padding: 12px; }
+  .directory-browser, .allowed-directories { padding: 12px; }
   .directory-list li, .directory-current { align-items: flex-start; flex-direction: column; }
 }

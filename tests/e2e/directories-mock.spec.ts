@@ -43,7 +43,8 @@ async function mockApi(page: Page, directories: (route: Route, url: URL) => Prom
 async function openDirectories(page: Page) {
   await page.goto(`${origin}/#/settings`);
   await page.getByRole('button', { name: '管理音乐目录', exact: true }).click();
-  return page.locator('.local-directories');
+  await page.getByRole('button', { name: '添加本地目录', exact: true }).click();
+  return page.getByRole('dialog', { name: '添加本地目录', exact: true });
 }
 
 test('mock directory pagination continues after an empty page', async ({ page }) => {
@@ -60,7 +61,7 @@ test('mock directory pagination continues after an empty page', async ({ page })
   await panel.getByRole('button', { name: '加载更多目录', exact: true }).click();
   await expect(panel.getByRole('button', { name: '打开目录 Fixture Music', exact: true })).toBeVisible();
   await expect(panel.getByRole('button', { name: '加载更多目录', exact: true })).toHaveCount(0);
-  expect(cursors).toEqual([null, 'roots-next']);
+  expect(cursors.filter(cursor => cursor !== null)).toEqual(['roots-next']);
 });
 
 test('mock expired directory cursor retries the current directory from its first page', async ({ page }) => {
@@ -81,14 +82,32 @@ test('mock expired directory cursor retries the current directory from its first
   await panel.getByRole('button', { name: '加载更多目录', exact: true }).click();
   await expect(panel.getByRole('alert')).toContainText('目录列表已变化，请重新读取当前目录。');
   await expect(panel.getByRole('button', { name: '加载更多目录', exact: true })).toBeDisabled();
-  await expect(panel.getByRole('button', { name: '添加当前目录', exact: true })).toBeDisabled();
+  await expect(panel.getByRole('button', { name: '选择当前目录', exact: true })).toBeDisabled();
   await panel.getByRole('button', { name: '重试', exact: true }).click();
   await expect(panel.getByRole('button', { name: '打开目录 Collection', exact: true })).toBeVisible();
   await expect(panel.getByRole('alert')).toHaveCount(0);
-  expect(requests).toEqual([
-    { path: null, cursor: null }, { path: root, cursor: null },
+  expect(requests.filter(request => request.path !== null)).toEqual([
+    { path: root, cursor: null },
     { path: root, cursor: 'children-next' }, { path: root, cursor: null },
   ]);
+});
+
+test('mock directory picker fits a narrow screen and closes without selecting a default', async ({ page }, info) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockApi(page, async route => route.fulfill({ json: directoryPage(null, [rootItem]) }));
+  const dialog = await openDirectories(page);
+  await expect(dialog.getByRole('button', { name: '添加所选目录', exact: true })).toBeDisabled();
+  await expect(dialog.getByRole('button', { name: '选择目录 Fixture Music', exact: true })).toBeVisible();
+  const bounds = await dialog.boundingBox();
+  expect(bounds).not.toBeNull();
+  expect(bounds!.x).toBeGreaterThanOrEqual(0);
+  expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(390);
+  expect(await dialog.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+  await dialog.screenshot({ path: info.outputPath('directory-picker-mobile.png') });
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '添加本地目录', exact: true })).toBeFocused();
+  await expect(page.getByRole('list', { name: '已选音乐目录', exact: true }).getByRole('listitem')).toHaveCount(0);
 });
 
 test('mock regular user cannot open directory management through settings or its direct URL', async ({ page }) => {

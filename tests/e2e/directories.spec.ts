@@ -1,4 +1,4 @@
-import { test, expect, type APIRequestContext } from '@playwright/test';
+import { test, expect, type APIRequestContext, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { basename, normalize } from 'node:path';
 import { login, scan } from './helpers';
@@ -26,6 +26,14 @@ async function runtimeState(api: APIRequestContext): Promise<string> {
   const snapshot = await response.json();
   return snapshot.items.find((plugin: { pluginId: string }) => plugin.pluginId === 'musicfs.localfiles')
     .instances.find((instance: { instanceId: string }) => instance.instanceId === 'local').runtimeState;
+}
+
+async function openPicker(page: Page) {
+  await page.getByRole('button', { name: '添加本地目录', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: '添加本地目录', exact: true });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole('button', { name: '添加所选目录', exact: true })).toBeDisabled();
+  return dialog;
 }
 
 test('administrator directory browser exposes only authorized directories', async ({ page, request }) => {
@@ -57,15 +65,39 @@ test('settings selects a child directory, saves without importing, and preserves
   test.setTimeout(120_000);
   await login(page, server);
   await page.getByRole('button', { name: '设置', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '本地音乐', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '未知来源', exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: '管理音乐目录', exact: true }).click();
   const panel = page.locator('.local-directories');
-  await panel.getByRole('button', { name: `打开目录 ${basename(server.allowedRoot)}`, exact: true }).click();
-  await expect(panel.getByRole('list', { name: '可选目录', exact: true })).not.toContainText('unselected.wav');
-  await panel.getByRole('button', { name: `打开目录 ${basename(server.selectedRoot)}`, exact: true }).click();
-  await expect(panel.getByText('此目录没有可浏览的子目录。', { exact: true })).toBeVisible();
-  await panel.getByRole('button', { name: '添加当前目录', exact: true }).click();
+  const allowed = panel.getByRole('list', { name: '允许访问的目录', exact: true });
+  const selected = panel.getByRole('list', { name: '已选音乐目录', exact: true });
+  await expect(allowed).toContainText(server.allowedRoot);
+  await expect(allowed.locator('button, input, select')).toHaveCount(0);
+  await expect(selected.getByRole('listitem')).toHaveCount(0);
+  await expect(panel.getByRole('button', { name: '保存音乐目录', exact: true })).toBeDisabled();
+  let dialog = await openPicker(page);
+  await dialog.getByRole('button', { name: `选择目录 ${basename(server.allowedRoot)}`, exact: true }).click();
+  await expect(dialog.getByRole('button', { name: '添加所选目录', exact: true })).toBeEnabled();
+  await dialog.getByRole('button', { name: '取消', exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(selected.getByRole('listitem')).toHaveCount(0);
+  await expect(panel.getByRole('button', { name: '添加本地目录', exact: true })).toBeFocused();
+  dialog = await openPicker(page);
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  await expect(selected.getByRole('listitem')).toHaveCount(0);
+  dialog = await openPicker(page);
+  await dialog.getByRole('button', { name: `打开目录 ${basename(server.allowedRoot)}`, exact: true }).click();
+  await expect(dialog.getByRole('list', { name: '可选目录', exact: true })).not.toContainText('unselected.wav');
+  await dialog.getByRole('button', { name: `打开目录 ${basename(server.selectedRoot)}`, exact: true }).click();
+  await expect(dialog.getByText('此目录没有可浏览的子目录。', { exact: true })).toBeVisible();
+  await dialog.getByRole('button', { name: '选择当前目录', exact: true }).click();
+  await expect(selected.getByRole('listitem')).toHaveCount(0);
+  expect((await configuration(page.request)).roots).toEqual([]);
+  await dialog.screenshot({ path: info.outputPath('directory-picker.png') });
+  await dialog.getByRole('button', { name: '添加所选目录', exact: true }).click();
+  await expect(dialog).toHaveCount(0);
   await expect(panel.getByRole('list', { name: '已选音乐目录', exact: true }).getByRole('listitem')).toHaveCount(1);
-  await expect(panel.getByRole('button', { name: '添加当前目录', exact: true })).toBeDisabled();
   await panel.screenshot({ path: info.outputPath('directory-selection.png') });
   const [saved] = await Promise.all([
     page.waitForResponse(response => response.url().endsWith(configurationPath) && response.request().method() === 'PUT'),
@@ -82,16 +114,21 @@ test('settings selects a child directory, saves without importing, and preserves
     id: saved.request().postDataJSON().musicRoots[0].id,
     name: basename(server.selectedRoot), pathConfigured: true,
   }]);
-  await panel.getByRole('button', { name: `打开目录 ${basename(server.allowedRoot)}`, exact: true }).click();
-  await expect(panel.getByRole('button', { name: `添加目录 ${basename(server.selectedRoot)}`, exact: true })).toBeDisabled();
-  await panel.getByRole('button', { name: `打开目录 ${basename(server.selectedRoot)}`, exact: true }).click();
-  await expect(panel.getByRole('button', { name: '添加当前目录', exact: true })).toBeDisabled();
+  dialog = await openPicker(page);
+  await dialog.getByRole('button', { name: `打开目录 ${basename(server.allowedRoot)}`, exact: true }).click();
+  await expect(dialog.getByRole('button', { name: `选择目录 ${basename(server.selectedRoot)}`, exact: true })).toBeDisabled();
+  await dialog.getByRole('button', { name: `打开目录 ${basename(server.selectedRoot)}`, exact: true }).click();
+  await expect(dialog.getByRole('button', { name: '选择当前目录', exact: true })).toBeDisabled();
+  await dialog.getByRole('button', { name: '取消', exact: true }).click();
   const savedDirectoryResponse = await page.request.get(server.origin + directoryPath, { params: { path: server.selectedRoot } });
   expect(savedDirectoryResponse.ok()).toBeTruthy();
   expect((await savedDirectoryResponse.json()).configuredRootId).toBe(configured.roots[0].id);
   await panel.getByRole('button', { name: `移除目录 ${basename(server.selectedRoot)}`, exact: true }).click();
   await expect(panel.getByRole('button', { name: '保存音乐目录', exact: true })).toBeEnabled();
-  await panel.getByRole('button', { name: '添加当前目录', exact: true }).click();
+  dialog = await openPicker(page);
+  await dialog.getByRole('button', { name: `打开目录 ${basename(server.allowedRoot)}`, exact: true }).click();
+  await dialog.getByRole('button', { name: `选择目录 ${basename(server.selectedRoot)}`, exact: true }).click();
+  await dialog.getByRole('button', { name: '添加所选目录', exact: true }).click();
   await expect(panel.getByRole('list', { name: '已选音乐目录', exact: true }).getByRole('listitem')).toHaveCount(1);
   await expect(panel.getByRole('list', { name: '已选音乐目录', exact: true })).toContainText(configured.roots[0].name);
   await expect(panel.getByRole('button', { name: '保存音乐目录', exact: true })).toBeDisabled();
@@ -117,6 +154,7 @@ test('settings selects a child directory, saves without importing, and preserves
   await server.restart();
   await page.reload();
   await expect(page.getByRole('button', { name: '账号菜单' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '本地音乐', exact: true })).toBeVisible();
   expect(await runtimeState(page.request)).toBe('pending_configuration');
   expect((await configuration(page.request)).roots).toEqual([]);
   expect(await sourceTracks()).toHaveLength(1);
