@@ -30,7 +30,7 @@ test("settings show pending, disabled and ready plugins and refresh their state"
   const card = page.locator(".settings-card").filter({ has: page.getByRole("heading", { name: "插件状态" }) });
   await expect(card.getByText("待配置", { exact: true })).toBeVisible();
   await expect(card.getByText("已禁用", { exact: true })).toBeVisible();
-  await expect(card.getByText("请在服务端配置可访问的音乐目录。")).toBeVisible();
+  await expect(card.getByText("请从允许访问的目录中选择音乐目录。")).toBeVisible();
   localState = "ready";
   await card.getByRole("button", { name: "刷新插件状态" }).click();
   await expect(card.getByText("可用", { exact: true })).toHaveCount(2);

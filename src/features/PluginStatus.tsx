@@ -2,6 +2,7 @@ import { useServices } from "../app/services";
 import { useResource } from "../components/query";
 import { ErrorNotice } from "../components/ui";
 import { tr, useLocale } from "../i18n";
+import { Link } from "react-router-dom";
 
 interface Instance {
   instanceId: string;
@@ -38,9 +39,10 @@ export function PluginStatus() {
           <span>{tr(states[i.runtimeState] ?? "暂不可用")}</span>
           {i.runtimeState === "pending_configuration" && (
             <p className="muted">{tr(p.pluginId === "musicfs.localfiles"
-              ? "请在服务端配置可访问的音乐目录。"
+              ? "请从允许访问的目录中选择音乐目录。"
               : "请在服务端配置可用的 FFmpeg 和 ffprobe 路径。")}</p>
           )}
+          {p.pluginId === "musicfs.localfiles" && <Link to={`/settings?directories=${encodeURIComponent(i.instanceId)}`}>{tr("管理音乐目录")}</Link>}
         </div>
       )))}
       {plugins.data?.items.length === 0 && <p>{tr("未发现已安装插件。")}</p>}

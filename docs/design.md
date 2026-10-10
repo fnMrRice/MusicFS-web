@@ -4,7 +4,7 @@
 
 按 [TypeScript + React 开发方案](react-development.md)和[共享 UI 设计](../../docs/ui-design.md)实现 Web。顶部只保留设置与换肤，不含桌面窗口控制。接口接入范围见[依赖清单](react-api-readiness.md)，Server 侧需求见[缺口交接](../../server/docs/web-ui-api-gaps.md)。
 
-旧版原生 DOM 页面与原生音频控件已移除；React 自定义播放栏沿用原流、处理输出和 NCM 控制核心。目录设置、扫描和刮削编辑仍通过 Server 配置／管理工具完成；下文长期职责不代表全部能力已经交付。
+旧版原生 DOM 页面与原生音频控件已移除；React 自定义播放栏沿用原流、处理输出和 NCM 控制核心。管理员可在设置页管理本地音乐目录：浏览 Server 授权根及子目录，选择、移除并保存实际音乐目录，跟踪服务端应用结果；空目录选择显示待配置。目录浏览由 Server 限定在 YAML 授权范围内，Web 不读取浏览器所在设备的磁盘。保存目录不自动扫描，导入仍通过已有 Server 扫描接口或脚本发起；下文长期职责不代表全部能力已经交付。
 
 Server 与客户端共同约定由 [MusicFS 跨端架构](../../docs/architecture.md) 管理；[Server 内部设计](../../server/docs/architecture.md)与[音频处理](../../server/docs/audio-processing.md)由 Server 仓库维护。本文件负责 Web 内部职责，OpenAPI、事件协议与协议 SDK 由 Server 发布。
 

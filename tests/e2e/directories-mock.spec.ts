@@ -1,0 +1,102 @@
+import { test, expect, type Page, type Route } from '@playwright/test';
+import { preview, type PreviewServer } from 'vite';
+
+let server: PreviewServer;
+const origin = 'http://127.0.0.1:18141';
+const root = 'D:\\Fixture Music';
+const child = `${root}\\Collection`;
+const rootItem = { name: 'Fixture Music', path: root, available: true, configuredRootId: null };
+const childItem = { name: 'Collection', path: child, available: true, configuredRootId: null };
+
+test.beforeAll(async () => {
+  server = await preview({ preview: { host: '127.0.0.1', port: 18141, strictPort: true } });
+});
+test.afterAll(async () => { await new Promise<void>(resolve => server?.httpServer.close(() => resolve())); });
+
+function directoryPage(path: string | null, items: unknown[], nextCursor: string | null = null) {
+  return { revision: 'mock-revision', path, parentPath: null, configuredRootId: null, items, nextCursor };
+}
+
+async function mockApi(page: Page, directories: (route: Route, url: URL) => Promise<void>, role = 'admin') {
+  const requested: string[] = [];
+  await page.route('**/api/v1/**', async route => {
+    const url = new URL(route.request().url());
+    const path = url.pathname;
+    requested.push(path);
+    if (path.endsWith('/directories')) return directories(route, url);
+    let json: unknown = { items: [], nextCursor: null };
+    if (path.endsWith('/health/ready')) json = { product: 'MusicFS', apiVersion: '1', ready: true, instanceId: 'mock-directories' };
+    if (path.endsWith('/auth/session')) json = { csrfToken: 'test', user: { id: role, role } };
+    if (path.endsWith('/provider-instances')) json = { items: [{
+      id: 'local', name: 'Fixture', availability: 'unavailable',
+      plugin: { id: 'musicfs.localfiles', name: 'Local files', localizedNames: { 'zh-CN': '本地音乐' }, features: ['music-source'] },
+    }] };
+    if (path.endsWith('/admin/plugins')) json = { items: [{
+      pluginId: 'musicfs.localfiles', instances: [{ instanceId: 'local', name: 'Fixture', runtimeState: 'pending_configuration' }],
+    }] };
+    if (path.endsWith('/configuration')) json = { revision: 'mock-revision', roots: [] };
+    await route.fulfill({ json });
+  });
+  return requested;
+}
+
+async function openDirectories(page: Page) {
+  await page.goto(`${origin}/#/settings`);
+  await page.getByRole('button', { name: '管理音乐目录', exact: true }).click();
+  return page.locator('.local-directories');
+}
+
+test('mock directory pagination continues after an empty page', async ({ page }) => {
+  const cursors: (string | null)[] = [];
+  await mockApi(page, async (route, url) => {
+    const cursor = url.searchParams.get('cursor');
+    cursors.push(cursor);
+    await route.fulfill({ json: cursor === null
+      ? directoryPage(null, [], 'roots-next') : directoryPage(null, [rootItem]) });
+  });
+  const panel = await openDirectories(page);
+  await expect(panel.getByRole('list', { name: '可选目录', exact: true }).getByRole('listitem')).toHaveCount(0);
+  await expect(panel.getByText('没有允许访问的目录，请在服务端配置目录访问权限。', { exact: true })).toHaveCount(0);
+  await panel.getByRole('button', { name: '加载更多目录', exact: true }).click();
+  await expect(panel.getByRole('button', { name: '打开目录 Fixture Music', exact: true })).toBeVisible();
+  await expect(panel.getByRole('button', { name: '加载更多目录', exact: true })).toHaveCount(0);
+  expect(cursors).toEqual([null, 'roots-next']);
+});
+
+test('mock expired directory cursor retries the current directory from its first page', async ({ page }) => {
+  const requests: { path: string | null; cursor: string | null }[] = [];
+  let firstPages = 0;
+  await mockApi(page, async (route, url) => {
+    const path = url.searchParams.get('path');
+    const cursor = url.searchParams.get('cursor');
+    requests.push({ path, cursor });
+    if (path === null) return route.fulfill({ json: directoryPage(null, [rootItem]) });
+    if (cursor !== null) return route.fulfill({ status: 400, json: { error: { code: 'CURSOR_EXPIRED', message: 'Directory list changed' } } });
+    firstPages++;
+    await route.fulfill({ json: firstPages === 1
+      ? directoryPage(root, [], 'children-next') : directoryPage(root, [childItem]) });
+  });
+  const panel = await openDirectories(page);
+  await panel.getByRole('button', { name: '打开目录 Fixture Music', exact: true }).click();
+  await panel.getByRole('button', { name: '加载更多目录', exact: true }).click();
+  await expect(panel.getByRole('alert')).toContainText('目录列表已变化，请重新读取当前目录。');
+  await expect(panel.getByRole('button', { name: '加载更多目录', exact: true })).toBeDisabled();
+  await expect(panel.getByRole('button', { name: '添加当前目录', exact: true })).toBeDisabled();
+  await panel.getByRole('button', { name: '重试', exact: true }).click();
+  await expect(panel.getByRole('button', { name: '打开目录 Collection', exact: true })).toBeVisible();
+  await expect(panel.getByRole('alert')).toHaveCount(0);
+  expect(requests).toEqual([
+    { path: null, cursor: null }, { path: root, cursor: null },
+    { path: root, cursor: 'children-next' }, { path: root, cursor: null },
+  ]);
+});
+
+test('mock regular user cannot open directory management through settings or its direct URL', async ({ page }) => {
+  const requested = await mockApi(page, async route => route.fulfill({ status: 403 }), 'user');
+  await page.goto(`${origin}/#/settings?directories=local`);
+  await expect(page.getByRole('heading', { name: '本地音乐', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '管理音乐目录', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: '管理音乐目录', exact: true })).toHaveCount(0);
+  await expect(page.locator('.local-directories')).toHaveCount(0);
+  expect(requested.some(path => path.includes('/admin/'))).toBe(false);
+});

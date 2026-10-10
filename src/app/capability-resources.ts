@@ -1,6 +1,8 @@
 const affectedResources = new Set([
   "providers",
   "settings-providers",
+  "settings-plugins",
+  "settings-local-directories-true",
   "search-instances",
   "import-providers",
   "platform-account-instances",

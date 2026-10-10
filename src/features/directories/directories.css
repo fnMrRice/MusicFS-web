@@ -1,0 +1,17 @@
+.local-directories { border-top: 1px solid var(--line); padding-top: 20px; margin-top: 20px; }
+.directory-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.directory-actions h4 { margin: 0; margin-right: auto; }
+.directory-browser { border: 1px solid var(--line); border-radius: 10px; padding: 18px; margin-top: 20px; }
+.directory-list { list-style: none; padding: 0; margin: 14px 0; }
+.directory-list li, .directory-current { display: flex; justify-content: space-between; align-items: center; gap: 14px; padding: 12px 0; }
+.directory-list li + li { border-top: 1px solid var(--line); }
+.directory-detail { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.directory-detail code, .directory-current code { overflow-wrap: anywhere; font-size: 12px; color: var(--muted); }
+.directory-list button, .directory-current button { flex-shrink: 0; }
+.directory-save { margin-top: 20px; }
+.music-source-row { flex-wrap: wrap; align-items: center; }
+.music-source-row > strong { margin-right: auto; }
+@media (max-width: 700px) {
+  .directory-browser { padding: 12px; }
+  .directory-list li, .directory-current { align-items: flex-start; flex-direction: column; }
+}

@@ -16,6 +16,7 @@ export interface RequestOptions {
   body?: unknown;
   signal?: AbortSignal;
   idempotencyKey?: string;
+  ifMatch?: string;
   bearer?: string;
   timeoutMs?: number;
   keepalive?: boolean;
@@ -47,6 +48,7 @@ export class ApiClient {
       headers.set("X-CSRF-Token", this.csrfToken);
     if (options.idempotencyKey)
       headers.set("Idempotency-Key", options.idempotencyKey);
+    if (options.ifMatch) headers.set("If-Match", options.ifMatch);
     try {
       const response = await this.fetcher(`/api/v1${path}`, {
         method,
