@@ -9,10 +9,19 @@ export async function login(page: Page, server: TestServer): Promise<void> {
 export async function scan(request: APIRequestContext, origin: string): Promise<void> {
   const session = await (await request.get(`${origin}/api/v1/auth/session`)).json();
   const response = await request.post(`${origin}/api/v1/provider-instances/local/scan-jobs`, {
-    headers: { Origin: origin, 'X-CSRF-Token': session.csrfToken, 'Idempotency-Key': crypto.randomUUID() }, data: { mode: 'full' },
+    headers: { Origin: origin, 'X-CSRF-Token': session.csrfToken, 'Idempotency-Key': crypto.randomUUID() }, data: await scanRequest(request, origin),
   });
   expect(response.ok()).toBeTruthy(); const { jobId } = await response.json();
   await expect.poll(async () => (await (await request.get(`${origin}/api/v1/scan-jobs/${jobId}`)).json()).status, { timeout: 90_000 }).toBe('succeeded');
+}
+export async function scanRequest(request: APIRequestContext, origin: string) {
+  const response = await request.get(`${origin}/api/v1/provider-instances`);
+  expect(response.ok()).toBeTruthy();
+  const providers = await response.json();
+  const provider = providers.items.find((item: { id: string }) => item.id === 'local');
+  expect(provider.configuration.schemaRevision).toBeTruthy();
+  expect(provider.roots.length).toBeGreaterThan(0);
+  return { mode: 'full', schemaRevision: provider.configuration.schemaRevision, rootIds: provider.roots.map((root: { id: string }) => root.id), options: {} };
 }
 export async function waitPlaying(page: Page): Promise<void> {
   await expect.poll(() => page.locator('audio').evaluate((audio: HTMLAudioElement) => ({ paused: audio.paused, time: audio.currentTime, ready: audio.readyState })))

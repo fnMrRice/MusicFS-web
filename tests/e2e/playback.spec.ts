@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { startDevServer, startServer, type TestServer } from './server';
-import { decodedEnergy, decodedSignal, login, scan, waitPlaying } from './helpers';
+import { decodedEnergy, decodedSignal, login, scan, scanRequest, waitPlaying } from './helpers';
 
 let server: TestServer;
 test.beforeAll(async () => { test.setTimeout(120_000); server = await startServer(); });
@@ -116,7 +116,7 @@ test('offline music directory retains published library and logout unloads activ
   try {
     const session = await (await page.request.get(`${server.origin}/api/v1/auth/session`)).json();
     const response = await page.request.post(`${server.origin}/api/v1/provider-instances/local/scan-jobs`, {
-      headers: { Origin: server.origin, 'X-CSRF-Token': session.csrfToken, 'Idempotency-Key': crypto.randomUUID() }, data: { mode: 'full' },
+      headers: { Origin: server.origin, 'X-CSRF-Token': session.csrfToken, 'Idempotency-Key': crypto.randomUUID() }, data: await scanRequest(page.request, server.origin),
     });
     expect(response.ok()).toBeTruthy(); const { jobId } = await response.json();
     await expect.poll(async () => (await (await page.request.get(`${server.origin}/api/v1/scan-jobs/${jobId}`)).json()).status).toBe('failed');
