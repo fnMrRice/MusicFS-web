@@ -56,4 +56,16 @@ describe('Player controller (Mock media; not decoder validation)', () => {
     expect(s.controller.state.positionMs).toBe(12_000); expect(s.controller.state.phase).toBe('paused');
     expect(s.audio.play).toHaveBeenCalledOnce(); expect(s.audio.seek).not.toHaveBeenCalled(); s.controller.stop();
   });
+  it('custom pause and volume survive a processed replacement', async () => {
+    const descriptor = { ...playback(), seekMode: 'timeRestart' } as Playback;
+    const s = setup(vi.fn().mockResolvedValue(descriptor)); s.audio.setVolume = vi.fn();
+    s.controller.setVolume(.35); await s.controller.select(track);
+    expect(s.audio.setVolume).toHaveBeenCalledWith(.35);
+    s.controller.toggle(); expect(s.audio.pause).toHaveBeenCalledOnce();
+    expect(s.controller.state.wantsPlay).toBe(false);
+    s.api.control.mockResolvedValue({ ...descriptor, attemptId: 'next', positionOriginMs: 4000 });
+    s.controller.seek(4000); await Promise.resolve(); await Promise.resolve();
+    expect(s.audio.play).toHaveBeenCalledOnce(); expect(s.audio.setVolume).toHaveBeenLastCalledWith(.35);
+    s.controller.toggle(); expect(s.audio.play).toHaveBeenCalledTimes(2); s.controller.stop();
+  });
 });

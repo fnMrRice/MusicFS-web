@@ -5,7 +5,21 @@ import { scanFailureMessage, waitForScanJob } from '../fixtures/scan-job';
 export async function login(page: Page, server: TestServer): Promise<void> {
   console.log('Opening page for real session login');
   await page.goto(server.origin); await page.getByLabel('管理员登录令牌').fill(server.token);
-  await page.getByRole('button', { name: '登录', exact: true }).click(); await expect(page.getByRole('button', { name: '退出登录' })).toBeVisible();
+  await page.getByRole('button', { name: '登录', exact: true }).click(); await expect(page.getByRole('button', { name: '账号菜单' })).toBeVisible();
+}
+export async function logout(page: Page): Promise<void> {
+  await page.getByRole('button', { name: '账号菜单' }).click();
+  await page.getByRole('button', { name: '退出登录', exact: true }).click();
+}
+export async function seekTo(page: Page, seconds: number): Promise<void> {
+  const slider = page.getByRole('slider', { name: '曲目进度', exact: true });
+  await slider.fill(String(seconds * 1000));
+  await slider.dispatchEvent('pointerup');
+}
+export async function setProcessing(page: Page, enabled: boolean): Promise<void> {
+  await page.getByRole('button', { name: '设置', exact: true }).click();
+  await page.getByLabel('服务端处理（降低 6 dB，下一首生效）').setChecked(enabled);
+  await page.getByRole('link', { name: '曲目列表', exact: true }).click();
 }
 export async function scan(request: APIRequestContext, origin: string): Promise<void> {
   const session = await (await request.get(`${origin}/api/v1/auth/session`)).json();

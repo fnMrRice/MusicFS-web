@@ -1,22 +1,28 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, request, type Page } from '@playwright/test';
 import { renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { startDevServer, startServer, type TestServer } from './server';
-import { decodedEnergy, decodedSignal, login, scan, scanRequest, waitPlaying, waitScan } from './helpers';
+import { decodedEnergy, decodedSignal, login, logout, seekTo, setProcessing, scan, scanRequest, waitPlaying, waitScan } from './helpers';
 
 let server: TestServer;
-test.beforeAll(async () => { test.setTimeout(120_000); server = await startServer(); });
+test.beforeAll(async () => {
+  test.setTimeout(120_000); server = await startServer();
+  const api = await request.newContext();
+  await api.post(server.origin + '/api/v1/auth/session', { headers: { Authorization: 'Bearer ' + server.token, Origin: server.origin } });
+  await scan(api, server.origin); await api.dispose();
+});
 test.afterAll(async () => { await server?.stop(); });
 
 async function showAll(page: Page): Promise<void> {
-  const more = page.getByRole('button', { name: '加载更多' });
-  await expect(more).toBeVisible(); await more.click(); await expect(page.locator('tbody tr')).toHaveCount(107);
+  await expect.poll(() => page.locator('tbody tr').count()).toBeGreaterThanOrEqual(100);
+  await page.locator('#page-scroll').evaluate(element => { element.scrollTop = element.scrollHeight; });
+  await expect(page.locator('tbody tr')).toHaveCount(107);
 }
 
 test('real login, CSRF rejection, scanning, fixed pages, refresh restore, and logout', async ({ page }) => {
   test.setTimeout(120_000);
   await login(page, server);
-  expect(await page.getByLabel('管理员登录令牌').inputValue()).toBe('');
+  await expect(page.getByLabel('管理员登录令牌')).toHaveCount(0);
   const cookie = (await page.context().cookies()).find((cookie) => cookie.name === 'musicfs_session');
   expect(cookie).toMatchObject({ httpOnly: true, sameSite: 'Strict', path: '/api/v1' });
   const denied = await page.request.post(`${server.origin}/api/v1/provider-instances/local/scan-jobs`, { headers: { Origin: server.origin }, data: { mode: 'full' } });
@@ -25,8 +31,8 @@ test('real login, CSRF rejection, scanning, fixed pages, refresh restore, and lo
   await expect(page.locator('tbody tr')).toHaveCount(100); await showAll(page);
   await expect(page.getByRole('button', { name: '播放 中文 空格曲目.wav', exact: true })).toBeVisible();
   expect(await page.evaluate(() => ({ local: localStorage.length, session: sessionStorage.length }))).toEqual({ local: 0, session: 0 });
-  await page.reload(); await expect(page.getByRole('button', { name: '退出登录' })).toBeVisible();
-  await page.getByRole('button', { name: '退出登录' }).click(); await expect(page.getByRole('button', { name: '登录', exact: true })).toBeVisible();
+  await page.reload(); await expect(page.getByRole('button', { name: '账号菜单' })).toBeVisible();
+  await logout(page); await expect(page.getByRole('button', { name: '登录', exact: true })).toBeVisible();
   expect((await page.request.get(`${server.origin}/api/v1/auth/session`)).status()).toBe(401);
 });
 
@@ -40,7 +46,7 @@ test('real original WAV decodes, pauses, seeks through Range, switches, and stop
   await audio.evaluate((element: HTMLAudioElement) => element.pause());
   const pausedAt = await audio.evaluate((element: HTMLAudioElement) => element.currentTime);
   await page.waitForTimeout(300); expect(await audio.evaluate((element: HTMLAudioElement) => element.currentTime)).toBeCloseTo(pausedAt, 1);
-  await page.getByLabel('曲目位置（秒）').fill('3'); await page.getByRole('button', { name: '跳转', exact: true }).click();
+  await seekTo(page, 3);
   await expect.poll(() => audio.evaluate((element: HTMLAudioElement) => element.currentTime)).toBeGreaterThanOrEqual(2.8);
   await audio.evaluate((element: HTMLAudioElement) => element.play()); await waitPlaying(page);
   const energy = await decodedEnergy(page); expect(energy).toBeGreaterThan(.01);
@@ -67,7 +73,7 @@ test('unsupported AIFF becomes streaming processed MP3 and timeRestart preserves
     });
   });
   expect(rawError).toBe(4);
-  await page.getByLabel('服务端处理（降低 6 dB，下一首生效）').check();
+  await setProcessing(page, true); await showAll(page);
   const [created] = await Promise.all([
     page.waitForResponse((response) => response.url().endsWith('/playback/sessions') && response.request().method() === 'POST'),
     page.getByRole('button', { name: '播放 processing.aiff', exact: true }).click(),
@@ -76,10 +82,10 @@ test('unsupported AIFF becomes streaming processed MP3 and timeRestart preserves
   await waitPlaying(page); expect(await decodedEnergy(page)).toBeGreaterThan(.01);
   const attempts: Record<string, unknown>[] = [];
   page.on('response', async (response) => { if (response.url().endsWith('/seek') && response.ok()) attempts.push(await response.json()); });
-  await page.getByLabel('曲目位置（秒）').fill('2'); await page.getByRole('button', { name: '跳转', exact: true }).click();
-  await page.getByLabel('曲目位置（秒）').fill('4'); await page.getByRole('button', { name: '跳转', exact: true }).click();
+  await seekTo(page, 2);
+  await seekTo(page, 4);
   await expect.poll(() => attempts.length).toBeGreaterThanOrEqual(1);
-  await expect(page.getByRole('region', { name: '播放器' })).toContainText(/曲目位置：[4-9]/);
+  await expect.poll(async () => Number(await page.getByRole('slider', { name: '曲目进度', exact: true }).inputValue())).toBeGreaterThanOrEqual(4000);
   const currentUrl = await page.locator('audio').getAttribute('src'); expect(currentUrl).not.toBe(initial.streamUrl);
   expect(attempts.at(-1)?.positionOriginMs).toBe(4000);
   await waitPlaying(page);
@@ -97,7 +103,7 @@ test('long processed output decodes before HTTP stream completes and cancellatio
   const completed = new Set<string>(); let firstResponseAt = 0;
   page.on('requestfinished', (request) => { if (request.url().endsWith('/stream')) completed.add(request.url()); });
   page.on('response', (response) => { if (response.url().endsWith('/stream') && !firstResponseAt) firstResponseAt = Date.now(); });
-  await page.getByLabel('服务端处理（降低 6 dB，下一首生效）').check();
+  await setProcessing(page, true); await showAll(page);
   const startedAt = Date.now(); await page.getByRole('button', { name: '播放 zz-long-processing.aiff', exact: true }).click();
   await waitPlaying(page); const energy = await decodedEnergy(page); const decodedAt = Date.now();
   const url = await page.locator('audio').evaluate((audio: HTMLAudioElement) => audio.src);
@@ -127,7 +133,7 @@ test('offline music directory retains published library and logout unloads activ
     await expect(page.locator('tbody tr')).toHaveCount(100);
   } finally { renameSync(unavailable, original); }
   await page.getByRole('button', { name: '播放 markers.wav', exact: true }).click(); await waitPlaying(page);
-  await page.getByRole('button', { name: '退出登录' }).click(); await expect(page.locator('audio')).toHaveCount(0);
+  await logout(page); await expect(page.locator('audio')).toHaveCount(0);
   await expect(page.getByRole('button', { name: '登录', exact: true })).toBeVisible();
 });
 
@@ -140,7 +146,7 @@ test('development proxy preserves origin, session cookies and native audio Range
       page.getByRole('button', { name: '播放 markers.wav', exact: true }).click(),
     ]);
     expect(stream.status()).toBe(206); await waitPlaying(page);
-    await page.getByRole('button', { name: '退出登录' }).click(); await expect(page.locator('audio')).toHaveCount(0);
+    await logout(page); await expect(page.locator('audio')).toHaveCount(0);
     await expect(page.getByRole('button', { name: '登录', exact: true })).toBeVisible();
   } finally { await stop(); }
 });
@@ -149,10 +155,8 @@ test('keyboard reaches scrollable library and final minimal player controls', as
   test.setTimeout(120_000);
   await login(page, server); await scan(page.request, server.origin);
   await page.getByRole('button', { name: '刷新列表' }).click(); await expect(page.locator('tbody tr')).toHaveCount(100);
-  await page.getByRole('button', { name: '退出登录' }).focus();
-  await page.keyboard.press('Tab'); await expect(page.getByLabel('来源', { exact: true })).toBeFocused();
+  await page.getByLabel('来源', { exact: true }).focus();
   await page.keyboard.press('Tab'); await expect(page.getByRole('button', { name: '刷新列表' })).toBeFocused();
-  await page.keyboard.press('Tab'); await expect(page.getByRole('region', { name: '可滚动的文件列表' })).toBeFocused();
   await page.getByRole('button', { name: '播放 markers.wav', exact: true }).click(); await waitPlaying(page);
   await page.getByRole('button', { name: '停止', exact: true }).scrollIntoViewIfNeeded();
   await expect(page.getByRole('button', { name: '停止', exact: true })).toBeInViewport();

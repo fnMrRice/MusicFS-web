@@ -1,0 +1,83 @@
+import { StrictMode } from "react";
+import { createRoot } from "react-dom/client";
+import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
+import { Services, ServicesContext, useServices, useStore } from "./services";
+import { Login } from "./Login";
+import { ErrorBoundary } from "./ErrorBoundary";
+import { AppShell } from "../layout/AppShell";
+import { Library } from "../features/Library";
+import { Search } from "../features/Search";
+import {
+  Recommendations,
+  DiscoveryPlaylist,
+} from "../features/Recommendations";
+import { Playlists } from "../features/playlists/Playlists";
+import { PlaylistDetail } from "../features/playlists/PlaylistDetail";
+import { AlbumDetail } from "../features/AlbumDetail";
+import { Settings } from "../features/Settings";
+import { Empty } from "../components/ui";
+import "../styles/global.css";
+
+const root = document.getElementById("app");
+if (!root) throw new Error("Missing application root");
+const audioRoot = document.createElement("div");
+audioRoot.hidden = true;
+document.body.append(audioRoot);
+const services = new Services(audioRoot);
+function Application() {
+  const s = useServices();
+  const auth = useStore(s.auth);
+  if (!auth.session) return <Login />;
+  return (
+    <Routes>
+      <Route element={<AppShell />}>
+        <Route path="/library" element={<Library />} />
+        <Route path="/search" element={<Search />} />
+        <Route path="/recommendations" element={<Recommendations />} />
+        <Route path="/playlists" element={<Playlists />} />
+        <Route path="/playlists/:id" element={<PlaylistDetail />} />
+        <Route
+          path="/discover/:instance/:external"
+          element={<DiscoveryPlaylist />}
+        />
+        <Route path="/albums/:id" element={<AlbumDetail />} />
+        <Route path="/settings" element={<Settings />} />
+        <Route
+          path="/favorites"
+          element={
+            <Empty title="把喜欢的音乐留在身边" icon="heart">
+              收藏接口尚未提供，此页面将在服务端能力就绪后接入。
+            </Empty>
+          }
+        />
+        <Route
+          path="/recent"
+          element={
+            <Empty title="每一次聆听，都值得回味" icon="clock">
+              播放历史接口尚未提供，当前不会上传或持久化你的聆听记录。
+            </Empty>
+          }
+        />
+        <Route path="*" element={<Navigate to="/library" replace />} />
+      </Route>
+    </Routes>
+  );
+}
+createRoot(root).render(
+  <StrictMode>
+    <ErrorBoundary>
+      <ServicesContext.Provider value={services}>
+        <HashRouter>
+          <Application />
+        </HashRouter>
+      </ServicesContext.Provider>
+    </ErrorBoundary>
+  </StrictMode>,
+);
+window.addEventListener("pagehide", () => services.player.stop());
+if (import.meta.hot)
+  import.meta.hot.dispose(() => {
+    services.clear();
+    audioRoot.remove();
+  });
+void services.connect();

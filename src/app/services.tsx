@@ -1,0 +1,264 @@
+import { createContext, useContext, useSyncExternalStore } from "react";
+import { ApiClient, ApiError, errorMessage } from "../api/client";
+import { AuthApi } from "../api/auth";
+import { LibraryApi } from "../api/library";
+import { ContentApi, type Playlist } from "../api/content";
+import { PlaybackApi } from "../api/playback";
+import type {
+  AuthSession,
+  Ready,
+  SourceTrack,
+  Preferences,
+} from "../api/types";
+import { PlayerController } from "../player/controller";
+import { audioFactory } from "../player/audio-adapter";
+import { capabilities } from "../player/capabilities";
+import { Store } from "./store";
+import { LibraryState } from "../library/state";
+
+interface AuthState {
+  session: AuthSession | null;
+  ready: Ready | null;
+  busy: boolean;
+  error: string | null;
+}
+interface PreferencesState {
+  theme: "dark" | "light";
+  volume: number;
+  mine: boolean;
+  playlists: boolean;
+  processing: boolean;
+}
+const defaults: PreferencesState = {
+  theme: "dark",
+  volume: 0.8,
+  mine: true,
+  playlists: true,
+  processing: false,
+};
+export class Services {
+  client = new ApiClient();
+  authApi = new AuthApi(this.client);
+  libraryApi = new LibraryApi(this.client);
+  content = new ContentApi(this.client);
+  auth = new Store<AuthState>({
+    session: null,
+    ready: null,
+    busy: true,
+    error: null,
+  });
+  preferences = new Store<PreferencesState>({ ...defaults });
+  playlists = new Store<Playlist[]>([]);
+  queue = new Store<{ items: SourceTrack[]; index: number; repeat: boolean }>({
+    items: [],
+    index: -1,
+    repeat: false,
+  });
+  player: PlayerController;
+  playerState: Store<PlayerController["state"]>;
+  currentTrack = new Store<string | null>(null);
+  private generation = 0;
+  private playlistRequest: AbortController | null = null;
+  private libraries = new Map<string, LibraryState>();
+  library(provider: string): LibraryState {
+    if (!this.libraries.has(provider)) this.libraries.set(provider, new LibraryState((p, cursor, signal) => this.libraryApi.page(p, cursor, signal)));
+    return this.libraries.get(provider)!;
+  }
+  constructor(root: HTMLElement) {
+    this.player = new PlayerController(
+      new PlaybackApi(this.client),
+      audioFactory(root),
+      capabilities(document.createElement("audio")),
+    );
+    this.playerState = new Store({ ...this.player.state });
+    this.player.onChange = () => {
+      const ended =
+        this.player.state.phase === "ended" &&
+        this.playerState.value.phase !== "ended";
+      this.playerState.set({ ...this.player.state });
+      const current = this.player.state.track?.sourceTrackId ?? null;
+      if (current !== this.currentTrack.value) this.currentTrack.set(current);
+      if (ended)
+        queueMicrotask(() => {
+          if (this.player.state.phase === "ended") this.next(1);
+        });
+    };
+    this.client.onUnauthorized = () => this.clear();
+  }
+  private key(): string | null {
+    const { ready, session } = this.auth.value;
+    return ready && session
+      ? `musicfs:${encodeURIComponent(ready.instanceId)}:${encodeURIComponent(session.user.id)}:preferences`
+      : null;
+  }
+  private accept(session: AuthSession): void {
+    this.auth.set({ ...this.auth.value, session, busy: false, error: null });
+    let saved: Partial<PreferencesState> = {};
+    try {
+      saved = JSON.parse(localStorage.getItem(this.key()!) ?? "{}");
+    } catch {
+      /* Storage may be unavailable. */
+    }
+    this.preferences.set({
+      theme: saved?.theme === "light" ? "light" : "dark",
+      volume:
+        typeof saved?.volume === "number" &&
+        saved.volume >= 0 &&
+        saved.volume <= 1
+          ? saved.volume
+          : 0.8,
+      mine: saved?.mine !== false,
+      playlists: saved?.playlists !== false,
+      processing: saved?.processing === true,
+    });
+    this.player.setVolume(this.preferences.value.volume);
+    void this.reloadPlaylists().catch(() => {});
+  }
+  async connect(): Promise<void> {
+    const generation = ++this.generation;
+    this.auth.set({ ...this.auth.value, busy: true, error: null });
+    try {
+      const ready = await this.authApi.ready();
+      if (generation !== this.generation) return;
+      if (
+        ready.product !== "MusicFS" ||
+        ready.apiVersion !== "1" ||
+        !ready.ready
+      )
+        throw new Error("Incompatible server");
+      this.auth.set({ ...this.auth.value, ready });
+      this.accept(await this.authApi.restore());
+    } catch (e) {
+      this.auth.set({
+        ...this.auth.value,
+        busy: false,
+        error:
+          e instanceof ApiError && e.status === 401
+            ? null
+            : e instanceof ApiError
+              ? errorMessage(e)
+              : "需要已就绪的 MusicFS API v1 服务。",
+      });
+    }
+  }
+  async login(token: string): Promise<void> {
+    if (!this.auth.value.ready) return;
+    this.auth.set({ ...this.auth.value, busy: true, error: null });
+    try {
+      this.accept(await this.authApi.login(token));
+    } catch (e) {
+      this.auth.set({
+        ...this.auth.value,
+        busy: false,
+        error: errorMessage(e),
+      });
+    }
+  }
+  async logout(): Promise<void> {
+    this.player.stop();
+    this.auth.set({ ...this.auth.value, busy: true, error: null });
+    try {
+      await this.authApi.logout();
+      this.clear();
+    } catch (e) {
+      this.auth.set({
+        ...this.auth.value,
+        busy: false,
+        error: errorMessage(e),
+      });
+    }
+  }
+  clear(): void {
+    this.libraries.forEach(library => library.clear());
+    this.libraries.clear();
+    ++this.generation;
+    this.playlistRequest?.abort();
+    this.player.stop();
+    this.queue.set({ items: [], index: -1, repeat: false });
+    this.playlists.set([]);
+    this.client.csrfToken = null;
+    this.preferences.set({ ...defaults });
+    this.auth.set({
+      ...this.auth.value,
+      session: null,
+      busy: false,
+      error: null,
+    });
+  }
+  preference(patch: Partial<PreferencesState>): void {
+    this.preferences.set({ ...this.preferences.value, ...patch });
+    this.player.setVolume(this.preferences.value.volume);
+    const key = this.key();
+    if (key)
+      try {
+        localStorage.setItem(key, JSON.stringify(this.preferences.value));
+      } catch {
+        /* Preferences remain in memory. */
+      }
+  }
+  async reloadPlaylists(): Promise<void> {
+    this.playlistRequest?.abort();
+    const request = new AbortController();
+    this.playlistRequest = request;
+    const generation = this.generation;
+    const items: Playlist[] = [];
+    let after: string | null = null;
+    const seen = new Set<string>();
+    do {
+      const page = await this.content.playlists(after, request.signal);
+      items.push(...page.items);
+      after = page.nextAfter;
+      if (after && seen.has(after))
+        throw new ApiError("PAGINATION_STALLED", "Playlist pagination stalled");
+      if (after) seen.add(after);
+    } while (after);
+    if (generation === this.generation && !request.signal.aborted)
+      this.playlists.set(items);
+  }
+  play(track: SourceTrack, items?: SourceTrack[]): void {
+    const candidates = items?.filter((t) => t.availability === "available") ?? [
+      track,
+    ];
+    this.queue.set({
+      ...this.queue.value,
+      items: candidates,
+      index: candidates.findIndex(
+        (t) => t.sourceTrackId === track.sourceTrackId,
+      ),
+    });
+    void this.player.select(track, this.playbackPreferences());
+  }
+  playbackPreferences(): Preferences {
+    return {
+      forceProcessing: this.preferences.value.processing,
+      gainDb: this.preferences.value.processing ? -6 : 0,
+    };
+  }
+  enqueue(items: SourceTrack[]): void {
+    this.queue.set({
+      ...this.queue.value,
+      items: [
+        ...this.queue.value.items,
+        ...items.filter((t) => t.availability === "available"),
+      ],
+    });
+  }
+  next(direction: number): void {
+    const q = this.queue.value;
+    let index = q.index + direction;
+    if (q.repeat && q.items.length)
+      index = (index + q.items.length) % q.items.length;
+    if (index < 0 || index >= q.items.length) return;
+    this.queue.set({ ...q, index });
+    void this.player.select(q.items[index], this.playbackPreferences());
+  }
+}
+export const ServicesContext = createContext<Services | null>(null);
+export function useServices(): Services {
+  const services = useContext(ServicesContext);
+  if (!services) throw new Error("Missing services");
+  return services;
+}
+export function useStore<T>(store: Store<T>): T {
+  return useSyncExternalStore(store.subscribe, store.getSnapshot);
+}

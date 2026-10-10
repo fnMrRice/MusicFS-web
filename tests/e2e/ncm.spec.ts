@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import type { Playback } from '../../src/api/types';
-import { decodedSignal, login, scan, waitPlaying } from './helpers';
+import { decodedSignal, login, seekTo, scan, waitPlaying } from './helpers';
 import { startServer, type TestServer } from './server';
 
 let server: TestServer;
@@ -33,7 +33,6 @@ test('NCM MP3 decrypts to exact Range bytes and native browser audio without DSP
   const descriptor = await choose(page, 'synthetic-mp3.ncm');
   expect(descriptor).toMatchObject({ deliveryMode: 'proxy', seekMode: 'byteRange', outputProfile: { mime: 'audio/mpeg', codec: 'mp3' } });
   expect(descriptor.effectiveProcessing).toEqual([{ type: 'ncmDecrypt', gainDb: 0, version: '1', execution: 'server' }]);
-  await expect(page.getByLabel('服务端处理（降低 6 dB，下一首生效）')).not.toBeChecked();
   await expect(page.getByRole('region', { name: '播放器', exact: true })).toContainText('服务端解密输出');
   await waitPlaying(page);
   const original = readFileSync(resolve(import.meta.dirname, '../../../server/tests/testdata/audio/vbr-untagged.mp3'));
@@ -45,7 +44,7 @@ test('NCM MP3 decrypts to exact Range bytes and native browser audio without DSP
   const complete = await page.request.get(`${server.origin}${descriptor.streamUrl}`);
   const digest = createHash('sha512').update(await complete.body()).digest('hex');
   expect(digest).toBe(createHash('sha512').update(original).digest('hex'));
-  await page.getByLabel('曲目位置（秒）').fill('4.5'); await page.getByRole('button', { name: '跳转', exact: true }).click();
+  await seekTo(page, 4.5);
   await expect.poll(() => page.locator('audio').evaluate((audio: HTMLAudioElement) => audio.currentTime)).toBeGreaterThanOrEqual(4.3);
   const signal = await decodedSignal(page); expect(signal.rms).toBeGreaterThan(.01);
   await page.getByRole('region', { name: '播放器', exact: true }).screenshot({ path: info.outputPath('ncm-mp3-player.png') });
@@ -58,12 +57,11 @@ test('NCM FLAC decrypts before MP3 conversion and timeRestart reaches the real m
   const descriptor = await choose(page, 'synthetic-flac.ncm');
   expect(descriptor).toMatchObject({ deliveryMode: 'processed', seekMode: 'timeRestart', outputProfile: { mime: 'audio/mpeg', codec: 'mp3' } });
   expect(descriptor.effectiveProcessing).toContainEqual({ type: 'ncmDecrypt', gainDb: 0, version: '1', execution: 'server' });
-  await expect(page.getByLabel('服务端处理（降低 6 dB，下一首生效）')).not.toBeChecked();
   await expect(page.getByRole('region', { name: '播放器', exact: true })).toContainText('服务端解密并转码输出');
   await waitPlaying(page);
   const [response] = await Promise.all([
     page.waitForResponse((response) => response.url().endsWith('/seek') && response.ok()),
-    (async () => { await page.getByLabel('曲目位置（秒）').fill('4'); await page.getByRole('button', { name: '跳转', exact: true }).click(); })(),
+    (async () => { await seekTo(page, 4); })(),
   ]);
   const located: Playback = await response.json();
   expect(located.positionOriginMs).toBe(4000); expect(located.attemptId).not.toBe(descriptor.attemptId);

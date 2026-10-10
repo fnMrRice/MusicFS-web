@@ -19,11 +19,23 @@ describe('Library revision state (Mock pages)', () => {
     expect(state.snapshot.items).toHaveLength(1); expect(state.snapshot.items[0].bitrateBps).toBeNull();
     expect(state.snapshot.items[0].sourceTrackId).toBe('fresh');
   });
-  it('restarts on expired cursors instead of merging revisions', async () => {
+  it('requires explicit refresh on expired cursors instead of merging revisions', async () => {
     const load = vi.fn().mockResolvedValueOnce(page('one', 'next')).mockRejectedValueOnce(new ApiError('CURSOR_EXPIRED', 'expired')).mockResolvedValueOnce(page('new', null, '2'));
     const state = new LibraryState(load); await state.select('local'); await state.more();
+    expect(state.snapshot.revision).toBe('1'); expect(state.snapshot.items[0].sourceTrackId).toBe('one');
+    expect(state.snapshot.error).toContain('请刷新'); expect(load).toHaveBeenCalledTimes(2);
+    await state.refresh();
     expect(state.snapshot.revision).toBe('2'); expect(state.snapshot.items[0].sourceTrackId).toBe('new');
     expect(load.mock.calls[2][1]).toBeNull();
+  });
+  it('blocks non-advancing cursors and concurrent appends', async () => {
+    const pending = deferred<TrackPage>();
+    const load = vi.fn().mockResolvedValueOnce(page('one', 'next')).mockReturnValueOnce(pending.promise);
+    const state = new LibraryState(load); await state.select('local');
+    const first = state.more(); await state.more(); expect(load).toHaveBeenCalledTimes(2);
+    pending.resolve(page('two', 'next')); await first;
+    expect(state.snapshot.items.map(t => t.sourceTrackId)).toEqual(['one']);
+    expect(state.snapshot.error).toContain('未能继续加载');
   });
   it('retains the last successful library on an offline error', async () => {
     const state = new LibraryState(vi.fn().mockResolvedValueOnce(page('one')).mockRejectedValueOnce(new ApiError('NETWORK_ERROR', 'offline')));

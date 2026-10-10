@@ -1,0 +1,258 @@
+.shell {
+  height: 100dvh;
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) 106px;
+  background: var(--bg);
+}
+.sidebar {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: 96px minmax(0, 1fr) 88px;
+  background: var(--sidebar);
+  border-right: 1px solid var(--line);
+}
+.navigation {
+  overflow: auto;
+  padding: 8px 16px;
+}
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  color: var(--text);
+  text-decoration: none;
+  padding: 13px 16px;
+  border-radius: 8px;
+  margin: 3px 0;
+  font-size: 15px;
+  min-width: 0;
+}
+.nav span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.nav:hover {
+  background: var(--hover);
+}
+.nav.active {
+  background: var(--accent);
+  color: white;
+  box-shadow: 0 5px 20px #ff3b5720;
+}
+.group {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid var(--line);
+  margin-top: 22px;
+  padding-top: 17px;
+  margin-bottom: 9px;
+}
+.groupToggle {
+  justify-content: flex-start;
+  background: none;
+  border: 0;
+  display: flex;
+  gap: 13px;
+  align-items: center;
+  color: var(--muted);
+  flex: 1;
+  text-align: left;
+}
+.collapsed {
+  transform: rotate(-90deg);
+}
+.dot {
+  height: 6px;
+  width: 6px;
+  background: var(--accent);
+  border-radius: 50%;
+}
+.hint {
+  font-size: 12px;
+  color: var(--muted);
+  padding: 0 16px;
+}
+.account {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 18px;
+  position: relative;
+  border-top: 1px solid var(--line);
+}
+.account > div:not(.accountMenu) {
+  min-width: 0;
+  flex: 1;
+}
+.account strong {
+  font-size: 14px;
+  font-weight: 500;
+}
+.account small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 11px;
+  margin-top: 4px;
+  color: var(--muted);
+}
+.avatar {
+  display: grid;
+  place-items: center;
+  background: var(--hover);
+  border: 1px solid var(--line);
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+}
+.accountMenu {
+  position: absolute;
+  bottom: 78px;
+  left: 18px;
+  right: 18px;
+  z-index: 30;
+}
+.main {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.header {
+  height: 88px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 0 30px;
+}
+.header h1 {
+  font-size: 23px;
+  font-weight: 600;
+  margin: 0;
+}
+.connection {
+  font-size: 11px;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.connection:before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  background: #73b59a;
+  border-radius: 50%;
+}
+.tools {
+  margin-left: auto;
+  display: flex;
+  gap: 14px;
+  position: relative;
+}
+.themeMenu {
+  position: absolute;
+  right: 0;
+  top: 48px;
+  width: 220px;
+  z-index: 40;
+}
+.themeMenu strong {
+  font-size: 13px;
+  display: block;
+  padding: 10px;
+}
+.swatch {
+  background: #151a20;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px solid #ff4860;
+  display: inline-block;
+  margin-right: 12px;
+  vertical-align: middle;
+}
+.swatch.light {
+  background: #faf7f5;
+}
+.content {
+  overflow: auto;
+  min-height: 0;
+  flex: 1;
+  padding: 5px 30px 28px;
+  scrollbar-gutter: stable;
+}
+@media (max-width: 850px) {
+  .shell {
+    grid-template-columns: 190px minmax(0, 1fr);
+  }
+  .header {
+    padding: 0 18px;
+  }
+  .content {
+    padding: 5px 18px 20px;
+  }
+  .connection {
+    display: none;
+  }
+  .navigation {
+    padding: 8px;
+  }
+  .nav {
+    gap: 10px;
+  }
+  .sidebar {
+    grid-template-rows: 80px minmax(0, 1fr) 80px;
+  }
+}
+@media (max-width: 580px) {
+  .shell {
+    grid-template-columns: 64px minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) 140px;
+  }
+  .sidebar :global(.brand) {
+    padding: 20px 16px;
+  }
+  .sidebar :global(.brand strong),
+  .nav span,
+  .hint,
+  .account strong,
+  .account small,
+  .account > .avatar {
+    display: none;
+  }
+  .groupToggle { display: flex; font-size: 0; padding: 3px; flex: 0; }
+  .nav {
+    padding: 12px;
+    justify-content: center;
+  }
+  .group {
+    justify-content: center;
+  }
+  .account {
+    padding: 14px 8px;
+  }
+  .accountMenu {
+    left: 5px;
+    width: 180px;
+    right: auto;
+  }
+  .header {
+    gap: 8px;
+    padding: 0 10px;
+    height: 72px;
+  }
+  .header h1 {
+    font-size: 19px;
+  }
+  .tools {
+    gap: 2px;
+  }
+  .content {
+    padding: 4px 12px 20px;
+  }
+}

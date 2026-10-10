@@ -1,7 +1,7 @@
 {
   "webVersion": "0.1.0",
   "apiVersions": ["1"],
-  "sourceEntry": "src/app/main.ts",
+  "sourceEntry": "src/app/main.tsx",
   "buildTool": "Vite 8.3.4",
   "runtime": "Node.js 26.3.1"
 }

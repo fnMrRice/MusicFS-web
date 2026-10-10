@@ -1,10 +1,10 @@
 # MusicFS-web 设计入口
 
-当前阶段：已实现最小页面，覆盖本地来源列表、原流与处理输出播放；状态与验证范围见 [实施记录](progress.md)。具体任务及后续范围见 [分阶段实现计划](implementation.md)。
+当前阶段（2026-10-10）：已由 React 接管界面，提供共享外壳、曲目表、搜索／推荐、歌单、专辑和设置；已有接口接入、未支持能力及验证范围见 [React 交付记录](react-validation.md)。历史最小页面记录保留于 [实施记录](progress.md)。
 
-下一阶段以 [TypeScript + React 开发方案](react-development.md)为实施入口，按[共享 UI 设计](../../docs/ui-design.md)实现 Web。Web 顶部只保留设置与换肤，不含迷你模式／小窗、最小化、最大化、关闭及对应分隔线；Client 等 Web 完成后再安排。当前 React 尚未接入，接口准备见[依赖清单](react-api-readiness.md)。
+按 [TypeScript + React 开发方案](react-development.md)和[共享 UI 设计](../../docs/ui-design.md)实现 Web。顶部只保留设置与换肤，不含桌面窗口控制。接口接入范围见[依赖清单](react-api-readiness.md)，Server 侧需求见[缺口交接](../../server/docs/web-ui-api-gaps.md)。
 
-已交付的最小范围为文件列表与播放，采用 TypeScript + Vite + 原生 DOM，使用普通 HTML 和音频控件。已接入 Go Server 的 Local Files Provider，原流及服务端处理输出在实际 Edge 浏览器中的播放和定位已验证，范围见 [兼容性记录](compatibility.md)。目录设置、扫描和插件通过 Server 配置/管理工具完成；下文的搜索、歌单、推荐、平台账号及刮削交互不代表当前已实现页面能力。
+旧版原生 DOM 页面与原生音频控件已移除；React 自定义播放栏沿用原流、处理输出和 NCM 控制核心。目录设置、扫描、插件、平台账号和刮削编辑仍通过 Server 配置／管理工具完成；下文长期职责不代表全部能力已经交付。
 
 Server 与客户端共同约定由 [MusicFS 跨端架构](../../docs/architecture.md) 管理；[Server 内部设计](../../server/docs/architecture.md)与[音频处理](../../server/docs/audio-processing.md)由 Server 仓库维护。本文件负责 Web 内部职责，OpenAPI、事件协议与协议 SDK 由 Server 发布。
 
