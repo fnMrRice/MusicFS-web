@@ -61,7 +61,7 @@ npm run test:e2e
 - Windows Edge 的实测结果不代表 Firefox、Safari 或全部设备支持；见兼容性记录。
 - 页面关闭通知只能尽力发送，Server 负责会话超时与进程回收。
 
-接口现状见 [React UI 接口清单](docs/react-api-readiness.md)。前端使用 hash 路由，静态托管无需额外路径回退；主题、音量和分组偏好按实例／账号隔离保存，队列只属于当前浏览器会话。
+接口现状见 [React UI 接口清单](docs/react-api-readiness.md)。前端使用 hash 路由，静态托管无需额外路径回退；主题默认跟随系统，登录页也会随系统明暗切换，已保存的主题选择继续生效。主题、音量和分组偏好按实例／账号隔离保存，队列只属于当前浏览器会话。
 
 ## 设计文档
 

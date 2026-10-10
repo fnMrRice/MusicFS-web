@@ -34,21 +34,6 @@ export function AppShell() {
   const accountButton = useRef<HTMLButtonElement>(null);
   const themeRoot = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
-    const systemTheme = window.matchMedia("(prefers-color-scheme: dark)");
-    const applyTheme = () => {
-      document.documentElement.dataset.theme =
-        prefs.theme === "system"
-          ? systemTheme.matches
-            ? "dark"
-            : "light"
-          : prefs.theme;
-    };
-    applyTheme();
-    if (prefs.theme !== "system") return;
-    systemTheme.addEventListener("change", applyTheme);
-    return () => systemTheme.removeEventListener("change", applyTheme);
-  }, [prefs.theme]);
-  useLayoutEffect(() => {
     const root = scroll.current;
     if (!root) return;
     const target = positions.current.get(location.key) ?? 0;

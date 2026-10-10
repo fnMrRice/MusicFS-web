@@ -33,7 +33,7 @@ interface PreferencesState {
   processing: boolean;
 }
 const defaults: PreferencesState = {
-  theme: "dark",
+  theme: "system",
   volume: 0.8,
   mine: true,
   playlists: true,
@@ -125,9 +125,11 @@ export class Services {
     }
     this.preferences.set({
       theme:
-        saved?.theme === "light" || saved?.theme === "system"
+        saved?.theme === "dark" ||
+        saved?.theme === "light" ||
+        saved?.theme === "system"
           ? saved.theme
-          : "dark",
+          : defaults.theme,
       volume:
         typeof saved?.volume === "number" &&
         saved.volume >= 0 &&

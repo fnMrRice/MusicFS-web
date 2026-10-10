@@ -1,5 +1,5 @@
 import { tr, useLocale } from "../i18n";
-import { StrictMode } from "react";
+import { StrictMode, useLayoutEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Services, ServicesContext, useServices, useStore } from "./services";
@@ -30,6 +30,22 @@ function Application() {
   useLocale();
   const s = useServices();
   const auth = useStore(s.auth);
+  const prefs = useStore(s.preferences);
+  useLayoutEffect(() => {
+    const systemTheme = window.matchMedia("(prefers-color-scheme: dark)");
+    const applyTheme = () => {
+      document.documentElement.dataset.theme =
+        prefs.theme === "system"
+          ? systemTheme.matches
+            ? "dark"
+            : "light"
+          : prefs.theme;
+    };
+    applyTheme();
+    if (prefs.theme !== "system") return;
+    systemTheme.addEventListener("change", applyTheme);
+    return () => systemTheme.removeEventListener("change", applyTheme);
+  }, [prefs.theme]);
   if (!auth.session) return <Login />;
   return (
     <Routes>

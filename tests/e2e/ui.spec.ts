@@ -124,5 +124,6 @@ test('session expiry clears cached library and next identity gets isolated prefe
   });
   await page.getByLabel('管理员登录令牌').fill(server.token); await page.getByRole('button', { name: '登录', exact: true }).click();
   await expect(page.getByRole('button', { name: '我的', exact: true })).toHaveAttribute('aria-expanded', 'true');
-  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  const systemTheme = await page.evaluate(() => matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  await expect(page.locator('html')).toHaveAttribute('data-theme', systemTheme);
 });
