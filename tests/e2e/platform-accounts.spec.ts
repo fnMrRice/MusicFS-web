@@ -1,11 +1,14 @@
 import { test, expect } from "@playwright/test";
-import { preview, type PreviewServer } from "vite";
+import { startDirectoryServer, type DirectoryTestServer } from "./directory-server";
 
-let server: PreviewServer;
-const origin = "http://127.0.0.1:18139";
-test.beforeAll(async () => { server = await preview({ preview: { host: "127.0.0.1", port: 18139, strictPort: true } }); });
-test.afterAll(async () => { await new Promise<void>((resolve) => server?.httpServer.close(() => resolve())); });
+let server: DirectoryTestServer;
+test.beforeAll(async () => {
+  test.setTimeout(120_000);
+  server = await startDirectoryServer();
+});
+test.afterAll(async () => { await server?.stop(); });
 test("platform QR login, local QR rendering, and platform-only logout", async ({ page }) => {
+  const { origin } = server;
   let state: Record<string, unknown> = { state: "signedOut" };
   let csrfSeen = false;
   let searches = 0;
@@ -40,6 +43,8 @@ test("platform QR login, local QR rendering, and platform-only logout", async ({
   const qr = page.getByAltText("网易云音乐登录二维码");
   await expect(qr).toBeVisible();
   await expect(qr).toHaveAttribute("src", /^data:image\/png;base64,/);
+  // A visible img with a src still passes when the server CSP blocks its pixels.
+  await expect.poll(() => qr.evaluate((image: HTMLImageElement) => image.naturalWidth)).toBeGreaterThan(0);
   await expect(page.getByText("已登录 · 测试听众")).toBeVisible();
   expect(csrfSeen).toBe(true);
   await page.goto(`${origin}/#/search?q=sample`);
