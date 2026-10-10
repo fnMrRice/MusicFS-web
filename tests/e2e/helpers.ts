@@ -1,5 +1,6 @@
 import { expect, type Page, type APIRequestContext } from '@playwright/test';
 import type { TestServer } from './server';
+import { scanFailureMessage, waitForScanJob } from '../fixtures/scan-job';
 
 export async function login(page: Page, server: TestServer): Promise<void> {
   console.log('Opening page for real session login');
@@ -12,7 +13,14 @@ export async function scan(request: APIRequestContext, origin: string): Promise<
     headers: { Origin: origin, 'X-CSRF-Token': session.csrfToken, 'Idempotency-Key': crypto.randomUUID() }, data: await scanRequest(request, origin),
   });
   expect(response.ok()).toBeTruthy(); const { jobId } = await response.json();
-  await expect.poll(async () => (await (await request.get(`${origin}/api/v1/scan-jobs/${jobId}`)).json()).status, { timeout: 90_000 }).toBe('succeeded');
+  const job = await waitScan(request, origin, jobId);
+  expect(job.status, scanFailureMessage(job)).toBe('succeeded');
+}
+export async function waitScan(request: APIRequestContext, origin: string, jobId: string) {
+  return waitForScanJob(async (timeout) => {
+    const response = await request.get(`${origin}/api/v1/scan-jobs/${encodeURIComponent(jobId)}`, { timeout });
+    expect(response.ok()).toBeTruthy(); return response.json();
+  }, { onRetry: () => console.log('Scan is waiting for a bounded automatic retry') });
 }
 export async function scanRequest(request: APIRequestContext, origin: string) {
   const response = await request.get(`${origin}/api/v1/provider-instances`);

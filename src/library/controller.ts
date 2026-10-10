@@ -3,6 +3,7 @@ import { errorMessage } from '../api/client';
 import type { Provider } from '../api/types';
 import { FileListView } from '../ui/file-list';
 import { LibraryState } from './state';
+import { scanStatusMessage } from './scan-state';
 
 export class LibraryController {
   readonly state: LibraryState;
@@ -33,9 +34,8 @@ export class LibraryController {
     this.view.status.textContent = state.error ?? (state.loading ? '正在刷新…' : `${state.items.length} 个文件`);
     if (state.stale) this.view.status.textContent += ' 内容可能不是最新。';
     if (!state.loading && !state.error && provider) {
-      if (!['available', 'online'].includes(provider.availability)) this.view.status.textContent = '来源暂不可用；保留上次成功扫描的内容。';
-      else if (['idle', 'queued', 'pending', 'running', 'never'].includes(provider.scanState ?? '')) this.view.status.textContent = '来源扫描尚未完成，请稍后刷新。';
-      else if (provider.scanState === 'failed') this.view.status.textContent = '最近扫描失败；保留上次成功扫描的内容，请检查 Server 音乐目录后重新扫描。';
+      const message = scanStatusMessage(provider);
+      if (message) this.view.status.textContent = message;
       else if (!state.items.length) this.view.status.textContent = '音乐库为空。';
     }
   }

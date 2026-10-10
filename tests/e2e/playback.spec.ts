@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { startDevServer, startServer, type TestServer } from './server';
-import { decodedEnergy, decodedSignal, login, scan, scanRequest, waitPlaying } from './helpers';
+import { decodedEnergy, decodedSignal, login, scan, scanRequest, waitPlaying, waitScan } from './helpers';
 
 let server: TestServer;
 test.beforeAll(async () => { test.setTimeout(120_000); server = await startServer(); });
@@ -119,9 +119,11 @@ test('offline music directory retains published library and logout unloads activ
       headers: { Origin: server.origin, 'X-CSRF-Token': session.csrfToken, 'Idempotency-Key': crypto.randomUUID() }, data: await scanRequest(page.request, server.origin),
     });
     expect(response.ok()).toBeTruthy(); const { jobId } = await response.json();
-    await expect.poll(async () => (await (await page.request.get(`${server.origin}/api/v1/scan-jobs/${jobId}`)).json()).status).toBe('failed');
+    const job = await waitScan(page.request, server.origin, jobId);
+    expect(job.status).toBe('paused'); expect(job.error?.code).toBe('SOURCE_OFFLINE');
     await page.getByRole('button', { name: '刷新列表' }).click();
-    await expect(page.getByRole('region', { name: '音乐文件' })).toContainText('最近扫描失败');
+    await expect(page.getByRole('region', { name: '音乐文件' })).toContainText('扫描已暂停');
+    await expect(page.getByRole('region', { name: '音乐文件' })).toContainText('重新提交扫描');
     await expect(page.locator('tbody tr')).toHaveCount(100);
   } finally { renameSync(unavailable, original); }
   await page.getByRole('button', { name: '播放 markers.wav', exact: true }).click(); await waitPlaying(page);
