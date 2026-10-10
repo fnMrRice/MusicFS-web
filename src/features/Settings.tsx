@@ -1,6 +1,7 @@
 import { useServices, useStore } from "../app/services";
 import { useResource } from "../components/query";
 import { ErrorNotice } from "../components/ui";
+import { PlatformAccounts } from "./accounts/PlatformAccounts";
 export function Settings() {
   const s = useServices();
   const auth = useStore(s.auth);
@@ -12,6 +13,7 @@ export function Settings() {
     <section className="settings-page">
       <p className="eyebrow">MAKE YOURSELF AT HOME</p>
       <h2>你的聆听偏好</h2>
+      <PlatformAccounts />
       <div className="settings-card">
         <h3>连接与账号</h3>
         <dl>
