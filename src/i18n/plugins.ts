@@ -14,4 +14,6 @@ export default {
   "请在服务端配置可用的 FFmpeg 和 ffprobe 路径。": ["Configure valid FFmpeg and ffprobe paths on the server.", "請在伺服器設定可用的 FFmpeg 和 ffprobe 路徑。", "サーバーで有効な FFmpeg と ffprobe のパスを設定してください。"],
   "未发现已安装插件。": ["No installed plugins found.", "未找到已安裝的外掛程式。", "インストール済みプラグインが見つかりません。"],
   "刷新插件状态": ["Refresh plugin status", "重新整理外掛程式狀態", "プラグインの状態を更新"],
+  "配置变更需要重启服务端后生效。": ["Configuration changes require a server restart to take effect.", "設定變更需要重新啟動伺服器後生效。", "設定変更を反映するにはサーバーの再起動が必要です。"],
+  "等待重启后停用。": ["Waiting for a server restart to disable.", "等待重新啟動後停用。", "サーバーの再起動後に無効化されます。"],
 } satisfies Record<string, readonly [string, string, string]>;
