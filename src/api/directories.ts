@@ -34,10 +34,12 @@ export interface ManagedInstance {
   name: string;
   runtimeState: string;
   reason: string | null;
+  ownerUserId?: string;
+  accountName?: string;
 }
 export interface PluginSnapshot {
   restartRequired?: boolean;
-  items: { pluginId: string; plugin: PluginIdentity; supportsMultipleInstances: boolean; instances: ManagedInstance[] }[];
+  items: { pluginId: string; plugin: PluginIdentity; version?: string; supportsMultipleInstances: boolean; instances: ManagedInstance[] }[];
 }
 
 export class DirectoriesApi {

@@ -116,7 +116,7 @@ describe("capability resource refresh", () => {
     const listener = vi.fn();
     const unsubscribe = resources.subscribe(listener);
     resources.invalidate();
-    for (const key of ["providers", "settings-providers", "search-instances", "import-providers"])
+    for (const key of ["providers", "settings-providers", "settings-plugins-false", "settings-plugins-true", "search-instances", "import-providers"])
       expect(resources.snapshot(key)).toBe(1);
     expect(resources.snapshot("playlist-1")).toBe(0);
     expect(listener).toHaveBeenCalledOnce();

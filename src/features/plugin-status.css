@@ -1,0 +1,122 @@
+.plugin-status-heading {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.plugin-status-heading h3 {
+  margin: 0;
+  flex-shrink: 0;
+}
+.plugin-status-heading button {
+  flex-shrink: 0;
+}
+.plugin-scope {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  font-size: 13px;
+}
+.plugin-entry + .plugin-entry {
+  border-top: 1px solid var(--line);
+}
+.plugin-entry > summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 20px 0;
+  cursor: pointer;
+  list-style: none;
+}
+.plugin-entry > summary::-webkit-details-marker {
+  display: none;
+}
+.plugin-entry > summary:hover {
+  color: var(--accent);
+}
+.plugin-entry > summary > svg {
+  flex-shrink: 0;
+  transform: rotate(-90deg);
+}
+.plugin-entry[open] > summary > svg {
+  transform: rotate(0);
+}
+.plugin-information {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.plugin-information > strong {
+  display: block;
+  font-size: 14px;
+}
+.plugin-metadata {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 20px;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.7;
+}
+.plugin-metadata > span {
+  min-width: 0;
+}
+.plugin-metadata code {
+  font-size: inherit;
+}
+.plugin-count {
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+.plugin-instances {
+  margin: 0 0 20px 30px;
+  border-left: 2px solid var(--line);
+  padding-left: 18px;
+}
+.plugin-instances h4 {
+  margin: 0 0 4px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+.plugin-instance {
+  padding: 14px 0;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.plugin-instance + .plugin-instance {
+  border-top: 1px solid var(--line);
+}
+.plugin-instance-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.plugin-instance-heading strong {
+  min-width: 0;
+}
+.plugin-instance p {
+  margin: 8px 0 0;
+}
+.plugin-instance a {
+  display: inline-block;
+  margin-top: 10px;
+}
+@media (max-width: 700px) {
+  .plugin-entry > summary {
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .plugin-count {
+    flex-basis: calc(100% - 26px);
+    margin-left: 26px;
+  }
+  .plugin-instances {
+    margin-left: 8px;
+    padding-left: 14px;
+  }
+}
