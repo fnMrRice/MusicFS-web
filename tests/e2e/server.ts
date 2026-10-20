@@ -4,6 +4,7 @@ import { copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, rmSync, write
 import { dirname, resolve, join } from 'node:path';
 import { yamlFixture, type FixtureConfig } from '../fixtures/config-yaml';
 import { createNcmFixtures } from '../fixtures/ncm';
+import { instanceIds } from '../fixtures/plugins';
 
 export interface TestServer { origin: string; token: string; directory: string; stop: () => Promise<void> }
 export async function startServer(options: { ncm?: boolean } = {}): Promise<TestServer> {
@@ -31,13 +32,13 @@ export async function startServer(options: { ncm?: boolean } = {}): Promise<Test
     listen: '127.0.0.1:18081', dataRoot: join(directory, 'data'), mediaRoot: join(directory, 'media'), cacheRoot: join(directory, 'cache'),
     webRoot, allowLoopbackHttp: true, allowedOrigins: [origin, 'http://127.0.0.1:5173'], maxSessions: 32,
     plugins: [
-      { pluginId: 'musicfs.localfiles', executable: join(directory, 'musicfs-plugin-local' + suffix), enabled: true,
-        instances: [{ instanceId: 'local', name: '测试音乐', role: 'provider', enabled: true,
+      { pluginId: 'musicfs.plugin.source.localfiles', executable: join(directory, 'musicfs-plugin-local' + suffix), enabled: true,
+        instances: [{ instanceId: instanceIds.local, name: '测试音乐', enabled: true,
           config: { musicRoots: [{ id: 'local', name: '测试音乐', path: music }] } }] },
-      { pluginId: 'musicfs.audio.ffmpeg', executable: join(directory, 'musicfs-plugin-audio-ffmpeg' + suffix), enabled: true,
-        instances: [{ instanceId: 'audio-default', role: 'audio', enabled: true, config: { ffmpegPath: ffmpeg, ffprobePath: ffprobe } }] },
-      ...(options.ncm ? [{ pluginId: 'musicfs.ncm', executable: join(directory, 'musicfs-plugin-ncm' + suffix), enabled: true,
-        instances: [{ instanceId: 'ncm-default', role: 'audio', enabled: true, config: {} }] }] : []),
+      { pluginId: 'musicfs.plugin.decoder.ffmpeg', executable: join(directory, 'musicfs-plugin-audio-ffmpeg' + suffix), enabled: true,
+        instances: [{ instanceId: instanceIds.ffmpeg, enabled: true, config: { ffmpegPath: ffmpeg, ffprobePath: ffprobe } }] },
+      ...(options.ncm ? [{ pluginId: 'musicfs.plugin.decoder.ncm', executable: join(directory, 'musicfs-plugin-ncm' + suffix), enabled: true,
+        instances: [{ instanceId: instanceIds.ncm, enabled: true, config: {} }] }] : []),
     ],
   };
   const configPath = join(directory, 'config.yaml'); writeFileSync(configPath, yamlFixture(config));

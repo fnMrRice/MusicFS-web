@@ -1,3 +1,4 @@
+import { instanceIds, localPlugin } from "../fixtures/plugins";
 import { test, expect, type Page, type Route } from '@playwright/test';
 import { preview, type PreviewServer } from 'vite';
 
@@ -28,11 +29,11 @@ async function mockApi(page: Page, directories: (route: Route, url: URL) => Prom
     if (path.endsWith('/health/ready')) json = { product: 'MusicFS', apiVersion: '1', ready: true, instanceId: 'mock-directories' };
     if (path.endsWith('/auth/session')) json = { csrfToken: 'test', user: { id: role, role } };
     if (path.endsWith('/provider-instances')) json = { items: [{
-      id: 'local', name: 'Fixture', availability: 'unavailable',
-      plugin: { id: 'musicfs.localfiles', name: 'Local files', localizedNames: { 'zh-CN': '本地音乐' }, features: ['music-source'] },
+      id: instanceIds.local, name: 'Fixture', availability: 'unavailable',
+      plugin: { id: 'musicfs.plugin.source.localfiles', name: 'Local files', localizedNames: { 'zh-CN': '本地音乐' }, features: ['music-source'] },
     }] };
     if (path.endsWith('/admin/plugins')) json = { items: [{
-      pluginId: 'musicfs.localfiles', instances: [{ instanceId: 'local', name: 'Fixture', runtimeState: 'pending_configuration' }],
+      pluginId: localPlugin.id, plugin: localPlugin, supportsMultipleInstances: false, instances: [{ instanceId: instanceIds.local, name: 'Fixture', runtimeState: 'pending_configuration' }],
     }] };
     if (path.endsWith('/configuration')) json = {
       revision: 'mock-revision', roots: [],
@@ -119,7 +120,7 @@ test('mock directory picker fits a narrow screen and closes without selecting a 
 
 test('mock regular user cannot open directory management through settings or its direct URL', async ({ page }) => {
   const requested = await mockApi(page, async route => route.fulfill({ status: 403 }), 'user');
-  await page.goto(`${origin}/#/settings?directories=local`);
+  await page.goto(`${origin}/#/settings?directories=${instanceIds.local}`);
   await expect(page.getByRole('heading', { name: '本地音乐', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: '管理目录', exact: true })).toHaveCount(0);
   await expect(page.getByRole('link', { name: '管理目录', exact: true })).toHaveCount(0);
@@ -144,41 +145,4 @@ test('mock tree disables unavailable roots and keeps child errors inside their b
   await expect(dialog.getByRole('checkbox', { name: '选择目录 Fixture Music', exact: true })).toBeVisible();
   await dialog.getByRole('button', { name: '取消', exact: true }).click();
   await expect(page.getByText('暂无已选择目录', { exact: true })).toBeVisible();
-});
-
-test('mock multiple local instances keep their selected directories and management dialogs separate', async ({ page }) => {
-  const requested = await mockApi(page, async route => route.fulfill({ json: directoryPage(null, [rootItem]) }));
-  const instances = ['local-a', 'local-b'].map(instanceId => ({ instanceId, name: instanceId, runtimeState: 'ready' }));
-  await page.route('**/api/v1/admin/plugins', route => route.fulfill({ json: {
-    items: [{ pluginId: 'musicfs.localfiles', instances }],
-  } }));
-  await page.route('**/api/v1/provider-instances', route => route.fulfill({ json: { items: instances.map(instance => ({
-    id: instance.instanceId, name: instance.name, availability: 'available',
-    plugin: { id: 'musicfs.localfiles', name: 'Local files', localizedNames: { 'zh-CN': '本地音乐' }, features: ['music-source'] },
-  })) } }));
-  await page.route('**/api/v1/admin/plugin-instances/*/configuration', route => {
-    const id = new URL(route.request().url()).pathname.split('/')[5];
-    return route.fulfill({ json: {
-      revision: 'mock-revision', roots: [{ id, name: id === 'local-a' ? 'Library A' : 'Library B', pathConfigured: true }],
-      importOptions: { importDefaults: { recursive: true, maxDepth: 0, skipHidden: true, respectNoMedia: true, excludePatterns: [] } },
-    } });
-  });
-  await page.goto(`${origin}/#/settings`);
-  const sources = page.locator('.local-music-source');
-  await expect(sources).toHaveCount(2);
-  await expect(sources.nth(0)).toContainText('Library A');
-  await expect(sources.nth(0)).not.toContainText('Library B');
-  await expect(sources.nth(1)).toContainText('Library B');
-  await expect(sources.nth(1)).not.toContainText('Library A');
-  for (const [index, name] of ['Library A', 'Library B'].entries()) {
-    await sources.nth(index).getByRole('button', { name: '管理目录', exact: true }).click();
-    const dialog = page.getByRole('dialog', { name: '管理目录', exact: true });
-    const selected = dialog.getByRole('list', { name: '已选音乐目录', exact: true });
-    await expect(selected.getByRole('listitem')).toHaveCount(1);
-    await expect(selected).toContainText(name);
-    await expect(dialog.getByRole('treeitem')).toHaveCount(1);
-    await dialog.getByRole('button', { name: '取消', exact: true }).click();
-  }
-  expect(requested).toContain('/api/v1/admin/plugin-instances/local-a/directories');
-  expect(requested).toContain('/api/v1/admin/plugin-instances/local-b/directories');
 });

@@ -1,4 +1,5 @@
 import { ApiClient } from "./client";
+import type { PluginIdentity } from "./types";
 
 export interface MusicRoot { id: string; name: string; path?: string }
 export interface ImportDefaults {
@@ -35,7 +36,8 @@ export interface ManagedInstance {
   reason: string | null;
 }
 export interface PluginSnapshot {
-  items: { pluginId: string; instances: ManagedInstance[] }[];
+  restartRequired?: boolean;
+  items: { pluginId: string; plugin: PluginIdentity; supportsMultipleInstances: boolean; instances: ManagedInstance[] }[];
 }
 
 export class DirectoriesApi {

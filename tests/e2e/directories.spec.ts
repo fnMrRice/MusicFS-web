@@ -3,10 +3,11 @@ import { readFileSync } from 'node:fs';
 import { basename, normalize } from 'node:path';
 import { login, scan } from './helpers';
 import { startDirectoryServer, type DirectoryTestServer } from './directory-server';
+import { instanceIds } from '../fixtures/plugins';
 
 let server: DirectoryTestServer;
-const configurationPath = '/api/v1/admin/plugin-instances/local/configuration';
-const directoryPath = '/api/v1/admin/plugin-instances/local/directories';
+const configurationPath = `/api/v1/admin/plugin-instances/${instanceIds.local}/configuration`;
+const directoryPath = `/api/v1/admin/plugin-instances/${instanceIds.local}/directories`;
 
 test.beforeAll(async () => {
   test.setTimeout(120_000);
@@ -24,8 +25,8 @@ async function runtimeState(api: APIRequestContext): Promise<string> {
   const response = await api.get(`${server.origin}/api/v1/admin/plugins`);
   expect(response.ok()).toBeTruthy();
   const snapshot = await response.json();
-  return snapshot.items.find((plugin: { pluginId: string }) => plugin.pluginId === 'musicfs.localfiles')
-    .instances.find((instance: { instanceId: string }) => instance.instanceId === 'local').runtimeState;
+  return snapshot.items.find((plugin: { pluginId: string }) => plugin.pluginId === 'musicfs.plugin.source.localfiles')
+    .instances.find((instance: { instanceId: string }) => instance.instanceId === instanceIds.local).runtimeState;
 }
 
 async function openManager(page: Page) {

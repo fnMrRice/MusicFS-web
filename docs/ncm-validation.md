@@ -2,7 +2,7 @@
 
 状态：2026-10-09，Windows / Edge 154.0.4258.62 真实无头浏览器完成3项联调，最终一次全通过（19.3秒）。仅验证本文的合成 MP3/FLAC 封装与错误样本。
 
-运行入口：[Server 本地运行](../../server/docs/running.md) → [YAML 配置模型](../../server/docs/configuration.md)与[NCM 插件配置](../../server/docs/ncm.md)。在 `plugins` 中配置 `musicfs.ncm` 的 `executable` 和音频实例，插件及实例均显式启用；重启、重新扫描后，页面直接选曲。FLAC 转码需同时配齐音频实例的 FFmpeg/ffprobe。逐项操作及预期见 [手动验收](manual-validation.md)。
+运行入口：[Server 本地运行](../../server/docs/running.md) → [YAML 配置模型](../../server/docs/configuration.md)与[NCM 插件配置](../../server/docs/ncm.md)。在 `plugins` 中配置 `musicfs.plugin.decoder.ncm` 的 `executable` 和音频实例，插件及实例均显式启用；重启、重新扫描后，页面直接选曲。FLAC 转码需同时配齐音频实例的 FFmpeg/ffprobe。逐项操作及预期见 [手动验收](manual-validation.md)。
 
 ## 兼容处理
 
@@ -39,4 +39,4 @@ NCM 专用启动器构建自己的临时 Server/Local Files/音频/NCM 工作进
 | FLAC解密转码 | timeRestart到4000ms返回新attempt/URL，PCM RMS 0.084159，主峰656.25Hz，停止通过 |
 | 损坏NCM恢复 | 415 UNSUPPORTED并显示错误；随后普通WAV解码RMS 0.044438，停止通过 |
 
-本轮独立证据见 [YAML配置迁移记录](validation/yaml-config-edge-2026-10-09.json)。测试服务和临时运行目录已清理。原有19.3秒JSON证据及两张截图保留为历史；本轮未重跑无关完整浏览器套件、未进行人工听音，也不验证后续插件动态启停。
+本轮独立证据见 [YAML配置迁移记录](validation/yaml-config-edge-2026-10-09.json)。该记录保留当时使用的插件 ID；当前启动器使用 `musicfs.plugin.source.localfiles`、`musicfs.plugin.decoder.ffmpeg` 和 `musicfs.plugin.decoder.ncm`，历史结果不代表新命名的验收。测试服务和临时运行目录已清理。原有19.3秒JSON证据及两张截图保留为历史；本轮未重跑无关完整浏览器套件、未进行人工听音，也不验证后续插件动态启停。

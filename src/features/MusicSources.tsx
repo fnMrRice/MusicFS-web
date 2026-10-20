@@ -8,10 +8,13 @@ import { useResource } from "../components/query";
 import { ErrorNotice } from "../components/ui";
 import { useSourceName } from "../components/use-source-name";
 import { musicSources } from "../components/music-sources";
-import { tr } from "../i18n";
+import { tr, useLocale } from "../i18n";
+import { pluginName } from "../components/source-name";
+import type { PluginIdentity } from "../api/types";
 import { PlatformAccount } from "./accounts/PlatformAccounts";
 
 export function MusicSources() {
+  const { locale } = useLocale();
   const s = useServices();
   const auth = useStore(s.auth);
   const admin = auth.session?.user.role === "admin";
@@ -19,8 +22,9 @@ export function MusicSources() {
   const plugins = useResource(`settings-local-directories-${admin}`, (signal) => admin
     ? s.client.request<PluginSnapshot>("/admin/plugins", { signal })
     : Promise.resolve({ items: [] }));
-  const previousLocal = useRef<ManagedInstance[]>([]);
-  if (plugins.data) previousLocal.current = plugins.data.items.filter((plugin) => plugin.pluginId === "musicfs.localfiles").flatMap((plugin) => plugin.instances);
+  const previousLocal = useRef<(ManagedInstance & { plugin: PluginIdentity })[]>([]);
+  if (plugins.data) previousLocal.current = plugins.data.items.filter((plugin) => plugin.pluginId === "musicfs.plugin.source.localfiles")
+    .flatMap((plugin) => plugin.instances.map((instance) => ({ ...instance, plugin: plugin.plugin })));
   const local = admin ? previousLocal.current : [];
   const chosen = local.find((instance) => instance.instanceId === query.get("directories"));
   function choose(id: string | null) {
@@ -50,7 +54,7 @@ export function MusicSources() {
         <p className="muted">{tr(source.provider!.availability === "available" ? "可用" : "暂不可用")}</p>
       </section>)}
     {local.filter((instance) => !sources.has(instance.instanceId)).map((instance) => <LocalMusicSource key={instance.instanceId}
-      instance={instance} name={sourceName(instance.instanceId)} manage={() => choose(instance.instanceId)} />)}
+      instance={instance} name={pluginName(instance.plugin, locale)} manage={() => choose(instance.instanceId)} />)}
     {!providers.loading && !online.loading && !sources.size && !local.length && !providers.error && !online.error &&
       <p className="muted">{tr("暂无音乐来源")}</p>}
     {admin && chosen && <LocalDirectories key={chosen.instanceId} instance={chosen} close={() => choose(null)} />}

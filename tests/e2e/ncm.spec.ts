@@ -1,3 +1,4 @@
+import { instanceIds } from "../fixtures/plugins";
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
 import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -76,7 +77,7 @@ test('NCM FLAC decrypts before MP3 conversion and timeRestart reaches the real m
 
 test('malformed NCM fails explicitly and does not prevent original WAV playback', async ({ page, browser }, info) => {
   const session = await (await page.request.get(`${server.origin}/api/v1/auth/session`)).json();
-  const tracks = await (await page.request.get(`${server.origin}/api/v1/source-tracks?providerInstanceId=local&limit=100`)).json();
+  const tracks = await (await page.request.get(`${server.origin}/api/v1/source-tracks?providerInstanceId=${instanceIds.local}&limit=100`)).json();
   const invalid = tracks.items.find((track: { displayName: string }) => track.displayName === 'corrupt.ncm');
   expect(invalid).toBeDefined();
   const rejected = await page.request.post(`${server.origin}/api/v1/playback/sessions`, {

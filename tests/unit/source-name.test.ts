@@ -1,3 +1,4 @@
+import { instanceIds } from "../fixtures/plugins";
 import { afterEach, describe, expect, it } from "vitest";
 import type { OnlineInstance, PluginIdentity } from "../../src/api/content";
 import { pluginName, sourceName } from "../../src/components/source-name";
@@ -10,7 +11,7 @@ const plugin: PluginIdentity = {
   localizedNames: { "zh-CN": "示例音乐", "zh-Hant": "示例音樂", "ja-JP": "サンプル音楽" },
 };
 const instance: OnlineInstance = {
-  instanceId: "custom/private-instance", name: "Private instance alias", platform: "custom",
+  instanceId: instanceIds.custom, name: "Private instance alias", platform: "custom",
   plugin, availability: "available", capabilities: [],
 };
 
@@ -51,12 +52,23 @@ describe("Plugin-owned source labels", () => {
       expect(sourceName(source, [offline], "en")).toBe("Unknown source");
     expect(sourceName(instance, [offline], "en")).toBe("Unknown source");
     expect(sourceName({ platform: "netease", name: "网易云公开资料" })).toBe("Unknown source");
-    expect(sourceName("qq-public")).toBe("Unknown source");
-    expect(sourceName("apple-public")).toBe("Unknown source");
-    expect(sourceName({ id: "local", name: "我的音乐目录" })).toBe("Unknown source");
+    expect(sourceName(instanceIds.qqmusic)).toBe("Unknown source");
+    expect(sourceName(instanceIds.applemusic)).toBe("Unknown source");
+    expect(sourceName({ id: instanceIds.local, name: "我的音乐目录" })).toBe("Unknown source");
     const offlineNamed = { ...instance, availability: "offline" };
     expect(sourceName(offlineNamed, [], "en")).toBe(plugin.name);
-    expect(sourceName("local", [{ id: "local", name: "Private local alias", plugin }], "zh-CN"))
+    expect(sourceName(instanceIds.local, [{ id: instanceIds.local, name: "Private local alias", plugin }], "zh-CN"))
       .toBe("示例音乐");
+  });
+
+  it("shows the bound account username with the localized plugin alias without exposing UUIDs", () => {
+    const account = { ...instance, accountId: "account-a", name: "Alice" };
+    expect(sourceName(account, [], "zh-CN")).toBe("示例音乐 · Alice");
+    expect(sourceName(account.instanceId, [account], "zh-TW")).toBe("示例音樂 · Alice");
+    expect(sourceName({ ...account, name: "   " }, [], "en")).toBe("Example Music");
+    expect(sourceName({ ...account, name: account.instanceId }, [], "en")).toBe("Example Music");
+    expect(sourceName({ ...account, name: plugin.name }, [], "zh-CN")).toBe("示例音乐");
+    expect(sourceName({ ...account, name: "示例音乐" }, [], "zh-CN")).toBe("示例音乐");
+    expect(sourceName(account, [{ ...account, accountId: undefined, name: "Private alias" }], "en")).toBe("Example Music");
   });
 });

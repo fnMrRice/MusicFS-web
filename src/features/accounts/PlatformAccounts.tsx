@@ -2,7 +2,8 @@ import { useState } from "react";
 import type { OnlineInstance } from "../../api/content";
 import { Modal } from "../../components/Modal";
 import { Icon } from "../../components/ui";
-import { useSourceName } from "../../components/use-source-name";
+import { pluginName } from "../../components/source-name";
+import { tr, useLocale } from "../../i18n";
 import { usePlatformAccount, type Account } from "./usePlatformAccount";
 import "./accounts.css";
 
@@ -12,11 +13,14 @@ const states: Record<string, string> = {
 };
 
 export function PlatformAccount({ instance }: { instance: OnlineInstance }) {
-  const name = useSourceName()(instance);
+  const { locale } = useLocale();
+  const name = instance.plugin ? pluginName(instance.plugin, locale) : tr("未知来源");
   const { account, options, error, busy, qr, dialogOpen, startLogin, closeLogin, operation, authorizeApple, musicKitReady } = usePlatformAccount(instance);
   const pending = !!account?.loginId;
   const bound = !!account?.accountId;
   const signedIn = account?.state === "signedIn";
+  const username = signedIn ? account?.displayName?.trim() : "";
+  const title = username ? `${name} · ${username}` : name;
   const modalLogin = instance.platform === "netease";
   const status = !account ? "正在读取账号状态…"
     : account.state === "signedOut" || account.state === "canceled"
@@ -29,9 +33,9 @@ export function PlatformAccount({ instance }: { instance: OnlineInstance }) {
     {(pending || dialogOpen) && <button onClick={() => { if (modalLogin) closeLogin(); else void operation("cancel"); }} disabled={!modalLogin && busy}>取消登录</button>}
   </div>;
 
-  return <section aria-label={`${name}账号`} className="platform-account">
+  return <section aria-label={`${title}账号`} className="platform-account">
     <div className="platform-account-heading">
-      <h4>{name}</h4>
+      <h4>{title}</h4>
       {!bound && <button className="primary" aria-label={`登录${name}`} disabled={busy || pending || !account || !options?.configured || instance.availability === "offline"}
         onClick={() => { void startLogin(); }}>登录</button>}
     </div>

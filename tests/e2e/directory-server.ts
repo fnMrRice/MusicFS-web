@@ -5,6 +5,7 @@ import { createServer } from 'node:net';
 import { dirname, join, resolve } from 'node:path';
 import { yamlFixture, type FixtureConfig } from '../fixtures/config-yaml';
 import { stopChild, type TestServer } from './server';
+import { instanceIds } from '../fixtures/plugins';
 
 export interface DirectoryTestServer extends TestServer {
   allowedRoot: string;
@@ -77,9 +78,9 @@ export async function startDirectoryServer(): Promise<DirectoryTestServer> {
       dataRoot: join(directory, 'data'), mediaRoot: join(directory, 'media'), cacheRoot: join(directory, 'cache'),
       webRoot, allowLoopbackHttp: true, allowedOrigins: [origin], maxSessions: 32,
       plugins: [{
-        pluginId: 'musicfs.localfiles', executable: join(directory, 'musicfs-plugin-local' + suffix), enabled: true,
+        pluginId: 'musicfs.plugin.source.localfiles', executable: join(directory, 'musicfs-plugin-local' + suffix), enabled: true,
         instances: [{
-          instanceId: 'local', name: '目录管理测试', role: 'provider', enabled: true,
+          instanceId: instanceIds.local, name: '目录管理测试', enabled: true,
           permissions: { readDirectories: [allowedRoot, secondAllowedRoot] }, config: {},
         }],
       }],

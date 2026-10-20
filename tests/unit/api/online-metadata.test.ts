@@ -1,9 +1,10 @@
+import { instanceIds } from "../../fixtures/plugins";
 import { describe, expect, it, vi } from "vitest";
 import { ApiClient } from "../../../src/api/client";
 import { ContentApi, type OnlineInstance } from "../../../src/api/content";
 
 const instance: OnlineInstance = {
-  instanceId: "private-instance", name: "Private alias", platform: "custom",
+  instanceId: instanceIds.custom, name: "Private alias", platform: "custom",
   plugin: { id: "example.custom", name: "Custom Music", localizedNames: {}, features: ["music-source"] },
   availability: "available", capabilities: [],
 };

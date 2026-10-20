@@ -1,10 +1,11 @@
+import { instanceIds } from "../fixtures/plugins";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AccountPlaylistPage, OnlineInstance } from "../../src/api/content";
 import { ApiError } from "../../src/api/client";
 import { SourcePlaylistCatalog } from "../../src/app/source-playlists";
 
 const instance: OnlineInstance = {
-  instanceId: "private", accountId: "account-a", name: "Private alias", platform: "custom", availability: "available",
+  instanceId: instanceIds.custom, accountId: "account-a", name: "Private alias", platform: "custom", availability: "available",
   plugin: { id: "example.radio", name: "Example", localizedNames: {}, features: ["music-source"] },
   capabilities: [{ name: "playlist.list", supported: true, reason: "Supported" }],
 };
@@ -23,12 +24,12 @@ describe("Source playlist navigation categories", () => {
     expect(load).toHaveBeenCalledOnce();
     finish(page);
     await first;
-    expect(catalog.pages.value.private.items).toHaveLength(1);
-    expect(await catalog.first("private")).toEqual(page);
+    expect(catalog.pages.value[instanceIds.custom].items).toHaveLength(1);
+    expect(await catalog.first(instanceIds.custom)).toEqual(page);
     expect(load).toHaveBeenCalledOnce();
-    catalog.accept("private", { ...page, items: [] }, catalog.generation("private"));
-    expect(catalog.pages.value.private.items).toHaveLength(0);
-    catalog.failed("private", catalog.generation("private"));
+    catalog.accept(instanceIds.custom, { ...page, items: [] }, catalog.generation(instanceIds.custom));
+    expect(catalog.pages.value[instanceIds.custom].items).toHaveLength(0);
+    catalog.failed(instanceIds.custom, catalog.generation(instanceIds.custom));
     expect(catalog.pages.value).toEqual({});
   });
 
@@ -37,9 +38,9 @@ describe("Source playlist navigation categories", () => {
     const catalog = new SourcePlaylistCatalog(load);
     catalog.update([
       { ...instance, availability: "offline" },
-      { ...instance, instanceId: "signed-out", availability: "loginRequired" },
-      { ...instance, instanceId: "unsupported", capabilities: [] },
-      { ...instance, instanceId: "decoder", plugin: { ...instance.plugin!, features: ["decode"] } },
+      { ...instance, instanceId: instanceIds.netease, availability: "loginRequired" },
+      { ...instance, instanceId: instanceIds.qqmusic, capabilities: [] },
+      { ...instance, instanceId: instanceIds.ffmpeg, plugin: { ...instance.plugin!, features: ["decode"] } },
     ]);
     expect(load).not.toHaveBeenCalled();
     expect(catalog.pages.value).toEqual({});
@@ -50,24 +51,24 @@ describe("Source playlist navigation categories", () => {
     const load = vi.fn(() => new Promise<AccountPlaylistPage>((resolve) => { complete.push(resolve); }));
     const catalog = new SourcePlaylistCatalog(load);
     catalog.update([instance]);
-    const old = catalog.first("private");
-    const oldGeneration = catalog.generation("private");
-    catalog.invalidate("private");
+    const old = catalog.first(instanceIds.custom);
+    const oldGeneration = catalog.generation(instanceIds.custom);
+    catalog.invalidate(instanceIds.custom);
     expect(catalog.pages.value).toEqual({});
     catalog.update([{ ...instance, accountId: "account-b" }]);
     complete[0](page);
     await expect(old).rejects.toMatchObject({ code: "CANCELLED" });
-    catalog.accept("private", page, oldGeneration);
+    catalog.accept(instanceIds.custom, page, oldGeneration);
     expect(catalog.pages.value).toEqual({});
-    const newer = catalog.first("private");
+    const newer = catalog.first(instanceIds.custom);
     catalog.clear();
     catalog.update([instance]);
     complete[1](page);
     await expect(newer).rejects.toMatchObject({ code: "CANCELLED" });
     expect(catalog.pages.value).toEqual({});
     complete[2]({ ...page, items: [] });
-    await catalog.first("private");
-    expect(catalog.pages.value.private.items).toEqual([]);
+    await catalog.first(instanceIds.custom);
+    expect(catalog.pages.value[instanceIds.custom].items).toEqual([]);
     catalog.clear();
   });
 
@@ -77,23 +78,23 @@ describe("Source playlist navigation categories", () => {
       .mockResolvedValueOnce(page);
     const catalog = new SourcePlaylistCatalog(load);
     catalog.update([instance]);
-    const first = catalog.first("private");
+    const first = catalog.first(instanceIds.custom);
     await vi.advanceTimersByTimeAsync(1999);
     expect(load).toHaveBeenCalledTimes(1);
     await vi.advanceTimersByTimeAsync(1);
     await first;
-    expect(catalog.pages.value.private.items).toHaveLength(1);
+    expect(catalog.pages.value[instanceIds.custom].items).toHaveLength(1);
     load.mockRejectedValue(new ApiError("RATE_LIMITED", "Rate limited", 429));
-    catalog.refresh("private");
-    const failure = expect(catalog.first("private")).rejects.toMatchObject({ code: "RATE_LIMITED" });
+    catalog.refresh(instanceIds.custom);
+    const failure = expect(catalog.first(instanceIds.custom)).rejects.toMatchObject({ code: "RATE_LIMITED" });
     await vi.advanceTimersByTimeAsync(3000);
     await failure;
     expect(load).toHaveBeenCalledTimes(5);
     expect(catalog.pages.value).toEqual({});
     load.mockResolvedValue(page);
     catalog.update([instance]);
-    await catalog.first("private");
-    expect(catalog.pages.value.private.items).toHaveLength(1);
+    await catalog.first(instanceIds.custom);
+    expect(catalog.pages.value[instanceIds.custom].items).toHaveLength(1);
   });
 
   it("invalidates the same account when its authorization revision changes", async () => {
@@ -102,20 +103,20 @@ describe("Source playlist navigation categories", () => {
     const catalog = new SourcePlaylistCatalog(load);
     catalog.update([{ ...instance, accountRevision: "revision-a" }]);
     complete[0](page);
-    await catalog.first("private");
-    expect(catalog.pages.value.private.items).toHaveLength(1);
-    catalog.refresh("private");
-    const stale = catalog.first("private");
-    const oldGeneration = catalog.generation("private");
+    await catalog.first(instanceIds.custom);
+    expect(catalog.pages.value[instanceIds.custom].items).toHaveLength(1);
+    catalog.refresh(instanceIds.custom);
+    const stale = catalog.first(instanceIds.custom);
+    const oldGeneration = catalog.generation(instanceIds.custom);
     catalog.update([{ ...instance, accountRevision: "revision-b" }]);
     expect(catalog.pages.value).toEqual({});
     expect(load).toHaveBeenCalledTimes(3);
     complete[1](page);
     await expect(stale).rejects.toMatchObject({ code: "CANCELLED" });
-    catalog.accept("private", page, oldGeneration);
+    catalog.accept(instanceIds.custom, page, oldGeneration);
     expect(catalog.pages.value).toEqual({});
     complete[2]({ ...page, items: [] });
-    await catalog.first("private");
-    expect(catalog.pages.value.private.items).toEqual([]);
+    await catalog.first(instanceIds.custom);
+    expect(catalog.pages.value[instanceIds.custom].items).toEqual([]);
   });
 });

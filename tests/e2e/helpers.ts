@@ -1,3 +1,4 @@
+import { instanceIds } from "../fixtures/plugins";
 import { expect, type Page, type APIRequestContext } from '@playwright/test';
 import type { TestServer } from './server';
 import { scanFailureMessage, waitForScanJob } from '../fixtures/scan-job';
@@ -24,7 +25,7 @@ export async function setProcessing(page: Page, enabled: boolean): Promise<void>
 }
 export async function scan(request: APIRequestContext, origin: string): Promise<void> {
   const session = await (await request.get(`${origin}/api/v1/auth/session`)).json();
-  const response = await request.post(`${origin}/api/v1/provider-instances/local/scan-jobs`, {
+  const response = await request.post(`${origin}/api/v1/provider-instances/${instanceIds.local}/scan-jobs`, {
     headers: { Origin: origin, 'X-CSRF-Token': session.csrfToken, 'Idempotency-Key': crypto.randomUUID() }, data: await scanRequest(request, origin),
   });
   expect(response.ok()).toBeTruthy(); const { jobId } = await response.json();
@@ -41,7 +42,7 @@ export async function scanRequest(request: APIRequestContext, origin: string) {
   const response = await request.get(`${origin}/api/v1/provider-instances`);
   expect(response.ok()).toBeTruthy();
   const providers = await response.json();
-  const provider = providers.items.find((item: { id: string }) => item.id === 'local');
+  const provider = providers.items.find((item: { id: string }) => item.id === instanceIds.local);
   expect(provider.configuration.schemaRevision).toBeTruthy();
   expect(provider.roots.length).toBeGreaterThan(0);
   return { mode: 'full', schemaRevision: provider.configuration.schemaRevision, rootIds: provider.roots.map((root: { id: string }) => root.id), options: {} };

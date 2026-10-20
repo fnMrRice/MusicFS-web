@@ -1,3 +1,4 @@
+import { instanceIds, localPlugin } from "../fixtures/plugins";
 import { expect, test, type Page } from "@playwright/test";
 import { preview, type PreviewServer } from "vite";
 
@@ -6,8 +7,8 @@ const origin = "http://127.0.0.1:18145";
 const tabNames = ["音乐源", "插件管理", "播放配置", "其他配置"];
 const processingLabel = "服务端处理（降低 6 dB，下一首生效）";
 const local = {
-  id: "local", name: "Fixture library", availability: "available", capabilities: [],
-  plugin: { id: "musicfs.localfiles", name: "Local files", localizedNames: { "zh-CN": "本地音乐" }, features: ["music-source"] },
+  id: instanceIds.local, name: "Fixture library", availability: "available", capabilities: [],
+  plugin: { id: "musicfs.plugin.source.localfiles", name: "Local files", localizedNames: { "zh-CN": "本地音乐" }, features: ["music-source"] },
 };
 
 test.beforeAll(async () => {
@@ -25,7 +26,7 @@ async function mock(page: Page, role = "admin") {
     if (path.endsWith("/auth/session")) json = { csrfToken: "fixture", user: { id: "listener", role } };
     if (path.endsWith("/provider-instances")) json = { items: [local] };
     if (path.endsWith("/admin/plugins")) json = { items: [{
-      pluginId: "musicfs.localfiles", instances: [{ instanceId: "local", name: "Local library", runtimeState: "ready" }],
+      pluginId: localPlugin.id, plugin: localPlugin, supportsMultipleInstances: false, instances: [{ instanceId: instanceIds.local, name: "Local library", runtimeState: "ready" }],
     }] };
     if (path.endsWith("/configuration")) json = {
       revision: "fixture-revision", roots: [],
@@ -136,7 +137,7 @@ test("regular users retain all tabs and see plugin permissions without admin req
 
 test("legacy directory links open music sources and dismiss before switching tabs", async ({ page }) => {
   await mock(page);
-  await page.goto(`${origin}/#/settings?tab=plugins&directories=local`);
+  await page.goto(`${origin}/#/settings?tab=plugins&directories=${instanceIds.local}`);
   await expect(page.getByRole("tab", { name: "音乐源", exact: true })).toHaveAttribute("aria-selected", "true");
   const directories = page.getByRole("list", { name: "已选音乐目录", exact: true });
   await expect(directories).toHaveCount(1);
@@ -155,11 +156,11 @@ test("leaving music sources cancels inline authorization and returning does not 
   const actions: { action: string; loginId: string }[] = [];
   let account: Record<string, unknown> = { state: "signedOut" };
   await page.route("**/api/v1/online-instances", (route) => route.fulfill({ json: { items: [{
-    instanceId: "qq", name: "QQ fixture", platform: "qqmusic", availability: "loginRequired", capabilities: [],
-    plugin: { id: "musicfs.qqmusic", name: "QQ Music", localizedNames: { "zh-CN": "QQ音乐" }, features: ["music-source"] },
+    instanceId: instanceIds.qqmusic, name: "QQ fixture", platform: "qqmusic", availability: "loginRequired", capabilities: [],
+    plugin: { id: "musicfs.plugin.source.qqmusic", name: "QQ Music", localizedNames: { "zh-CN": "QQ音乐" }, features: ["music-source"] },
   }] } }));
-  await page.route("**/api/v1/online-instances/qq/account/options", (route) => route.fulfill({ json: { method: "qr", configured: true } }));
-  await page.route("**/api/v1/online-instances/qq/account", (route) => {
+  await page.route(`**/api/v1/online-instances/${instanceIds.qqmusic}/account/options`, (route) => route.fulfill({ json: { method: "qr", configured: true } }));
+  await page.route(`**/api/v1/online-instances/${instanceIds.qqmusic}/account`, (route) => {
     if (route.request().method() === "POST") {
       const body = route.request().postDataJSON() as { action: string; loginId: string };
       actions.push(body);

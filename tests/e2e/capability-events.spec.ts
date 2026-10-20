@@ -1,3 +1,4 @@
+import { instanceIds } from "../fixtures/plugins";
 import { expect, test } from "@playwright/test";
 import { login, logout } from "./helpers";
 import { startDevServer, startServer, type TestServer } from "./server";
@@ -52,14 +53,14 @@ test("StrictMode uses one real event stream and refreshes authorized capabilitie
   await login(page, { ...server, origin });
   await expect.poll(() => page.evaluate(() => window.capabilityStreamProbe.changed)).toBeGreaterThan(0);
   await expect.poll(() => providerReads).toBeGreaterThan(0);
-  await expect(page.getByRole("option", { name: "本地音乐文件", exact: true })).toHaveCount(1);
+  await expect(page.getByRole("option", { name: "本地音乐", exact: true })).toHaveCount(1);
   expect(await page.evaluate(() => window.capabilityStreamProbe.created)).toBe(1);
 
   const sessionResponse = await page.request.get(`${origin}/api/v1/auth/session`);
   const session = await sessionResponse.json();
   const change = async (enabled: boolean) => {
     const snapshot = await (await page.request.get(`${origin}/api/v1/admin/plugins`)).json();
-    const response = await page.request.put(`${origin}/api/v1/admin/plugin-instances/local/state`, {
+    const response = await page.request.put(`${origin}/api/v1/admin/plugin-instances/${instanceIds.local}/state`, {
       headers: { Origin: origin, "X-CSRF-Token": session.csrfToken, "If-Match": `"${snapshot.revision}"`, "Idempotency-Key": crypto.randomUUID() },
       data: { enabled, mode: "drain" },
     });

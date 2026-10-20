@@ -1,6 +1,7 @@
 import type { Playback, SourceTrack, TrackPage } from '../../src/api/types';
+import { instanceIds } from './plugins';
 export const track: SourceTrack = {
-  sourceTrackId: 'track-1', providerInstanceId: 'local', displayName: '中文 <sample>.wav',
+  sourceTrackId: 'track-1', providerInstanceId: instanceIds.local, displayName: '中文 <sample>.wav',
   title: null, artists: [], durationMs: 30_000, codec: 'pcm_s16le', container: 'wav', bitrateBps: null,
   availability: 'available', assetId: 'asset-1',
 };

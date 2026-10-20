@@ -1,3 +1,4 @@
+import { instanceIds } from "../fixtures/plugins";
 import { test, expect, type Page } from "@playwright/test";
 import { startDirectoryServer, type DirectoryTestServer } from "./directory-server";
 
@@ -41,7 +42,7 @@ async function mockAccounts(
     let json: unknown = { items: [], nextCursor: null };
     if (path.endsWith("/health/ready")) json = { product: "MusicFS", ready: true, apiVersion: "1", instanceId: "account-test" };
     if (path.endsWith("/auth/session")) json = { csrfToken: "test-csrf", user: { id: "admin", role: "admin" } };
-    if (path.endsWith("/online-instances")) json = { items: [{ instanceId: "net", name: "测试来源", platform: "netease", plugin: { features: ["music-source"], id: "musicfs.netease", name: "NetEase Cloud Music", localizedNames: { "zh-CN": "网易云音乐" } }, availability: state.state === "signedIn" ? "available" : "loginRequired", capabilities: [{ name: "search.tracks", supported: true, reason: "" }] }] };
+    if (path.endsWith("/online-instances")) json = { items: [{ instanceId: instanceIds.netease, name: state.state === "signedIn" ? String(state.displayName) : "NetEase Cloud Music", accountId: state.accountId, platform: "netease", plugin: { features: ["music-source"], id: "musicfs.plugin.source.netease", name: "NetEase Cloud Music", localizedNames: { "zh-CN": "网易云音乐" } }, availability: state.state === "signedIn" ? "available" : "loginRequired", capabilities: [{ name: "search.tracks", supported: true, reason: "" }] }] };
     if (path.endsWith("/search")) { searches++; json = { tracks: [], nextCursor: null, truncated: false }; }
     if (path.endsWith("/account/options")) json = { method: "qr", configured: true, validation: "liveAccountPending" };
     if (path.endsWith("/account")) {

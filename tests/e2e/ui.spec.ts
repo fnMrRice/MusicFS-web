@@ -1,3 +1,4 @@
+import { instanceIds, neteasePlugin } from "../fixtures/plugins";
 import { test, expect } from '@playwright/test';
 import { startServer, type TestServer } from './server';
 import { login, logout, scan, waitPlaying } from './helpers';
@@ -96,10 +97,10 @@ test('mock 1000-row cursor selection and retry do not auto-select appended rows'
 
 test('mock source search preserves partial failure and never calls missing search types', async ({ page }, info) => {
   const calls: string[] = [];
-  await page.route('**/api/v1/online-instances', route => route.fulfill({ json: { items: ['a', 'b'].map(id => ({ instanceId: id, name: `测试来源 ${id}`, platform: 'netease', availability: 'available', capabilities: [{ name: 'search.tracks', supported: true, reason: 'Mock' }] })) } }));
+  await page.route('**/api/v1/online-instances', route => route.fulfill({ json: { items: [instanceIds.netease, instanceIds.neteaseSecond].map((id, index) => ({ instanceId: id, name: `Listener ${index + 1}`, accountId: `account-${index + 1}`, plugin: neteasePlugin, platform: 'netease', availability: 'available', capabilities: [{ name: 'search.tracks', supported: true, reason: 'Mock' }] })) } }));
   await page.route('**/api/v1/online-instances/*/search?**', async route => {
     calls.push(route.request().url()); const url = new URL(route.request().url());
-    if (url.pathname.includes('/b/')) { await route.fulfill({ status: 503, json: { error: { code: 'SOURCE_UNAVAILABLE', message: 'Unavailable' } } }); return; }
+    if (url.pathname.includes(`/${instanceIds.neteaseSecond}/`)) { await route.fulfill({ status: 503, json: { error: { code: 'SOURCE_UNAVAILABLE', message: 'Unavailable' } } }); return; }
     await route.fulfill({ json: { tracks: [{ externalId: '123', title: '测试曲目 <安全文本>', artists: ['测试歌手'], album: '测试专辑', durationMs: 120000, sourceUrl: 'https://music.163.com/song?id=123' }], nextCursor: null, truncated: false } });
   });
   await login(page, server); await page.getByRole('link', { name: '搜索', exact: true }).click();

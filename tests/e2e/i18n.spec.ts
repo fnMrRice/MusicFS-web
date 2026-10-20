@@ -1,3 +1,4 @@
+import { instanceIds } from "../fixtures/plugins";
 import { test, expect, type BrowserContext, type Page } from "@playwright/test";
 import { preview, type PreviewServer } from "vite";
 import { track } from "../fixtures/dto";
@@ -44,26 +45,26 @@ async function mock(context: BrowserContext, authenticated = true) {
       json = {
         items: [
           {
-            instanceId: "netease-public",
+            instanceId: instanceIds.netease,
             name: "网易云公开资料",
             platform: "netease",
-            plugin: { features: ["music-source"], id: "musicfs.netease", name: "NetEase Cloud Music", localizedNames: { "zh-CN": "网易云音乐", "zh-TW": "網易雲音樂" } },
+            plugin: { features: ["music-source"], id: "musicfs.plugin.source.netease", name: "NetEase Cloud Music", localizedNames: { "zh-CN": "网易云音乐", "zh-TW": "網易雲音樂" } },
             availability: "available",
             capabilities: [],
           },
           {
-            instanceId: "qq-public",
+            instanceId: instanceIds.qqmusic,
             name: "qq-public",
             platform: "qqmusic",
-            plugin: { features: ["music-source"], id: "musicfs.qqmusic", name: "QQ Music", localizedNames: { "zh-CN": "QQ音乐", "zh-TW": "QQ音樂" } },
+            plugin: { features: ["music-source"], id: "musicfs.plugin.source.qqmusic", name: "QQ Music", localizedNames: { "zh-CN": "QQ音乐", "zh-TW": "QQ音樂" } },
             availability: "available",
             capabilities: [],
           },
           {
-            instanceId: "apple-public",
+            instanceId: instanceIds.applemusic,
             name: "apple-public",
             platform: "applemusic",
-            plugin: { features: ["music-source"], id: "musicfs.applemusic", name: "Apple Music", localizedNames: {} },
+            plugin: { features: ["music-source"], id: "musicfs.plugin.source.applemusic", name: "Apple Music", localizedNames: {} },
             availability: "available",
             capabilities: [],
           },

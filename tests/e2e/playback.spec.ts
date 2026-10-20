@@ -1,3 +1,4 @@
+import { instanceIds } from "../fixtures/plugins";
 import { test, expect, request, type Page } from '@playwright/test';
 import { renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -25,7 +26,7 @@ test('real login, CSRF rejection, scanning, fixed pages, refresh restore, and lo
   await expect(page.getByLabel('管理员登录令牌')).toHaveCount(0);
   const cookie = (await page.context().cookies()).find((cookie) => cookie.name === 'musicfs_session');
   expect(cookie).toMatchObject({ httpOnly: true, sameSite: 'Strict', path: '/api/v1' });
-  const denied = await page.request.post(`${server.origin}/api/v1/provider-instances/local/scan-jobs`, { headers: { Origin: server.origin }, data: { mode: 'full' } });
+  const denied = await page.request.post(`${server.origin}/api/v1/provider-instances/${instanceIds.local}/scan-jobs`, { headers: { Origin: server.origin }, data: { mode: 'full' } });
   expect(denied.status()).toBe(403);
   await scan(page.request, server.origin); await page.getByRole('button', { name: '刷新列表' }).click();
   await expect(page.locator('tbody tr')).toHaveCount(100); await showAll(page);
@@ -121,7 +122,7 @@ test('offline music directory retains published library and logout unloads activ
   renameSync(original, unavailable);
   try {
     const session = await (await page.request.get(`${server.origin}/api/v1/auth/session`)).json();
-    const response = await page.request.post(`${server.origin}/api/v1/provider-instances/local/scan-jobs`, {
+    const response = await page.request.post(`${server.origin}/api/v1/provider-instances/${instanceIds.local}/scan-jobs`, {
       headers: { Origin: server.origin, 'X-CSRF-Token': session.csrfToken, 'Idempotency-Key': crypto.randomUUID() }, data: await scanRequest(page.request, server.origin),
     });
     expect(response.ok()).toBeTruthy(); const { jobId } = await response.json();

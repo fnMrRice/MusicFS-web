@@ -5,6 +5,7 @@ export type SourceLabel = string | {
   platform?: string;
   name?: string;
   instanceId?: string;
+  accountId?: string;
   id?: string;
   plugin?: PluginIdentity;
 };
@@ -15,7 +16,8 @@ function localeTag(value: string): Intl.Locale | null {
 }
 
 /** Plugin-owned names never pass through the application's message dictionary. */
-export function pluginName(plugin: PluginIdentity, locale: string): string {
+export function pluginName(plugin: PluginIdentity | undefined, locale: string): string {
+  if (!plugin) return tr("未知来源");
   const target = localeTag(locale);
   const translations = Object.entries(plugin.localizedNames ?? {})
     .filter(([, name]) => typeof name === "string" && name.trim())
@@ -35,7 +37,7 @@ export function pluginName(plugin: PluginIdentity, locale: string): string {
   return plugin.name || tr("未知来源");
 }
 
-// Request identifiers stay unchanged. Online instance aliases are not display names.
+// Request identifiers stay unchanged. Only a bound platform account supplies a user-facing instance name.
 export function sourceName(
   source: SourceLabel,
   instances: readonly Exclude<SourceLabel, string>[] = [],
@@ -43,7 +45,12 @@ export function sourceName(
 ): string {
   const instanceId = typeof source === "string" ? source : source.instanceId ?? source.id;
   const instance = instances.find((item) => (item.instanceId ?? item.id) === instanceId);
-  const plugin = instance ? instance.plugin : typeof source === "string" ? undefined : source.plugin;
-  if (plugin) return pluginName(plugin, locale);
+  const identity = instance ?? (typeof source === "string" ? undefined : source);
+  const plugin = identity?.plugin;
+  if (plugin) {
+    const alias = pluginName(plugin, locale);
+    const username = identity.accountId ? identity.name?.trim() : "";
+    return username && username !== instanceId && username !== alias && username !== plugin.name ? `${alias} · ${username}` : alias;
+  }
   return tr("未知来源");
 }
