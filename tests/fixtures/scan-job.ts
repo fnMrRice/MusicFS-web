@@ -3,8 +3,7 @@ export interface ScanJobObservation {
   error?: { code: string; message: string } | null;
 }
 
-// The minimal page has no scan submission UI. This bounded waiter is shared by
-// real-server E2E setup and its unit tests, not exposed as a new page feature.
+// 此有界等待器用于真实服务端测试的数据准备；页面扫描交互由独立状态管理。
 export async function waitForScanJob(
   load: (timeoutMs: number) => Promise<ScanJobObservation>,
   options: { timeoutMs?: number; pollMs?: number; onRetry?: () => void } = {},

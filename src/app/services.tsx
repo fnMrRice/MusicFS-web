@@ -20,6 +20,11 @@ import { capabilityResources } from "./capability-resources";
 import { SourcePlaylistCatalog } from "./source-playlists";
 import { ProfileApi } from "../api/profile";
 import { PersonalProfileState } from "./personal-profile";
+import { ScansApi } from "../api/scans";
+import { LocalScanState } from "../library/local-scan-state";
+import { LocalScans } from "../library/local-scans";
+import { ConfigurationScans } from "../library/configuration-scans";
+import type { PluginOperation } from "../api/directories";
 
 interface AuthState {
   session: AuthSession | null;
@@ -75,6 +80,14 @@ export class Services {
   private sourceRequest: AbortController | null = null;
   private playlistRequest: AbortController | null = null;
   private libraries = new Map<string, LibraryState>();
+  private scans = new LocalScans(new ScansApi(this.client, this.libraryApi), (instance, succeeded) => {
+    if (succeeded) for (const id of ["all", instance]) void this.libraries.get(id)?.refresh();
+    capabilityResources.invalidate();
+    void this.libraryApi.providers().catch(() => {});
+  });
+  private configurationScans = new ConfigurationScans(this.client, (instance) => this.scans.get(instance).requestAutomatic());
+  localScan(instance: string): LocalScanState { return this.scans.get(instance); }
+  scanMusicAfterDirectoryOperation(instance: string, operation: PluginOperation): void { this.configurationScans.watch(instance, operation); }
   library(provider: string): LibraryState {
     if (!this.libraries.has(provider))
       this.libraries.set(
@@ -118,6 +131,8 @@ export class Services {
     this.content.clearOnlineInstances();
     this.libraryApi.clearProviderInstances();
     this.auth.set({ ...this.auth.value, session, busy: false, error: null });
+    this.scans.setSession(this.auth.value.ready!.instanceId, session.user.id);
+    this.configurationScans.setSession(this.auth.value.ready!.instanceId, session.user.id);
     this.profile.setUser(session.user.id);
     this.reloadSourceNames();
     this.capabilityEvents.start(session.csrfToken);
@@ -213,6 +228,8 @@ export class Services {
     }
   }
   clear(): void {
+    this.configurationScans.clear();
+    this.scans.clear();
     this.profile.setUser(null);
     this.capabilityEvents.stop();
     this.sourceRequest?.abort();

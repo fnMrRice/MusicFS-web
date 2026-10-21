@@ -27,7 +27,8 @@ export class DirectorySettingsState extends Store<State> {
   private originalRoots: MusicRoot[] = [];
   private pending: PendingSave | null = null;
   private operationId: string | null = null;
-  constructor(private api: DirectoriesApi, private storage: OperationStorage) {
+  constructor(private api: DirectoriesApi, private storage: OperationStorage,
+    private operationAccepted?: (operation: PluginOperation) => void) {
     super({ roots: [], revision: "", loaded: false, busy: false, error: null, conflict: false, operation: null, saved: false,
       importDefaults: defaultOptions(), additionOptions: defaultOptions(), rootImportDefaultsSupported: false });
   }
@@ -116,6 +117,7 @@ export class DirectorySettingsState extends Store<State> {
       this.pending = null;
       this.operationId = operation.operationId;
       this.storage.set(operation.operationId);
+      this.operationAccepted?.(operation);
       await this.accept(operation, signal);
     } catch (e) {
       if (signal?.aborted) return;

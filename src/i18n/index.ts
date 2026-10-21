@@ -4,6 +4,7 @@ import music from "./music";
 import notices from "./notices";
 import plugins from "./plugins";
 import directories from "./directories";
+import scans from "./scans";
 
 export type Locale = "en" | "zh-CN" | "zh-TW" | "ja";
 export type Language = "browser" | Locale;
@@ -14,6 +15,7 @@ const messages: Record<string, readonly string[]> = {
   ...notices,
   ...plugins,
   ...directories,
+  ...scans,
 };
 const columns: Record<Locale, number> = {
   en: 0,

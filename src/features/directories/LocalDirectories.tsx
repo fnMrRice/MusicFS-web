@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { DirectoriesApi, type ImportDefaults, type ManagedInstance } from "../../api/directories";
 import { useServices, useStore } from "../../app/services";
 import { capabilityResources } from "../../app/capability-resources";
@@ -24,9 +24,10 @@ export function LocalDirectories({ instance, action = { type: "add" }, close }: 
     return new DirectorySettingsState(api, {
       get() { try { return sessionStorage.getItem(key); } catch { return null; } },
       set(id) { try { if (id) sessionStorage.setItem(key, id); else sessionStorage.removeItem(key); } catch { /* Keep progress in memory. */ } },
-    });
-  }, [api, auth.ready?.instanceId, auth.session?.user.id, instance.instanceId]);
+    }, action.type === "remove" ? undefined : (operation) => s.scanMusicAfterDirectoryOperation(instance.instanceId, operation));
+  }, [api, auth.ready?.instanceId, auth.session?.user.id, instance.instanceId, action.type]);
   const value = useStore(state);
+  const applied = useRef(false);
   useEffect(() => {
     const controller = new AbortController();
     void Promise.resolve().then(() => { if (!controller.signal.aborted) return state.start(controller.signal); });
@@ -38,7 +39,11 @@ export function LocalDirectories({ instance, action = { type: "add" }, close }: 
     return () => clearTimeout(timer);
   }, [state, value.operation, value.busy, value.error]);
   useEffect(() => {
-    if (value.saved) { capabilityResources.invalidate(); close(); }
+    if (value.saved && !applied.current) {
+      applied.current = true;
+      capabilityResources.invalidate();
+      close();
+    }
   }, [value.saved]);
   const locked = state.locked;
   const root = action.type === "add" ? null : value.roots.find((item) => item.id === action.rootId)
@@ -94,8 +99,8 @@ export function LocalDirectories({ instance, action = { type: "add" }, close }: 
           advanced={(advanced) => changeOptions({ ...options, ...advanced })} />
           : <p className="muted">{tr("此服务端暂不支持单独配置目录查找设置。")}</p>}
         {value.rootImportDefaultsSupported && <p className="muted">{tr(action.type === "add"
-          ? "查找设置仅应用于本次添加的目录。保存后不会自动扫描。"
-          : "查找设置仅应用于此目录，不会修改其他目录。保存后不会自动扫描。")}</p>}
+          ? "查找设置仅应用于本次添加的目录。保存后将自动扫描音乐。"
+          : "查找设置仅应用于此目录，不会修改其他目录。保存后将自动扫描音乐。")}</p>}
       </>}
       <div className="directory-actions directory-modal-actions">
         <button type="button" disabled={locked} onClick={close}>{tr("取消")}</button>

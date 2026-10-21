@@ -1,7 +1,7 @@
 import { test, expect, type APIRequestContext, type Locator, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { basename, normalize } from 'node:path';
-import { login, scan } from './helpers';
+import { login } from './helpers';
 import { startDirectoryServer, type DirectoryTestServer } from './directory-server';
 import { instanceIds } from '../fixtures/plugins';
 
@@ -189,8 +189,7 @@ test('added directories support isolated configuration, cancellation, deletion a
   }
   await page.locator('.settings-card').filter({ has: heading }).screenshot({ path: info.outputPath('directory-added-list.png') });
   await expectAllowedCount(page);
-  await scan(page.request, server.origin);
-  expect(await importedNames(page.request)).toEqual(['second-selected.wav', 'selected.wav']);
+  await expect.poll(() => importedNames(page.request)).toEqual(['second-selected.wav', 'selected.wav']);
   dialog = await openAdd(page);
   await expand(dialog, server.allowedRoot);
   await expand(dialog, server.secondAllowedRoot);
@@ -219,8 +218,7 @@ test('added directories support isolated configuration, cancellation, deletion a
   expect((await configuration(page.request)).roots[1].importDefaults).toEqual(added.musicRoots[1].importDefaults);
   expect(limited.musicRoots.every((root: { path?: string }) => root.path === undefined)).toBe(true);
   expect(limited.importDefaults).toEqual(added.importDefaults);
-  await scan(page.request, server.origin);
-  expect(await importedNames(page.request)).toEqual(['depth-one.wav', 'second-selected.wav', 'selected.wav']);
+  await expect.poll(() => importedNames(page.request)).toEqual(['depth-one.wav', 'second-selected.wav', 'selected.wav']);
   dialog = await openEdit(page, firstName);
   await advanced(dialog);
   await expect(limit()).toBeChecked();
@@ -232,13 +230,15 @@ test('added directories support isolated configuration, cancellation, deletion a
   const unlimited = await save(page, dialog);
   expect(unlimited.musicRoots[0].importDefaults).toMatchObject({ recursive: true, maxDepth: 0, skipHidden: false, respectNoMedia: false });
   expect(unlimited.musicRoots[1]).toEqual(limited.musicRoots[1]);
+  await expect.poll(() => importedNames(page.request)).toEqual(['.hidden.wav', 'depth-one.wav', 'depth-two.wav', 'hidden-child.wav', 'nomedia.wav', 'second-selected.wav', 'selected.wav']);
   await server.restart();
   await page.reload();
   await expect(selected.getByRole('listitem')).toHaveCount(2);
   const persisted = await configuration(page.request);
   expect(persisted.roots[0].importDefaults).toEqual(unlimited.musicRoots[0].importDefaults);
   expect(persisted.roots[1].importDefaults).toEqual(added.musicRoots[1].importDefaults);
-  await scan(page.request, server.origin);
+  await page.getByRole('button', { name: '扫描音乐', exact: true }).click();
+  await expect(page.getByRole('status').filter({ hasText: '扫描完成' })).toContainText('7');
   expect(await importedNames(page.request)).toEqual(['.hidden.wav', 'depth-one.wav', 'depth-two.wav', 'hidden-child.wav', 'nomedia.wav', 'second-selected.wav', 'selected.wav']);
   dialog = await openDelete(page, firstName);
   await dialog.getByRole('button', { name: '取消', exact: true }).click();

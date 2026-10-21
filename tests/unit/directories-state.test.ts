@@ -5,7 +5,7 @@ import { DirectorySettingsState } from "../../src/features/directories/state";
 
 const operation = (status: PluginOperation["status"]): PluginOperation => ({ operationId: "operation-1", status, errorCode: null });
 const defaultOptions = { recursive: true, maxDepth: 0, importLyrics: false, excludePatterns: [], skipHidden: true, respectNoMedia: true };
-function fixture(savedId: string | null = null) {
+function fixture(savedId: string | null = null, operationAccepted?: (operation: PluginOperation) => void) {
   let id = savedId;
   const api = {
     configuration: vi.fn(async (): Promise<LocalConfiguration> => ({ revision: "r1", roots: [{ id: "existing", name: "Saved", pathConfigured: true }] })),
@@ -13,11 +13,28 @@ function fixture(savedId: string | null = null) {
     operation: vi.fn(async () => operation("succeeded")),
   };
   const storage = { get: () => id, set: vi.fn((value: string | null) => { id = value; }) };
-  const state = new DirectorySettingsState(api as unknown as DirectoriesApi, storage);
+  const state = new DirectorySettingsState(api as unknown as DirectoriesApi, storage, operationAccepted);
   return { api, storage, state };
 }
 
 describe("Music folder configuration state", () => {
+  it("hands accepted operations to the session before the directory modal can disappear", async () => {
+    const accepted = vi.fn();
+    const { state } = fixture(null, accepted);
+    await state.start();
+    await state.save();
+    expect(accepted).toHaveBeenCalledExactlyOnceWith(operation("applying"));
+    expect(state.value.saved).toBe(false);
+    await state.resume();
+    expect(accepted).toHaveBeenCalledTimes(1);
+  });
+  it("does not invent scan intent when restoring an existing directory operation", async () => {
+    const accepted = vi.fn();
+    const { state } = fixture("saved-remove-operation", accepted);
+    await state.start();
+    expect(state.value.saved).toBe(true);
+    expect(accepted).not.toHaveBeenCalled();
+  });
   it("keeps an empty configuration empty until a directory is explicitly selected", async () => {
     const { state, api } = fixture();
     api.configuration.mockResolvedValueOnce({ revision: "r1", roots: [] });
