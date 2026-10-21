@@ -113,7 +113,7 @@ export function PluginStatus() {
               </span>
               <PluginCount count={p.displayCount} locale={locale} />
             </summary>
-            {p.storage || p.dsp ? <InfrastructurePluginDetails plugin={p} /> : <div className="plugin-instances">
+            {p.storage || p.dsp || p.builtin ? <InfrastructurePluginDetails plugin={p} /> : <div className="plugin-instances">
               <h4>{tr("插件实例")}</h4>
               {p.instances.map((i) => (
                 <div className="plugin-instance" key={i.instanceId}>

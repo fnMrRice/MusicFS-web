@@ -14,15 +14,23 @@ const storageStates: Record<PluginStorage["runtimeState"], string> = {
 const modeLabel = (mode: "builtin" | "process") => tr(mode === "builtin" ? "服务端内置" : "独立进程");
 
 export function InfrastructurePluginBadges({ plugin }: { plugin: ManagedPlugin }) {
-  if (!plugin.required && !plugin.dsp) return null;
+  if (!plugin.required && !plugin.dsp && !plugin.execution) return null;
   return <span className="plugin-infrastructure-badges">
     {plugin.required && <span className="badge">{tr("必需")}</span>}
+    {plugin.execution && <span className="badge">{modeLabel(plugin.execution)}</span>}
     {plugin.dsp && <span className="badge">{tr(chainStates[plugin.dsp.chainState])}</span>}
   </span>;
 }
 
 export function InfrastructurePluginDetails({ plugin }: { plugin: ManagedPlugin }) {
   return <div className="plugin-infrastructure">
+    {plugin.builtin && <>
+      <p>{tr("内置能力已装配到服务端主进程，按对应业务配置使用；这里不表示依赖工具已就绪或任务正在运行。")}</p>
+      <dl className="plugin-properties">
+        <div><dt>{tr("运行方式")}</dt><dd>{tr("服务端内置")}</dd></div>
+        <div><dt>{tr("业务配置")}</dt><dd>{tr(plugin.builtin.configured ? "已配置" : "未配置")}</dd></div>
+      </dl>
+    </>}
     {plugin.storage && <>
       <p>{tr("数据库为服务端必需组件，不能停用。后端由服务端启动配置选择，修改后需重启服务端。")}</p>
       <dl className="plugin-properties">

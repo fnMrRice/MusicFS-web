@@ -43,6 +43,32 @@ function entry(card: Locator, id: string) {
   return card.locator(".plugin-entry").filter({ has: card.page().getByText(id, { exact: true }) });
 }
 
+test("builtin algorithms show configuration and purpose without fake instances", async ({ page }) => {
+  const items: ManagedPlugin[] = [
+    ["analysis.chromaprint", "音频分析", "audio-analysis", false],
+    ["tags.flac", "标签格式", "tag-format", false],
+    ["matching.standard", "录音匹配", "matching", true],
+    ["transform.thumbnail", "内容变换", "content-transform", true],
+  ].map(([suffix, label, purpose, configured]) => {
+    const id = `musicfs.plugin.${suffix}`;
+    return { pluginId: id, plugin: { id, name: String(label), localizedNames: {}, features: [String(purpose)] }, version: "0.1.0", supportsMultipleInstances: false,
+      instances: [], stateMutable: false, execution: "builtin", builtin: { configured: Boolean(configured), capabilities: [String(purpose)] } };
+  });
+  const card = await openPlugins(page, items);
+  for (const plugin of items) {
+    const item = entry(card, plugin.pluginId);
+    await expect(item.locator("summary")).toContainText("服务端内置");
+    await item.locator("summary").click();
+    await expect(item).toContainText("不表示依赖工具已就绪或任务正在运行");
+    await expect(item.locator(".plugin-properties")).toContainText(plugin.builtin?.configured ? "已配置" : "未配置");
+    await expect(item.getByText("暂无插件实例。", { exact: true })).toHaveCount(0);
+    await expect(item.getByRole("button")).toHaveCount(0);
+  }
+  await card.getByRole("group", { name: "插件类型", exact: true }).getByRole("checkbox", { name: "内容变换", exact: true }).check();
+  await expect(card.locator(".plugin-entry")).toHaveCount(1);
+  await expect(entry(card, "musicfs.plugin.transform.thumbnail")).toBeVisible();
+});
+
 test("database is required and read-only while empty DSP has a configuration state", async ({ page }, info) => {
   const card = await openPlugins(page, [database, gain, legacy]);
   const db = entry(card, database.pluginId);

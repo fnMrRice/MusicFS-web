@@ -1,4 +1,15 @@
 export default {
+  "音频分析": ["Audio analysis", "音訊分析", "音声分析"],
+  "标签格式": ["Tag formats", "標籤格式", "タグ形式"],
+  "录音匹配": ["Recording matching", "錄音匹配", "録音の照合"],
+  "内容变换": ["Content transforms", "內容轉換", "コンテンツ変換"],
+  "业务配置": ["Feature configuration", "功能設定", "機能設定"],
+  "已配置": ["Configured", "已設定", "設定済み"],
+  "内置能力已装配到服务端主进程，按对应业务配置使用；这里不表示依赖工具已就绪或任务正在运行。": [
+    "Built-in capabilities run in the server process and follow their feature settings. This does not indicate that external tools are ready or a task is running.",
+    "內建能力已裝配至伺服器主程序，依對應功能設定使用；此處不表示相依工具已就緒或工作正在執行。",
+    "組み込み機能はサーバープロセス内で機能設定に従って動作します。外部ツールの準備完了やタスクの実行状態を示すものではありません。",
+  ],
   "插件列表": ["Plugin list", "外掛程式清單", "プラグイン一覧"],
   "用途": ["Purpose", "用途", "用途"],
   "插件类型": ["Plugin types", "外掛程式類型", "プラグインの種類"],

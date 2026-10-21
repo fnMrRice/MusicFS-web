@@ -70,6 +70,8 @@ export interface ManagedPlugin {
   stateMutable?: boolean;
   storage?: PluginStorage;
   dsp?: PluginDSP;
+  execution?: "builtin" | "process";
+  builtin?: { configured: boolean; capabilities: string[] };
 }
 export interface PluginSnapshot {
   restartRequired?: boolean;
