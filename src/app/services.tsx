@@ -18,6 +18,8 @@ import { LibraryState } from "../library/state";
 import { CapabilityEvents } from "./capability-events";
 import { capabilityResources } from "./capability-resources";
 import { SourcePlaylistCatalog } from "./source-playlists";
+import { ProfileApi } from "../api/profile";
+import { PersonalProfileState } from "./personal-profile";
 
 interface AuthState {
   session: AuthSession | null;
@@ -42,6 +44,7 @@ const defaults: PreferencesState = {
 export class Services {
   client = new ApiClient();
   authApi = new AuthApi(this.client);
+  profile = new PersonalProfileState(new ProfileApi(this.client));
   libraryApi = new LibraryApi(this.client);
   content = new ContentApi(this.client);
   sourcePlaylists = new SourcePlaylistCatalog((instance, signal) => this.content.accountPlaylists(instance, null, signal));
@@ -115,6 +118,7 @@ export class Services {
     this.content.clearOnlineInstances();
     this.libraryApi.clearProviderInstances();
     this.auth.set({ ...this.auth.value, session, busy: false, error: null });
+    this.profile.setUser(session.user.id);
     this.reloadSourceNames();
     this.capabilityEvents.start(session.csrfToken);
     let saved: Partial<PreferencesState> = {};
@@ -209,6 +213,7 @@ export class Services {
     }
   }
   clear(): void {
+    this.profile.setUser(null);
     this.capabilityEvents.stop();
     this.sourceRequest?.abort();
     this.sourcePlaylists.clear();

@@ -4,7 +4,7 @@
 
 | 页面 | 接入范围 | 边界 |
 | --- | --- | --- |
-| 登录、设置 | readiness、session、provider-instances | 同源 Cookie、Origin、CSRF；个人昵称接口已提供，页面待适配 |
+| 登录、账号、设置 | readiness、session、me/profile、provider-instances | 同源 Cookie、Origin、CSRF；个人信息卡已接入昵称读取、修改及清空；使用默认头像 |
 | 曲目列表 | source-tracks 实例过滤、固定修订游标 | 连续滚动；全库关键词、格式、收藏、观测可用性和排序已有接口，页面待适配；不支持静态“仅可播放”判断 |
 | 在线搜索 | online-instances 与逐实例 search | 当前 UI 仅接曲目资料；Server 已有四类搜索，其余页签及详情待适配；无在线播放承诺 |
 | 推荐 | recommendations 逐来源卡片和 stale/error | 原始来源顺序，失败不遮挡其他来源；点击只预览 |
@@ -23,7 +23,7 @@
 - `/library/queries`、`/library/queries/{id}`：固定完整查询结果的创建、分页、恢复和取消；“播放全部”不能继续用当前已加载页代替。
 - 在线逐实例 `search?kind=...`：曲目、专辑、歌手、歌单；专辑／歌手详情及相关曲目／专辑分页。
 - `/playlists?q=...`、在线歌单 `tracks` 分页、`/source-refs/lookup` 和在线曲目批量读取：本人歌单搜索与引用展示。
-- `/me/profile`、`/me/favorites`、`/me/recently-played`：昵称、账号收藏和最近播放。最近播放需要在真实播放开始后上报，遵守会话去重和保存期限；头像上传仍未支持。
+- `/me/favorites`、`/me/recently-played`：账号收藏和最近播放。最近播放需要在真实播放开始后上报，遵守会话去重和保存期限；昵称已通过 `/me/profile` 接入，头像上传仍未支持。
 
 目前 UI 的歌单本地曲目展示仍遍历固定修订曲库关联，批量读取接口已提供，尚待替换。`availableOnly` 仅表示扫描观测可用，不能承诺音频解码或播放授权；`playableOnly` 尚不支持。远程资料引用不构成音频播放许可，在线现网结果仍受配置、权限和来源状态影响，界面 Mock 测试不能代替平台验收。完整接口字段和保留边界见 [Server 完成对照](../../server/docs/web-ui-api-gaps.md)。
 

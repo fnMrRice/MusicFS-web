@@ -7,6 +7,7 @@ import { PlayerBar } from "../player/PlayerBar";
 import styles from "./Shell.module.css";
 import { ErrorBoundary } from "../app/ErrorBoundary";
 import { useMusicSources, useSourceName } from "../components/use-source-name";
+import { NicknameEditor } from "../features/profile/NicknameEditor";
 
 const links = [
   ["/search", "search", "搜索"],
@@ -18,6 +19,7 @@ export function AppShell() {
   useLocale();
   const s = useServices();
   const auth = useStore(s.auth);
+  const profile = useStore(s.profile.state);
   const prefs = useStore(s.preferences);
   const playlists = useStore(s.playlists);
   const sources = useMusicSources();
@@ -29,6 +31,8 @@ export function AppShell() {
   const content = useRef<HTMLDivElement>(null);
   const positions = useRef(new Map<string, number>());
   const [account, setAccount] = useState(false);
+  const [editingNickname, setEditingNickname] = useState(false);
+  const nicknameWasOpen = useRef(false);
   const [theme, setTheme] = useState(false);
   const accountRoot = useRef<HTMLDivElement>(null);
   const accountButton = useRef<HTMLButtonElement>(null);
@@ -80,7 +84,15 @@ export function AppShell() {
   useEffect(() => {
     setAccount(false);
     setTheme(false);
+    setEditingNickname(false);
   }, [location.pathname]);
+  useEffect(() => {
+    if (nicknameWasOpen.current && !editingNickname) {
+      accountButton.current?.focus();
+      setAccount(false);
+    }
+    nicknameWasOpen.current = editingNickname;
+  }, [editingNickname]);
   const title =
     links.find(([path]) => location.pathname === path)?.[2] ??
     (location.pathname === "/settings"
@@ -116,7 +128,6 @@ export function AppShell() {
         <nav
           className={styles.navigation}
           aria-label={tr("主导航")}
-          onScroll={() => setAccount(false)}
         >
           {links.map(([path, icon, label]) => nav(path, icon, tr(label)))}
           <div className={styles.group}>
@@ -180,53 +191,6 @@ export function AppShell() {
             tr("{0} 的歌单", { 0: sourceName(source.online ?? source.provider!) }),
           ))}
         </nav>
-        <div
-          className={styles.account}
-          ref={accountRoot}
-          onContextMenu={(e) => {
-            e.preventDefault();
-            setAccount(true);
-          }}
-        >
-          <span className={styles.avatar}>
-            <Icon name="user" />
-          </span>
-          <div>
-            <strong>{tr("我的账号")}</strong>
-            <small>{auth.session?.user.id}</small>
-          </div>
-          <button
-            ref={accountButton}
-            className="icon-button"
-            aria-label={tr("账号菜单")}
-            aria-expanded={account}
-            onClick={() => setAccount(!account)}
-          >
-            <Icon name="more" />
-          </button>
-          {account && (
-            <div
-              className={`${styles.accountMenu} popover`}
-              aria-label={tr("账号操作")}
-            >
-              <button
-                onClick={() => {
-                  navigate("/settings");
-                }}
-              >
-                {tr("设置")}
-              </button>
-              <button
-                disabled={auth.busy}
-                onClick={() => {
-                  void s.logout();
-                }}
-              >
-                {tr("退出登录")}
-              </button>
-            </div>
-          )}
-        </div>
       </aside>
       <section className={styles.main}>
         <header className={styles.header}>
@@ -247,7 +211,7 @@ export function AppShell() {
               label={tr("设置")}
               onClick={() => navigate("/settings")}
             />
-            <div ref={themeRoot}>
+            <div ref={themeRoot} className={styles.themePicker}>
               <IconButton
                 icon="theme"
                 label={tr("换肤")}
@@ -279,6 +243,75 @@ export function AppShell() {
                 </div>
               )}
             </div>
+            <div
+              className={styles.account}
+              ref={accountRoot}
+              onPointerEnter={(e) => {
+                if (e.pointerType !== "touch") setAccount(true);
+              }}
+              onPointerLeave={() => {
+                if (!accountRoot.current?.contains(document.activeElement)) setAccount(false);
+              }}
+              onFocus={(e) => {
+                if (!e.currentTarget.contains(e.relatedTarget)) setAccount(true);
+              }}
+              onBlur={(e) => {
+                if (!e.currentTarget.contains(e.relatedTarget)) setAccount(false);
+              }}
+            >
+              <button
+                ref={accountButton}
+                className={styles.avatar}
+                aria-label={tr("账号菜单")}
+                aria-expanded={account}
+                aria-controls="account-details"
+                onClick={() => setAccount(true)}
+              >
+                <Icon name="user" size={20} />
+              </button>
+              {account && (
+                <section
+                  id="account-details"
+                  className={styles.accountMenu}
+                  aria-label={tr("账号操作")}
+                >
+                  <div className={`${styles.accountCard} popover`}>
+                    <div className={styles.accountProfile}>
+                      <span className={styles.profileAvatar} aria-hidden="true">
+                        <Icon name="user" size={32} />
+                      </span>
+                      <div className={styles.accountInfo}>
+                        <span>{tr("我的账号")}</span>
+                        <strong>{profile.data?.nickname ?? auth.session?.user.id}</strong>
+                        {profile.data?.nickname && (
+                          <small>{tr("账号：{0}", { 0: auth.session?.user.id ?? "" })}</small>
+                        )}
+                        <small>{auth.session?.user.role === "admin"
+                          ? tr("管理员")
+                          : auth.session?.user.role === "user"
+                            ? tr("用户")
+                            : auth.session?.user.role}</small>
+                        <button
+                          className={styles.editNickname}
+                          disabled={auth.busy}
+                          onClick={() => {
+                            setAccount(false);
+                            setEditingNickname(true);
+                          }}
+                        >
+                          {tr("修改昵称")}
+                        </button>
+                      </div>
+                    </div>
+                    <div className={styles.accountActions}>
+                      <button disabled={auth.busy} onClick={() => void s.logout()}>
+                        {tr("退出登录")}
+                      </button>
+                    </div>
+                  </div>
+                </section>
+              )}
+            </div>
           </div>
         </header>
         <div
@@ -297,6 +330,7 @@ export function AppShell() {
         </div>
       </section>
       <PlayerBar />
+      {editingNickname && <NicknameEditor close={() => setEditingNickname(false)} />}
     </div>
   );
 }
