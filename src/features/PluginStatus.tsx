@@ -4,8 +4,8 @@ import { useResource } from "../components/query";
 import { ErrorNotice, Icon } from "../components/ui";
 import { tr, useLocale } from "../i18n";
 import { Link } from "react-router-dom";
-import type { PluginSnapshot } from "../api/directories";
-import { pluginName, sourceName } from "../components/source-name";
+import type { PluginDisplayCount, PluginSnapshot } from "../api/directories";
+import { localizedPluginText, pluginName, sourceName } from "../components/source-name";
 import "./plugin-status.css";
 const states: Record<string, string> = {
   disabled: "已禁用",
@@ -15,6 +15,13 @@ const states: Record<string, string> = {
   draining: "正在停止",
   failed: "启动或运行失败",
 };
+
+function PluginCount({ count, locale }: { count?: PluginDisplayCount; locale: string }) {
+  if (!count || !Number.isSafeInteger(count.value) || count.value < 0 ||
+    typeof count.unit !== "string" || !count.unit.trim()) return null;
+  const unit = localizedPluginText(count.unit, count.localizedUnits, locale);
+  return <span className="plugin-count">{`${count.value} ${unit}`}</span>;
+}
 
 export function PluginStatus() {
   const { locale } = useLocale();
@@ -67,7 +74,7 @@ export function PluginStatus() {
                   <span>{tr("版本")}：{p.version?.trim() || tr("未知版本")}</span>
                 </span>
               </span>
-              <span className="plugin-count">{tr("{0} 个实例", { 0: p.instances.length })}</span>
+              <PluginCount count={p.displayCount} locale={locale} />
             </summary>
             <div className="plugin-instances">
               <h4>{tr("插件实例")}</h4>

@@ -66,7 +66,8 @@
   font-size: inherit;
 }
 .plugin-count {
-  flex-shrink: 0;
+  max-width: 40%;
+  overflow-wrap: anywhere;
   color: var(--muted);
   font-size: 12px;
 }
@@ -113,6 +114,7 @@
   }
   .plugin-count {
     flex-basis: calc(100% - 26px);
+    max-width: none;
     margin-left: 26px;
   }
   .plugin-instances {

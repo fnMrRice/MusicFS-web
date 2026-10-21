@@ -48,8 +48,10 @@ async function expectRefreshBesideHeading(card: Locator, label = "刷新插件�
 
 test("plugin groups show identity, separate rows and expandable instances with refresh beside the heading", async ({ page }, info) => {
   let localState = "pending_configuration";
+  let localSources = 4;
   await mockPlugins(page, () => ({ items: [
     { pluginId: localPlugin.id, plugin: localPlugin, version: "1.2.3", supportsMultipleInstances: false,
+      displayCount: { value: localSources, unit: "sources", localizedUnits: { "zh-CN": "个来源" } },
       instances: [{ instanceId: instanceIds.local, name: "Local test", runtimeState: localState }] },
     { pluginId: ncmPlugin.id, plugin: ncmPlugin, version: "2.0.1", supportsMultipleInstances: false,
       instances: [{ instanceId: instanceIds.ncm, name: "NCM test", runtimeState: "disabled" }] },
@@ -71,10 +73,13 @@ test("plugin groups show identity, separate rows and expandable instances with r
     await expect(summary.getByText(name, { exact: true })).toBeVisible();
     await expect(summary.getByText(id, { exact: true })).toBeVisible();
     await expect(summary).toContainText(version);
-    await expect(summary).toContainText("1 个实例");
+    await expect(summary).not.toContainText("个实例");
     await expect(entry).not.toHaveAttribute("open");
     await expect(entry.locator(".plugin-instance")).toBeHidden();
   }
+  await expect(local.locator(".plugin-count")).toHaveText("4 个来源");
+  await expect(ncm.locator(".plugin-count")).toHaveCount(0);
+  await expect(scraper.locator(".plugin-count")).toHaveCount(0);
   await expectRefreshBesideHeading(card);
   expect(await card.locator(".plugin-entry").evaluateAll(entries => entries.slice(1).every((entry, index) =>
     parseFloat(getComputedStyle(entry).borderTopWidth) > 0 ||
@@ -101,7 +106,9 @@ test("plugin groups show identity, separate rows and expandable instances with r
   await ncm.locator("summary").click();
   await expect(ncm).not.toHaveAttribute("open");
   localState = "ready";
+  localSources = 2;
   await card.getByRole("button", { name: "刷新插件状态" }).click();
+  await expect(local.locator(".plugin-count")).toHaveText("2 个来源");
   await expect(local.getByText("可用", { exact: true })).toBeVisible();
   await expect(scraper.getByText("可用", { exact: true })).toBeVisible();
   await expect(local).toHaveAttribute("open");
@@ -134,11 +141,12 @@ test("settings show restart-required disable while the plugin remains available"
   await expect(entry).toHaveAttribute("open");
 });
 
-test("each account has its own instance inside one plugin group and refreshes after logout", async ({ page }) => {
+test("plugin-provided user counts and account names refresh after logout", async ({ page }) => {
   let bound = true;
   const plugin = { ...neteasePlugin, id: "example.custom.source", name: "Custom Source", localizedNames: { "zh-CN": "自定义来源" } };
   await mockPlugins(page, () => ({ items: [
     { pluginId: plugin.id, plugin, version: "4.2.0", supportsMultipleInstances: true,
+      displayCount: { value: bound ? 2 : 1, unit: "users", localizedUnits: { "zh-CN": "个用户" } },
       instances: [instanceIds.netease, instanceIds.neteaseSecond]
         .map(instanceId => ({ instanceId, name: instanceId, runtimeState: "ready" })) },
     { pluginId: ncmPlugin.id, plugin: ncmPlugin, version: "2.0.1", supportsMultipleInstances: false,
@@ -154,7 +162,7 @@ test("each account has its own instance inside one plugin group and refreshes af
   const card = pluginCard(page);
   const entry = pluginEntry(card, plugin.id);
   await expect(entry).toHaveCount(1);
-  await expect(entry.locator("summary")).toContainText("2 个实例");
+  await expect(entry.locator(".plugin-count")).toHaveText("2 个用户");
   await entry.locator("summary").click();
   const instances = entry.locator(".plugin-instance");
   await expect(instances).toHaveCount(2);
@@ -166,6 +174,7 @@ test("each account has its own instance inside one plugin group and refreshes af
   await expect(card.getByText(/Ignored config|Never use|ab4dfbab|87d29d7b/)).toHaveCount(0);
   bound = false;
   await card.getByRole("button", { name: "刷新插件状态" }).click();
+  await expect(entry.locator(".plugin-count")).toHaveText("1 个用户");
   await expect(instances).toHaveCount(2);
   await expect(instances.nth(0).getByText("自定义来源", { exact: true })).toBeVisible();
   await expect(instances.nth(1).getByText("自定义来源 · Bob", { exact: true })).toBeVisible();
@@ -185,6 +194,8 @@ test("admins opt into all user instances and return to their own instances witho
   await mockPlugins(page, url => {
     scopes.push(url.searchParams.get("allUsers"));
     return { items: [{ pluginId: plugin.id, plugin, version: "4.2.0", supportsMultipleInstances: true,
+      displayCount: { value: url.searchParams.get("allUsers") === "true" ? 2 : 1,
+        unit: "users", localizedUnits: { "zh-CN": "个用户" } },
       instances: url.searchParams.get("allUsers") === "true" ? instances : instances.slice(0, 1) }] };
   }, () => [
     { instanceId: instanceIds.netease, plugin, name: "Alice", accountId: "account-a", capabilities: [] },
@@ -194,7 +205,7 @@ test("admins opt into all user instances and return to their own instances witho
   const allUsers = card.getByRole("checkbox", { name: "显示所有用户实例", exact: true });
   const entry = pluginEntry(card, plugin.id);
   await expect(allUsers).not.toBeChecked();
-  await expect(entry.locator("summary")).toContainText("1 个实例");
+  await expect(entry.locator(".plugin-count")).toHaveText("1 个用户");
   expect(scopes).toEqual([null]);
   await entry.locator("summary").click();
   await expect(entry.locator(".plugin-instance")).toHaveCount(1);
@@ -202,7 +213,7 @@ test("admins opt into all user instances and return to their own instances witho
   await expect(entry.getByText("账号来源 · Bob", { exact: true })).toHaveCount(0);
 
   await allUsers.check();
-  await expect(entry.locator("summary")).toContainText("2 个实例");
+  await expect(entry.locator(".plugin-count")).toHaveText("2 个用户");
   await expect(entry.locator(".plugin-instance")).toHaveCount(2);
   const alice = entry.locator(".plugin-instance").filter({ hasText: "账号来源 · Alice" });
   const bob = entry.locator(".plugin-instance").filter({ hasText: "账号来源 · Bob" });
@@ -213,16 +224,20 @@ test("admins opt into all user instances and return to their own instances witho
   expect(scopes).toEqual([null, "true"]);
 
   await allUsers.uncheck();
-  await expect(entry.locator("summary")).toContainText("1 个实例");
+  await expect(entry.locator(".plugin-count")).toHaveText("1 个用户");
   await expect(entry.locator(".plugin-instance")).toHaveCount(1);
   await expect(entry.getByText("账号来源 · Alice", { exact: true })).toBeVisible();
   await expect(entry.getByText("账号来源 · Bob", { exact: true })).toHaveCount(0);
   expect(scopes).toEqual([null, "true", null]);
 });
 
-test("plugins without instances remain listed and missing versions have a clear fallback", async ({ page }) => {
+test("missing counts stay hidden and plugins can provide zero with arbitrary units", async ({ page }) => {
+  const custom = { ...scraperPlugin, id: "example.custom.catalog", name: "Custom Catalog", localizedNames: {} };
   await mockPlugins(page, () => ({ items: [
     { pluginId: localPlugin.id, plugin: localPlugin, supportsMultipleInstances: false, instances: [] },
+    { pluginId: custom.id, plugin: custom, supportsMultipleInstances: false,
+      displayCount: { value: 0, unit: "indexes", localizedUnits: { "zh-CN": "项索引" } },
+      instances: [{ instanceId: instanceIds.custom, ownerUserId: "listener-a", runtimeState: "ready" }] },
   ] }));
   await page.goto(`${origin}/#/settings?tab=plugins`);
   const card = pluginCard(page);
@@ -230,27 +245,51 @@ test("plugins without instances remain listed and missing versions have a clear 
   await expect(entry.locator("summary").getByText("本地音乐", { exact: true })).toBeVisible();
   await expect(entry.locator("summary").getByText(localPlugin.id, { exact: true })).toBeVisible();
   await expect(entry.locator("summary")).toContainText("未知版本");
-  await expect(entry.locator("summary")).toContainText("0 个实例");
+  await expect(entry.locator(".plugin-count")).toHaveCount(0);
+  await expect(pluginEntry(card, custom.id).locator(".plugin-count")).toHaveText("0 项索引");
   await entry.locator("summary").click();
   await expect(entry).toHaveAttribute("open");
   await expect(entry.locator(".plugin-instance")).toHaveCount(0);
   await expect(card.getByText("未发现已安装插件。", { exact: true })).toHaveCount(0);
 });
 
-for (const [locale, heading, name, version, refresh] of [
-  ["en", "Plugin status", "Local Music", "Unknown version", "Refresh plugin status"],
-  ["zh-TW", "外掛程式狀態", "本地音樂", "未知版本", "重新整理外掛程式狀態"],
+test("malformed plugin counts never become instance-count fallbacks", async ({ page }) => {
+  const invalidCounts = [
+    null,
+    { value: -1, unit: "users" },
+    { value: 1.5, unit: "users" },
+    { value: "2", unit: "users" },
+    { value: 2, unit: " " },
+    { value: 2 },
+  ];
+  await mockPlugins(page, () => ({ items: invalidCounts.map((displayCount, index) => {
+    const plugin = { ...neteasePlugin, id: `example.invalid.${index}` };
+    return { pluginId: plugin.id, plugin, displayCount, supportsMultipleInstances: true,
+      instances: [{ instanceId: instanceIds.netease, ownerUserId: "admin", runtimeState: "ready" }] };
+  }) }));
+  await page.goto(`${origin}/#/settings?tab=plugins`);
+  const card = pluginCard(page);
+  await expect(card.locator(".plugin-entry")).toHaveCount(invalidCounts.length);
+  await expect(card.locator(".plugin-count")).toHaveCount(0);
+});
+
+for (const [locale, heading, name, version, refresh, count] of [
+  ["en", "Plugin status", "Local Music", "Unknown version", "Refresh plugin status", "3 sources"],
+  ["zh-TW", "外掛程式狀態", "本地音樂", "未知版本", "重新整理外掛程式狀態", "3 個來源"],
+  ["ja", "プラグインの状態", "Local Music", "不明なバージョン", "プラグインの状態を更新", "3 sources"],
 ] as const) {
   test(`plugin group labels and controls follow the ${locale} language preference`, async ({ page }) => {
     await page.addInitScript(language => localStorage.setItem("musicfs:language", language), locale);
     await mockPlugins(page, () => ({ items: [
-      { pluginId: localPlugin.id, plugin: localPlugin, supportsMultipleInstances: false, instances: [] },
+      { pluginId: localPlugin.id, plugin: localPlugin, supportsMultipleInstances: false, instances: [],
+        displayCount: { value: 3, unit: "sources", localizedUnits: { "zh_Hant": "個來源", "zh-CN": "个来源" } } },
     ] }));
     await page.goto(`${origin}/#/settings?tab=plugins`);
     const card = pluginCard(page);
     await expect(card.getByRole("heading", { name: heading, exact: true })).toBeVisible();
     await expect(card.locator("summary").getByText(name, { exact: true })).toBeVisible();
     await expect(card.locator("summary")).toContainText(version);
+    await expect(card.locator(".plugin-count")).toHaveText(count);
     await expect(card.locator("summary").getByText(localPlugin.id, { exact: true })).toBeVisible();
     await expect(card.getByRole("button", { name: refresh, exact: true })).toBeVisible();
   });
@@ -259,9 +298,10 @@ for (const [locale, heading, name, version, refresh] of [
 test("mobile plugin groups wrap long identifiers without horizontal overflow", async ({ page }, info) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const plugin = { ...neteasePlugin, id: `example.plugin.source.${"verylongidentifier".repeat(8)}`,
-    name: "An extended provider name", localizedNames: { "zh-CN": "提供多个用户独立账号实例的音乐来源插件" } };
+    name: "An extended provider name", localizedNames: { "zh-CN": "提供多个用户独立账号的音乐来源插件" } };
   await mockPlugins(page, () => ({ items: [
     { pluginId: plugin.id, plugin, version: "2026.10.20-preview.1234567890", supportsMultipleInstances: true,
+      displayCount: { value: 2, unit: "users", localizedUnits: { "zh-CN": "个用户" } },
       instances: [instanceIds.netease, instanceIds.neteaseSecond]
         .map(instanceId => ({ instanceId, name: instanceId, runtimeState: "ready" })) },
     { pluginId: localPlugin.id, plugin: localPlugin, version: "1.2.3", supportsMultipleInstances: false, instances: [] },

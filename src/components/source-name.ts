@@ -18,8 +18,12 @@ function localeTag(value: string): Intl.Locale | null {
 /** Plugin-owned names never pass through the application's message dictionary. */
 export function pluginName(plugin: PluginIdentity | undefined, locale: string): string {
   if (!plugin) return tr("未知来源");
+  return localizedPluginText(plugin.name || tr("未知来源"), plugin.localizedNames, locale);
+}
+
+export function localizedPluginText(text: string, localized: Record<string, string> | undefined, locale: string): string {
   const target = localeTag(locale);
-  const translations = Object.entries(plugin.localizedNames ?? {})
+  const translations = Object.entries(localized ?? {})
     .filter(([, name]) => typeof name === "string" && name.trim())
     .map(([tag, name]) => ({ tag: localeTag(tag), name }))
     .filter((entry): entry is { tag: Intl.Locale; name: string } => !!entry.tag)
@@ -34,7 +38,7 @@ export function pluginName(plugin: PluginIdentity | undefined, locale: string): 
       tag.language === target.language && tag.maximize().script === script);
     if (related) return related.name;
   }
-  return plugin.name || tr("未知来源");
+  return text;
 }
 
 // Request identifiers stay unchanged. Only a bound platform account supplies a user-facing instance name.
