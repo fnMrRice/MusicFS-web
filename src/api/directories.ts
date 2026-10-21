@@ -1,7 +1,7 @@
 import { ApiClient } from "./client";
 import type { PluginIdentity } from "./types";
 
-export interface MusicRoot { id: string; name: string; path?: string }
+export interface MusicRoot { id: string; name: string; path?: string; importDefaults?: ImportDefaults }
 export interface ImportDefaults {
   recursive: boolean;
   maxDepth: number;
@@ -21,7 +21,8 @@ export interface DirectoryPage {
 }
 export interface LocalConfiguration {
   revision: string;
-  roots: { id: string; name: string; pathConfigured: boolean }[];
+  roots: { id: string; name: string; pathConfigured: boolean; importDefaults?: ImportDefaults }[];
+  rootImportDefaultsSupported?: boolean;
   importOptions?: { importDefaults: ImportDefaults; schemaRevision: string };
 }
 export interface PluginOperation {

@@ -23,7 +23,8 @@ describe("Administrator directory API", () => {
     client.csrfToken = "csrf-test";
     const api = new DirectoriesApi(client, instanceIds.local);
     const importDefaults = { recursive: true, maxDepth: 0, importLyrics: true, excludePatterns: ["private/**"], skipHidden: true, respectNoMedia: true };
-    await api.save([{ id: "old", name: "Existing" }, { id: "new", name: "New", path: "/music/new" }], importDefaults, "opaque-revision", "retry-key");
+    const rootOptions = { ...importDefaults, recursive: false, skipHidden: false };
+    await api.save([{ id: "old", name: "Existing", importDefaults: rootOptions }, { id: "new", name: "New", path: "/music/new" }], importDefaults, "opaque-revision", "retry-key");
     const [path, options] = (fetcher.mock.calls as unknown as [string, RequestInit][])[0];
     expect(path).toBe(`/api/v1/admin/plugin-instances/${instanceIds.local}/configuration`);
     expect(options.method).toBe("PUT");
@@ -32,7 +33,7 @@ describe("Administrator directory API", () => {
     expect(headers.get("Idempotency-Key")).toBe("retry-key");
     expect(headers.get("X-CSRF-Token")).toBe("csrf-test");
     expect(JSON.parse(String(options.body))).toEqual({ musicRoots: [
-      { id: "old", name: "Existing" }, { id: "new", name: "New", path: "/music/new" },
+      { id: "old", name: "Existing", importDefaults: rootOptions }, { id: "new", name: "New", path: "/music/new" },
     ], importDefaults });
     expect(fetcher).toHaveBeenCalledOnce();
   });

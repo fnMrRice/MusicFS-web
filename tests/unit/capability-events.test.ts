@@ -118,6 +118,8 @@ describe("capability resource refresh", () => {
     resources.invalidate();
     for (const key of ["providers", "settings-providers", "settings-plugins-false", "settings-plugins-true", "search-instances", "import-providers"])
       expect(resources.snapshot(key)).toBe(1);
+    for (const instance of ["local-first", "local-second"])
+      expect(resources.snapshot(`settings-local-directories:${instance}`)).toBe(1);
     expect(resources.snapshot("playlist-1")).toBe(0);
     expect(listener).toHaveBeenCalledOnce();
     unsubscribe();

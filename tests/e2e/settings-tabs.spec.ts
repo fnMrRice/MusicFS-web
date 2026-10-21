@@ -131,7 +131,7 @@ test("regular users retain all tabs and see plugin permissions without admin req
   await expect(page.getByRole("button", { name: "刷新插件列表", exact: true })).toHaveCount(0);
   await page.getByRole("tab", { name: "音乐源", exact: true }).click();
   await expect(page.getByRole("heading", { name: "本地音乐", exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: /^(管理目录|管理音乐目录)$/ })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /^(添加本地目录|管理音乐目录)$/ })).toHaveCount(0);
   expect(requests.filter((path) => path.includes("/admin/"))).toEqual([]);
 });
 
@@ -139,7 +139,7 @@ test("legacy directory links open music sources and dismiss before switching tab
   await mock(page);
   await page.goto(`${origin}/#/settings?tab=plugins&directories=${instanceIds.local}`);
   await expect(page.getByRole("tab", { name: "音乐源", exact: true })).toHaveAttribute("aria-selected", "true");
-  const directories = page.getByRole("list", { name: "已选音乐目录", exact: true });
+  const directories = page.getByRole("dialog", { name: "添加本地目录", exact: true });
   await expect(directories).toHaveCount(1);
   await page.getByRole("button", { name: /^(取消|收起目录管理)$/ }).click();
   await expect(directories).toHaveCount(0);

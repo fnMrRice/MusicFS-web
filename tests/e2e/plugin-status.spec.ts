@@ -48,10 +48,10 @@ async function expectRefreshBesideHeading(card: Locator, label = "刷新插件�
 
 test("plugin groups show identity, separate rows and expandable instances with refresh beside the heading", async ({ page }, info) => {
   let localState = "pending_configuration";
-  let localSources = 4;
+  let allowedDirectories = 4;
   await mockPlugins(page, () => ({ items: [
     { pluginId: localPlugin.id, plugin: localPlugin, version: "1.2.3", supportsMultipleInstances: false,
-      displayCount: { value: localSources, unit: "sources", localizedUnits: { "zh-CN": "个来源" } },
+      displayCount: { value: allowedDirectories, unit: "allowed directories", localizedUnits: { "zh-CN": "个允许访问的目录" } },
       instances: [{ instanceId: instanceIds.local, name: "Local test", runtimeState: localState }] },
     { pluginId: ncmPlugin.id, plugin: ncmPlugin, version: "2.0.1", supportsMultipleInstances: false,
       instances: [{ instanceId: instanceIds.ncm, name: "NCM test", runtimeState: "disabled" }] },
@@ -77,7 +77,7 @@ test("plugin groups show identity, separate rows and expandable instances with r
     await expect(entry).not.toHaveAttribute("open");
     await expect(entry.locator(".plugin-instance")).toBeHidden();
   }
-  await expect(local.locator(".plugin-count")).toHaveText("4 个来源");
+  await expect(local.locator(".plugin-count")).toHaveText("4 个允许访问的目录");
   await expect(ncm.locator(".plugin-count")).toHaveCount(0);
   await expect(scraper.locator(".plugin-count")).toHaveCount(0);
   await expectRefreshBesideHeading(card);
@@ -106,9 +106,9 @@ test("plugin groups show identity, separate rows and expandable instances with r
   await ncm.locator("summary").click();
   await expect(ncm).not.toHaveAttribute("open");
   localState = "ready";
-  localSources = 2;
+  allowedDirectories = 2;
   await card.getByRole("button", { name: "刷新插件列表" }).click();
-  await expect(local.locator(".plugin-count")).toHaveText("2 个来源");
+  await expect(local.locator(".plugin-count")).toHaveText("2 个允许访问的目录");
   await expect(local.getByText("可用", { exact: true })).toBeVisible();
   await expect(scraper.getByText("可用", { exact: true })).toBeVisible();
   await expect(local).toHaveAttribute("open");

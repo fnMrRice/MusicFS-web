@@ -1,8 +1,8 @@
 import { useServices, useStore } from "../app/services";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import type { ManagedInstance, PluginSnapshot } from "../api/directories";
-import { LocalDirectories } from "./directories/LocalDirectories";
+import { LocalDirectories, type DirectoryAction } from "./directories/LocalDirectories";
 import { LocalMusicSource } from "./directories/LocalMusicSource";
 import { useResource } from "../components/query";
 import { ErrorNotice } from "../components/ui";
@@ -27,7 +27,9 @@ export function MusicSources() {
     .flatMap((plugin) => plugin.instances.map((instance) => ({ ...instance, plugin: plugin.plugin })));
   const local = admin ? previousLocal.current : [];
   const chosen = local.find((instance) => instance.instanceId === query.get("directories"));
-  function choose(id: string | null) {
+  const [directoryAction, setDirectoryAction] = useState<DirectoryAction>({ type: "add" });
+  function choose(id: string | null, action: DirectoryAction = { type: "add" }) {
+    setDirectoryAction(action);
     const next = new URLSearchParams(query);
     if (id) next.set("directories", id); else next.delete("directories");
     setQuery(next, { replace: true });
@@ -48,15 +50,15 @@ export function MusicSources() {
       ? <PlatformAccount key={id} instance={source.online} />
       : admin && local.some((instance) => instance.instanceId === id)
         ? <LocalMusicSource key={id} instance={local.find((instance) => instance.instanceId === id)!}
-          name={sourceName(source.provider!)} manage={() => choose(id)} />
+          name={sourceName(source.provider!)} manage={(action) => choose(id, action)} />
         : <section key={id} aria-label={sourceName(source.provider!)} style={{ marginBlock: 20 }}>
         <h4>{sourceName(source.provider!)}</h4>
         <p className="muted">{tr(source.provider!.availability === "available" ? "可用" : "暂不可用")}</p>
       </section>)}
     {local.filter((instance) => !sources.has(instance.instanceId)).map((instance) => <LocalMusicSource key={instance.instanceId}
-      instance={instance} name={pluginName(instance.plugin, locale)} manage={() => choose(instance.instanceId)} />)}
+      instance={instance} name={pluginName(instance.plugin, locale)} manage={(action) => choose(instance.instanceId, action)} />)}
     {!providers.loading && !online.loading && !sources.size && !local.length && !providers.error && !online.error &&
       <p className="muted">{tr("暂无音乐来源")}</p>}
-    {admin && chosen && <LocalDirectories key={chosen.instanceId} instance={chosen} close={() => choose(null)} />}
+    {admin && chosen && <LocalDirectories key={chosen.instanceId} instance={chosen} action={directoryAction} close={() => choose(null)} />}
   </div>;
 }

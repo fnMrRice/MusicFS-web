@@ -8,6 +8,7 @@ interface Selection {
   api: DirectoriesApi;
   disabled: boolean;
   roots: MusicRoot[];
+  savedRootIds: string[];
   toggle: (item: DirectoryItem) => void;
 }
 
@@ -38,7 +39,8 @@ function DirectoryBranch({ path, ...props }: Selection & { path: string | null }
 function DirectoryNode({ item, root, ...props }: Selection & { item: DirectoryItem; root: boolean }) {
   const [expanded, setExpanded] = useState(false);
   const checked = props.roots.some((selected) => selected.path === item.path || selected.id === item.configuredRootId);
-  const disabled = props.disabled || !item.available;
+  const saved = item.configuredRootId !== null && props.savedRootIds.includes(item.configuredRootId);
+  const disabled = props.disabled || !item.available || saved;
   function keyDown(event: KeyboardEvent<HTMLLIElement>) {
     if (event.target !== event.currentTarget) return;
     const element = event.currentTarget;
@@ -60,7 +62,7 @@ function DirectoryNode({ item, root, ...props }: Selection & { item: DirectoryIt
     }
   }
   return <li role="treeitem" aria-label={item.name} aria-expanded={expanded} aria-selected={checked}
-    aria-disabled={!item.available} tabIndex={0} onKeyDown={keyDown}>
+    aria-disabled={props.disabled || !item.available} tabIndex={0} onKeyDown={keyDown}>
     <div className={`directory-tree-row${checked ? " directory-selected" : ""}`}>
       <button type="button" className={`directory-expand${expanded ? " expanded" : ""}`} disabled={!item.available}
         aria-label={tr(expanded ? "收起目录 {0}" : "展开目录 {0}", { 0: item.name })}
@@ -71,6 +73,7 @@ function DirectoryNode({ item, root, ...props }: Selection & { item: DirectoryIt
         <Icon name="folder" size={19} />
         <span className="directory-detail"><span title={item.path}>{item.name}</span>
           {root && <code>{item.path}</code>}
+          {saved && <span className="muted">{tr("已添加")}</span>}
           {!item.available && <span className="muted">{tr("目录不存在或无法访问")}</span>}
         </span>
       </label>

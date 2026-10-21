@@ -46,8 +46,10 @@ export async function startDirectoryServer(): Promise<DirectoryTestServer> {
   };
   try {
     console.log('Building isolated directory test server and local plugin');
-    for (const name of ['musicfs', 'musicfs-plugin-local']) {
-      execFileSync('go', ['build', '-o', join(directory, name + suffix), `./src/app/${name}`], {
+    for (const [name, packagePath] of [
+      ['musicfs', './src/app/musicfs'], ['musicfs-plugin-local', './plugins/source/localfiles/cmd/musicfs-plugin-local'],
+    ]) {
+      execFileSync('go', ['build', '-o', join(directory, name + suffix), packagePath], {
         cwd: source, stdio: 'pipe', windowsHide: true,
       });
     }
@@ -56,7 +58,7 @@ export async function startDirectoryServer(): Promise<DirectoryTestServer> {
     const secondAllowedRoot = join(directory, 'Second Music');
     const secondSelectedRoot = join(secondAllowedRoot, '第二专辑');
     const outsideRoot = join(directory, 'Outside Music');
-    for (const path of [join(selectedRoot, '一级', '二级'), join(selectedRoot, '.Hidden album'), join(selectedRoot, 'No media'), secondSelectedRoot, outsideRoot]) mkdirSync(path, { recursive: true });
+    for (const path of [join(selectedRoot, '一级', '二级'), join(selectedRoot, '.Hidden album'), join(selectedRoot, 'No media'), join(secondSelectedRoot, 'Second child'), outsideRoot]) mkdirSync(path, { recursive: true });
     const wave = join(source, 'tests/testdata/audio/markers.wav');
     copyFileSync(wave, join(selectedRoot, 'selected.wav'));
     copyFileSync(wave, join(selectedRoot, '一级', 'depth-one.wav'));
@@ -66,6 +68,7 @@ export async function startDirectoryServer(): Promise<DirectoryTestServer> {
     copyFileSync(wave, join(selectedRoot, 'No media', 'nomedia.wav'));
     writeFileSync(join(selectedRoot, 'No media', '.nomedia'), '');
     copyFileSync(wave, join(secondSelectedRoot, 'second-selected.wav'));
+    copyFileSync(wave, join(secondSelectedRoot, 'Second child', 'second-depth-one.wav'));
     copyFileSync(wave, join(allowedRoot, 'unselected.wav'));
     copyFileSync(wave, join(outsideRoot, 'outside.wav'));
     const webRoot = join(directory, 'web');

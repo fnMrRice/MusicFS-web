@@ -17,7 +17,7 @@ export class CapabilityResources {
   private revision = 0;
   private listeners = new Set<() => void>();
   snapshot = (key: string): number =>
-    affectedResources.has(key) ? this.revision : 0;
+    affectedResources.has(key) || key.startsWith("settings-local-directories:") ? this.revision : 0;
   subscribe = (listener: () => void): (() => void) => {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);

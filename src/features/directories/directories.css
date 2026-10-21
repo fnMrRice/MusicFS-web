@@ -2,8 +2,13 @@
 .directory-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
 .directory-actions h4 { margin: 0; margin-right: auto; }
 .directory-saved-list { list-style: none; padding: 0; margin-bottom: 0; }
-.directory-saved-list li { padding: 7px 0; overflow-wrap: anywhere; }
+.directory-saved-list li { display: flex; align-items: center; gap: 14px; padding: 10px 0; overflow-wrap: anywhere; }
+.directory-saved-list li + li { border-top: 1px solid var(--line); }
+.directory-saved-name { flex: 1; min-width: 0; }
+.directory-row-actions { display: flex; align-items: center; flex-shrink: 0; gap: 8px; }
+.directory-row-actions button { min-width: 34px; }
 .directory-manager { display: block; }
+.directory-section-title { font-size: 14px; margin: 18px 0 10px; }
 .directory-modal-actions { justify-content: flex-end; margin-top: 20px; }
 .directory-tree { border: 1px solid var(--line); border-radius: 10px; padding: 8px; max-height: 34dvh; min-height: 110px; overflow: auto; }
 .directory-tree-branch { list-style: none; padding: 0; margin: 0; }

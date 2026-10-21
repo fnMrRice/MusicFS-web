@@ -21,19 +21,35 @@ async function configuration(api: APIRequestContext) {
   return response.json();
 }
 
-async function runtimeState(api: APIRequestContext): Promise<string> {
+async function localPlugin(api: APIRequestContext) {
   const response = await api.get(`${server.origin}/api/v1/admin/plugins`);
   expect(response.ok()).toBeTruthy();
-  const snapshot = await response.json();
-  return snapshot.items.find((plugin: { pluginId: string }) => plugin.pluginId === 'musicfs.plugin.source.localfiles')
-    .instances.find((instance: { instanceId: string }) => instance.instanceId === instanceIds.local).runtimeState;
+  return (await response.json()).items.find((plugin: { pluginId: string }) => plugin.pluginId === 'musicfs.plugin.source.localfiles');
 }
 
-async function openManager(page: Page) {
-  await page.getByRole('button', { name: '管理目录', exact: true }).click();
-  const dialog = page.getByRole('dialog', { name: '管理目录', exact: true });
-  await expect(dialog).toBeVisible();
+async function runtimeState(api: APIRequestContext): Promise<string> {
+  return (await localPlugin(api)).instances.find((instance: { instanceId: string }) => instance.instanceId === instanceIds.local).runtimeState;
+}
+
+async function openAdd(page: Page) {
+  await page.getByRole('button', { name: '添加本地目录', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: '添加本地目录', exact: true });
   await expect(dialog.getByRole('tree', { name: '允许访问的目录', exact: true })).toBeVisible();
+  return dialog;
+}
+
+async function openEdit(page: Page, name: string) {
+  await page.getByRole('button', { name: `编辑目录 ${name}`, exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: '编辑目录配置', exact: true });
+  await expect(dialog.getByRole('checkbox', { name: '递归查找子目录', exact: true })).toBeVisible();
+  await expect(dialog.getByRole('tree')).toHaveCount(0);
+  return dialog;
+}
+
+async function openDelete(page: Page, name: string) {
+  await page.getByRole('button', { name: `删除目录 ${name}`, exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: '删除本地目录', exact: true });
+  await expect(dialog).toBeVisible();
   return dialog;
 }
 
@@ -51,10 +67,10 @@ async function advanced(dialog: Locator) {
   await expect(dialog.getByRole('checkbox', { name: '限制递归深度', exact: true })).toBeVisible();
 }
 
-async function save(page: Page, dialog: Locator) {
+async function save(page: Page, dialog: Locator, action = '保存') {
   const [response] = await Promise.all([
     page.waitForResponse(response => response.url().endsWith(configurationPath) && response.request().method() === 'PUT'),
-    dialog.getByRole('button', { name: '保存', exact: true }).click(),
+    dialog.getByRole('button', { name: action, exact: true }).click(),
   ]);
   expect(response.status()).toBe(202);
   await expect(dialog).toHaveCount(0);
@@ -67,13 +83,23 @@ async function importedNames(api: APIRequestContext): Promise<string[]> {
   return (await response.json()).items.map((item: { displayName: string }) => item.displayName).sort();
 }
 
-test('administrator tree roots expose only allowed server directories', async ({ page, request }) => {
+async function expectAllowedCount(page: Page) {
+  expect((await localPlugin(page.request)).displayCount.value).toBe(2);
+  await page.getByRole('tab', { name: '插件管理', exact: true }).click();
+  const entry = page.locator('.plugin-entry').filter({ has: page.getByText('musicfs.plugin.source.localfiles', { exact: true }) });
+  await expect(entry.locator('.plugin-count')).toHaveText('2 个允许访问的目录');
+  await page.getByRole('tab', { name: '音乐源', exact: true }).click();
+}
+
+test('administrator tree exposes allowed directories independently of configured music directories', async ({ page, request }) => {
   expect((await request.get(server.origin + directoryPath)).status()).toBe(401);
   await login(page, server);
   const defaults = await configuration(page.request);
   expect(defaults.roots).toEqual([]);
+  expect(defaults.rootImportDefaultsSupported).toBe(true);
   expect(defaults.importOptions.importDefaults).toMatchObject({ recursive: true, maxDepth: 0, skipHidden: true, respectNoMedia: true });
   expect(await runtimeState(page.request)).toBe('pending_configuration');
+  expect((await localPlugin(page.request)).displayCount.value).toBe(2);
   const rootsResponse = await page.request.get(server.origin + directoryPath);
   expect(rootsResponse.ok()).toBeTruthy();
   const roots = await rootsResponse.json();
@@ -97,161 +123,144 @@ test('administrator tree roots expose only allowed server directories', async ({
   expect(readFileSync(server.configPath, 'utf8')).toBe(server.configuration);
 });
 
-test('directory tree saves multiple subdirectories and applies disabled, limited and unlimited recursion', async ({ page }, info) => {
-  test.setTimeout(120_000);
+test('added directories support isolated configuration, cancellation, deletion and restart persistence', async ({ page }, info) => {
+  test.setTimeout(180_000);
   await login(page, server);
   await page.getByRole('button', { name: '设置', exact: true }).click();
   const heading = page.getByRole('heading', { name: '本地音乐', exact: true });
   await expect(heading).toBeVisible();
-  await expect(page.getByRole('heading', { name: '未知来源', exact: true })).toHaveCount(0);
-  await expect(page.getByText('暂无已选择目录', { exact: true })).toBeVisible();
-  const manage = page.getByRole('button', { name: '管理目录', exact: true });
+  await expect(page.getByText('暂无已添加目录', { exact: true })).toBeVisible();
+  await expectAllowedCount(page);
+  const add = page.getByRole('button', { name: '添加本地目录', exact: true });
   const titleBounds = (await heading.boundingBox())!;
-  const manageBounds = (await manage.boundingBox())!;
-  expect(manageBounds.x).toBeGreaterThan(titleBounds.x + titleBounds.width);
-  expect(Math.abs(manageBounds.y + manageBounds.height / 2 - titleBounds.y - titleBounds.height / 2)).toBeLessThan(10);
-  let dialog = await openManager(page);
+  const addBounds = (await add.boundingBox())!;
+  expect(addBounds.x).toBeGreaterThan(titleBounds.x + titleBounds.width);
+  expect(Math.abs(addBounds.y + addBounds.height / 2 - titleBounds.y - titleBounds.height / 2)).toBeLessThan(10);
+  let dialog = await openAdd(page);
   const recursive = () => dialog.getByRole('checkbox', { name: '递归查找子目录', exact: true });
   const limit = () => dialog.getByRole('checkbox', { name: '限制递归深度', exact: true });
   const depth = () => dialog.getByRole('spinbutton', { name: '递归深度', exact: true });
-  await expect(dialog.getByRole('button', { name: '保存', exact: true })).toBeDisabled();
+  await expect(dialog.getByRole('button', { name: '添加所选目录', exact: true })).toBeDisabled();
   await expect(recursive()).toBeChecked();
-  await expect(dialog.getByLabel('限制递归深度', { exact: true })).not.toBeVisible();
-  await advanced(dialog);
-  await expect(limit()).not.toBeChecked();
-  await expect(depth()).toHaveValue('0');
-  await expect(depth()).toBeDisabled();
-  await expect(dialog.getByRole('checkbox', { name: '包含隐藏文件和目录', exact: true })).not.toBeChecked();
-  await expect(dialog.getByRole('checkbox', { name: '遵循 .nomedia 标记', exact: true })).toBeChecked();
+  await expect(dialog.getByRole('textbox')).toHaveCount(0);
   await expect(dialog.getByRole('treeitem')).toHaveCount(2);
   await expect(select(dialog, server.allowedRoot)).not.toBeChecked();
   await select(dialog, server.allowedRoot).check();
   await recursive().uncheck();
   await dialog.getByRole('button', { name: '取消', exact: true }).click();
   await expect(dialog).toHaveCount(0);
-  await expect(manage).toBeFocused();
+  await expect(add).toBeFocused();
   expect((await configuration(page.request)).roots).toEqual([]);
-  dialog = await openManager(page);
+  dialog = await openAdd(page);
   await expect(select(dialog, server.allowedRoot)).not.toBeChecked();
   await expect(recursive()).toBeChecked();
   await page.keyboard.press('Escape');
   await expect(dialog).toHaveCount(0);
-  await expect(manage).toBeFocused();
-  dialog = await openManager(page);
+  await expect(add).toBeFocused();
+  dialog = await openAdd(page);
   await advanced(dialog);
+  await expect(limit()).not.toBeChecked();
+  await expect(depth()).toHaveValue('0');
+  await expect(depth()).toBeDisabled();
   await expand(dialog, server.allowedRoot);
-  await expect(select(dialog, server.selectedRoot)).toBeVisible();
   await expect(dialog.getByRole('tree')).not.toContainText('unselected.wav');
-  await dialog.getByRole('button', { name: `收起目录 ${basename(server.allowedRoot)}`, exact: true }).click();
-  await expect(select(dialog, server.selectedRoot)).not.toBeVisible();
-  await expand(dialog, server.allowedRoot);
   await select(dialog, server.selectedRoot).check();
   await expand(dialog, server.secondAllowedRoot);
   await select(dialog, server.secondSelectedRoot).check();
   await expect(select(dialog, server.allowedRoot)).not.toBeChecked();
   await expect(select(dialog, server.secondAllowedRoot)).not.toBeChecked();
-  await dialog.getByText('高级选项', { exact: true }).click();
-  await expect(dialog.getByLabel('限制递归深度', { exact: true })).not.toBeVisible();
-  await dialog.screenshot({ path: info.outputPath('directory-tree.png') });
-  await advanced(dialog);
   await recursive().uncheck();
   await expect(limit()).toBeDisabled();
-  await expect(depth()).toBeDisabled();
-  expect((await configuration(page.request)).roots).toEqual([]);
-  const saved = await save(page, dialog);
-  expect(saved.musicRoots).toEqual([server.selectedRoot, server.secondSelectedRoot].map(path => ({
+  await dialog.screenshot({ path: info.outputPath('directory-add.png') });
+  const added = await save(page, dialog, '添加所选目录');
+  expect(added.musicRoots).toEqual([server.selectedRoot, server.secondSelectedRoot].map(path => ({
     id: expect.any(String), name: basename(path), path,
+    importDefaults: expect.objectContaining({ recursive: false, maxDepth: 0 }),
   })));
-  expect(saved.importDefaults).toMatchObject({ recursive: false, maxDepth: 0 });
+  expect(added.importDefaults).toMatchObject({ recursive: true, maxDepth: 0 });
   await expect.poll(() => runtimeState(page.request)).toBe('ready');
-  await expect(page.getByText('暂无已选择目录', { exact: true })).toHaveCount(0);
-  const selected = page.getByRole('list', { name: '已选音乐目录', exact: true });
+  const selected = page.getByRole('list', { name: '已添加的目录', exact: true });
   await expect(selected.getByRole('listitem')).toHaveCount(2);
-  await expect(selected).toContainText(basename(server.selectedRoot));
-  await expect(selected).toContainText(basename(server.secondSelectedRoot));
-  const configured = await configuration(page.request);
-  expect(configured.roots.map((root: { id: string }) => root.id)).toEqual(saved.musicRoots.map((root: { id: string }) => root.id));
-  expect(configured.importOptions.importDefaults).toMatchObject({ recursive: false, maxDepth: 0 });
-  expect(await importedNames(page.request)).toEqual([]);
+  const firstName = basename(server.selectedRoot);
+  const secondName = basename(server.secondSelectedRoot);
+  for (const name of [firstName, secondName]) {
+    await expect(selected.getByRole('button', { name: `删除目录 ${name}`, exact: true })).toHaveText('−');
+    await expect(selected.getByRole('button', { name: `编辑目录 ${name}`, exact: true })).toBeVisible();
+  }
+  await page.locator('.settings-card').filter({ has: heading }).screenshot({ path: info.outputPath('directory-added-list.png') });
+  await expectAllowedCount(page);
   await scan(page.request, server.origin);
   expect(await importedNames(page.request)).toEqual(['second-selected.wav', 'selected.wav']);
-  dialog = await openManager(page);
-  await advanced(dialog);
+  dialog = await openAdd(page);
   await expand(dialog, server.allowedRoot);
   await expand(dialog, server.secondAllowedRoot);
-  await expect(select(dialog, server.selectedRoot)).toBeChecked();
-  await expect(select(dialog, server.secondSelectedRoot)).toBeChecked();
-  await expect(dialog.getByRole('button', { name: '保存', exact: true })).toBeDisabled();
-  await select(dialog, server.selectedRoot).uncheck();
-  await select(dialog, server.selectedRoot).check();
-  await expect(dialog.getByRole('button', { name: '保存', exact: true })).toBeDisabled();
+  for (const path of [server.selectedRoot, server.secondSelectedRoot]) {
+    await expect(select(dialog, path)).toBeChecked();
+    await expect(select(dialog, path)).toBeDisabled();
+  }
+  await expect(dialog.getByRole('button', { name: /删除目录|移除目录/ })).toHaveCount(0);
+  await expect(dialog.getByRole('button', { name: '添加所选目录', exact: true })).toBeDisabled();
+  await select(dialog, server.allowedRoot).check();
+  await dialog.getByRole('button', { name: '取消', exact: true }).click();
+  expect((await configuration(page.request)).roots).toHaveLength(2);
+  dialog = await openEdit(page, firstName);
   await recursive().check();
-  await expect(limit()).not.toBeChecked();
-  await expect(depth()).toBeDisabled();
+  await dialog.getByRole('button', { name: '取消', exact: true }).click();
+  expect((await configuration(page.request)).roots[0].importDefaults.recursive).toBe(false);
+  dialog = await openEdit(page, firstName);
+  await expect(recursive()).not.toBeChecked();
+  await recursive().check();
+  await advanced(dialog);
   await limit().check();
-  await expect(depth()).toBeEnabled();
   await expect(depth()).toHaveValue('1');
   const limited = await save(page, dialog);
-  expect(limited.importDefaults).toMatchObject({ recursive: true, maxDepth: 1 });
-  expect(limited.musicRoots).toHaveLength(configured.roots.length);
-  expect(limited.musicRoots).toEqual(expect.arrayContaining(configured.roots.map(({ id, name }: { id: string; name: string }) => ({ id, name }))));
-  expect((await configuration(page.request)).importOptions.importDefaults).toMatchObject({ recursive: true, maxDepth: 1 });
+  expect(limited.musicRoots[0]).toMatchObject({ id: added.musicRoots[0].id, importDefaults: { recursive: true, maxDepth: 1 } });
+  expect(limited.musicRoots[1]).toEqual({ id: added.musicRoots[1].id, name: secondName });
+  expect((await configuration(page.request)).roots[1].importDefaults).toEqual(added.musicRoots[1].importDefaults);
+  expect(limited.musicRoots.every((root: { path?: string }) => root.path === undefined)).toBe(true);
+  expect(limited.importDefaults).toEqual(added.importDefaults);
   await scan(page.request, server.origin);
   expect(await importedNames(page.request)).toEqual(['depth-one.wav', 'second-selected.wav', 'selected.wav']);
-  dialog = await openManager(page);
+  dialog = await openEdit(page, firstName);
   await advanced(dialog);
   await expect(limit()).toBeChecked();
-  await expect(depth()).toHaveValue('1');
-  await recursive().uncheck();
-  await expect(limit()).toBeDisabled();
-  await recursive().check();
-  await expect(limit()).not.toBeChecked();
-  await expect(depth()).toHaveValue('0');
-  await limit().check();
-  await expect(depth()).toHaveValue('1');
   await limit().uncheck();
   await expect(depth()).toBeDisabled();
-  await dialog.screenshot({ path: info.outputPath('directory-unlimited.png') });
-  const unlimited = await save(page, dialog);
-  expect(unlimited.importDefaults).toMatchObject({ recursive: true, maxDepth: 0 });
-  await server.restart();
-  await page.reload();
-  await expect(manage).toBeVisible();
-  expect((await configuration(page.request)).importOptions.importDefaults).toMatchObject({ recursive: true, maxDepth: 0 });
-  await scan(page.request, server.origin);
-  expect(await importedNames(page.request)).toEqual(['depth-one.wav', 'depth-two.wav', 'second-selected.wav', 'selected.wav']);
-  dialog = await openManager(page);
-  await advanced(dialog);
-  await expect(limit()).not.toBeChecked();
-  await expect(depth()).toHaveValue('0');
   await dialog.getByRole('checkbox', { name: '包含隐藏文件和目录', exact: true }).check();
   await dialog.getByRole('checkbox', { name: '遵循 .nomedia 标记', exact: true }).uncheck();
-  await dialog.screenshot({ path: info.outputPath('directory-advanced.png') });
-  const includeAll = await save(page, dialog);
-  expect(includeAll.importDefaults).toMatchObject({ recursive: true, maxDepth: 0, skipHidden: false, respectNoMedia: false });
-  expect(await importedNames(page.request)).toHaveLength(4);
+  await dialog.screenshot({ path: info.outputPath('directory-edit.png') });
+  const unlimited = await save(page, dialog);
+  expect(unlimited.musicRoots[0].importDefaults).toMatchObject({ recursive: true, maxDepth: 0, skipHidden: false, respectNoMedia: false });
+  expect(unlimited.musicRoots[1]).toEqual(limited.musicRoots[1]);
+  await server.restart();
+  await page.reload();
+  await expect(selected.getByRole('listitem')).toHaveCount(2);
+  const persisted = await configuration(page.request);
+  expect(persisted.roots[0].importDefaults).toEqual(unlimited.musicRoots[0].importDefaults);
+  expect(persisted.roots[1].importDefaults).toEqual(added.musicRoots[1].importDefaults);
   await scan(page.request, server.origin);
   expect(await importedNames(page.request)).toEqual(['.hidden.wav', 'depth-one.wav', 'depth-two.wav', 'hidden-child.wav', 'nomedia.wav', 'second-selected.wav', 'selected.wav']);
+  dialog = await openDelete(page, firstName);
+  await dialog.getByRole('button', { name: '取消', exact: true }).click();
+  expect((await configuration(page.request)).roots).toHaveLength(2);
+  dialog = await openDelete(page, firstName);
+  const removed = await save(page, dialog, '删除');
+  expect(removed.musicRoots).toEqual([unlimited.musicRoots[1]]);
+  await expect(selected.getByRole('listitem')).toHaveCount(1);
+  await expectAllowedCount(page);
   await server.restart();
   await page.reload();
-  dialog = await openManager(page);
-  await advanced(dialog);
-  await expect(dialog.getByRole('checkbox', { name: '包含隐藏文件和目录', exact: true })).toBeChecked();
-  await expect(dialog.getByRole('checkbox', { name: '遵循 .nomedia 标记', exact: true })).not.toBeChecked();
-  await expand(dialog, server.allowedRoot);
-  await expand(dialog, server.secondAllowedRoot);
-  await select(dialog, server.selectedRoot).uncheck();
-  await select(dialog, server.secondSelectedRoot).uncheck();
-  await save(page, dialog);
-  await expect(page.getByText('暂无已选择目录', { exact: true })).toBeVisible();
+  await expect(selected.getByRole('listitem')).toHaveCount(1);
+  dialog = await openDelete(page, secondName);
+  await save(page, dialog, '删除');
+  await expect(page.getByText('暂无已添加目录', { exact: true })).toBeVisible();
   await expect.poll(() => runtimeState(page.request)).toBe('pending_configuration');
   expect((await configuration(page.request)).roots).toEqual([]);
-  expect(await importedNames(page.request)).toHaveLength(7);
+  await expectAllowedCount(page);
   await server.restart();
   await page.reload();
-  await expect(page.getByText('暂无已选择目录', { exact: true })).toBeVisible();
+  await expect(page.getByText('暂无已添加目录', { exact: true })).toBeVisible();
   expect((await configuration(page.request)).roots).toEqual([]);
-  expect(await importedNames(page.request)).toHaveLength(7);
   expect(readFileSync(server.configPath, 'utf8')).toBe(server.configuration);
   await page.locator('.settings-card').filter({ has: heading }).screenshot({ path: info.outputPath('directory-empty.png') });
 });
