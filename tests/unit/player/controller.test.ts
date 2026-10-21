@@ -3,6 +3,7 @@ import { PlayerController } from '../../../src/player/controller';
 import type { AudioPort, MediaObservation } from '../../../src/player/audio-adapter';
 import type { Playback } from '../../../src/api/types';
 import { deferred, playback, track } from '../../fixtures/dto';
+import { ApiError } from '../../../src/api/client';
 
 function setup(create = vi.fn().mockResolvedValue(playback())) {
   let observe: (event: MediaObservation) => void = () => {};
@@ -13,6 +14,16 @@ function setup(create = vi.fn().mockResolvedValue(playback())) {
   return { controller, api, audio, factory, event: (type: MediaObservation['type'], seconds = 0, paused = false) => observe({ type, seconds, paused }) };
 }
 describe('Player controller (Mock media; not decoder validation)', () => {
+  it('shows playback-specific guidance when a required decoder is unavailable', async () => {
+    const s = setup(vi.fn().mockRejectedValue(new ApiError('UNSUPPORTED', 'NCM decryption plugin is unavailable', 415)));
+    await s.controller.select(track);
+    expect(s.controller.state.phase).toBe('error');
+    expect(s.controller.state.message).toContain('解密或转码');
+    expect(s.controller.state.message).toContain('插件是否已启用');
+    expect(s.controller.state.message).toContain('音频文件是否完整');
+    expect(s.factory).not.toHaveBeenCalled();
+    expect(s.api.create).toHaveBeenCalledOnce();
+  });
   it('only the latest song is attached and late sessions are closed', async () => {
     const old = deferred<Playback>(); const fresh = deferred<Playback>();
     const s = setup(vi.fn().mockReturnValueOnce(old.promise).mockReturnValueOnce(fresh.promise));

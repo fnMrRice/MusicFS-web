@@ -141,13 +141,21 @@
   min-width: 0;
 }
 .track-play {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   text-align: left;
   padding: 0;
   border: 0;
   background: none;
   font-size: 14px;
   max-width: 280px;
+}
+.track-play svg {
+  flex-shrink: 0;
+}
+.track-play span {
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

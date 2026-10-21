@@ -9,6 +9,7 @@ import { localizedPluginText, pluginName, sourceName } from "../components/sourc
 import { matchesPlugin, pluginPurposes, pluginPurposeLabel } from "./plugin-filters";
 import { InfrastructurePluginBadges, InfrastructurePluginDetails } from "./InfrastructurePlugin";
 import "./plugin-status.css";
+import { PluginSettings } from "./plugin-settings/PluginSettings";
 const states: Record<string, string> = {
   disabled: "已禁用",
   pending_configuration: "待配置",
@@ -139,6 +140,7 @@ export function PluginStatus() {
               ))}
               {p.instances.length === 0 && <p className="muted">{tr("暂无插件实例。")}</p>}
             </div>}
+            {p.settingsAvailable && expanded.has(p.pluginId) && <PluginSettings pluginId={p.pluginId} />}
           </details>
         ))}
       </div>

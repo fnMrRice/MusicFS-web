@@ -4,6 +4,7 @@ import type { SourceTrack, TrackPage } from "../api/types";
 export interface LibrarySnapshot {
   items: SourceTrack[];
   revision: string | null;
+  matchingRevision?: number;
   cursor: string | null;
   loading: boolean;
   stale: boolean;
@@ -91,7 +92,7 @@ export class LibraryState {
         this.controller.signal,
       );
       if (generation !== this.generation) return;
-      if (append && page.libraryRevision !== this.snapshot.revision)
+      if (append && (page.libraryRevision !== this.snapshot.revision || page.matchingRevision !== this.snapshot.matchingRevision))
         throw new ApiError("CURSOR_EXPIRED", "Revision changed");
       const added = page.items.filter(
         (item) =>
@@ -116,6 +117,7 @@ export class LibraryState {
           ...new Map(items.map((item) => [item.sourceTrackId, item])).values(),
         ],
         revision: page.libraryRevision,
+        matchingRevision: page.matchingRevision,
         cursor: page.nextCursor,
         loading: false,
         stale: false,

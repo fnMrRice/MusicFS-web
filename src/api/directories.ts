@@ -72,6 +72,7 @@ export interface ManagedPlugin {
   dsp?: PluginDSP;
   execution?: "builtin" | "process";
   builtin?: { configured: boolean; capabilities: string[] };
+  settingsAvailable?: boolean;
 }
 export interface PluginSnapshot {
   restartRequired?: boolean;

@@ -132,6 +132,8 @@ test('added directories support isolated configuration, cancellation, deletion a
   await expect(page.getByText('暂无已添加目录', { exact: true })).toBeVisible();
   await expectAllowedCount(page);
   const add = page.getByRole('button', { name: '添加本地目录', exact: true });
+  await expect(heading).toBeVisible();
+  await expect(add).toBeVisible();
   const titleBounds = (await heading.boundingBox())!;
   const addBounds = (await add.boundingBox())!;
   expect(addBounds.x).toBeGreaterThan(titleBounds.x + titleBounds.width);

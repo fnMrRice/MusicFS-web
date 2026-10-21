@@ -1,4 +1,4 @@
-import { ApiError, errorMessage } from "../api/client";
+import { ApiError } from "../api/client";
 import type { PlaybackApi } from "../api/playback";
 import type {
   Capabilities,
@@ -15,6 +15,7 @@ import { initialState } from "./state";
 import { ControlQueue, isUncertain } from "./control-queue";
 import { RecoveryBudget } from "./recovery";
 import { trackPosition, seekAllowed } from "./timeline";
+import { playbackErrorMessage } from "./errors";
 
 export class PlayerController {
   state = initialState();
@@ -115,12 +116,12 @@ export class PlayerController {
           if (apply) this.attach(current, generation);
         },
         (error) => {
-          if (generation === this.generation) this.fail(errorMessage(error));
+          if (generation === this.generation) this.fail(playbackErrorMessage(error));
         },
       );
       this.attach(playback, generation);
     } catch (error) {
-      if (generation === this.generation) this.fail(errorMessage(error));
+      if (generation === this.generation) this.fail(playbackErrorMessage(error));
     }
   }
   stop(): void {
@@ -274,7 +275,7 @@ export class PlayerController {
     if (!this.audio) return;
     if (playback?.seekMode !== "byteRange") {
       this.fail(
-        errorMessage(new ApiError("SEEK_UNSUPPORTED", "Seek not available")),
+        playbackErrorMessage(new ApiError("SEEK_UNSUPPORTED", "Seek not available")),
       );
       return;
     }

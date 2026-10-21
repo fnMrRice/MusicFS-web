@@ -14,8 +14,9 @@ export interface SourceTrack {
   title: string | null; artists: string[] | null; durationMs: number | null;
   codec: string | null; container: string | null; bitrateBps: number | null;
   availability: string; assetId: string | null; recordingId?: string | null;
+  versions?: SourceTrack[];
 }
-export interface TrackPage { items: SourceTrack[]; nextCursor: string | null; libraryRevision: string }
+export interface TrackPage { items: SourceTrack[]; nextCursor: string | null; libraryRevision: string; matchingRevision?: number }
 export interface OutputProfile { mime: string; codec: string; container: string; transport: string }
 export interface Playback {
   sessionId: string; attemptId: string; assetId: string; representationId: string;

@@ -25,6 +25,8 @@ import { LocalScanState } from "../library/local-scan-state";
 import { LocalScans } from "../library/local-scans";
 import { ConfigurationScans } from "../library/configuration-scans";
 import type { PluginOperation } from "../api/directories";
+import { MatchingApi } from "../api/matching";
+import { MatchingDecisions } from "../library/matching-decisions";
 
 interface AuthState {
   session: AuthSession | null;
@@ -51,6 +53,7 @@ export class Services {
   authApi = new AuthApi(this.client);
   profile = new PersonalProfileState(new ProfileApi(this.client));
   libraryApi = new LibraryApi(this.client);
+  matchingDecisions = new MatchingDecisions(new MatchingApi(this.client), () => this.matchingChanged());
   content = new ContentApi(this.client);
   sourcePlaylists = new SourcePlaylistCatalog((instance, signal) => this.content.accountPlaylists(instance, null, signal));
   private capabilityEvents = new CapabilityEvents(
@@ -88,12 +91,16 @@ export class Services {
   private configurationScans = new ConfigurationScans(this.client, (instance) => this.scans.get(instance).requestAutomatic());
   localScan(instance: string): LocalScanState { return this.scans.get(instance); }
   scanMusicAfterDirectoryOperation(instance: string, operation: PluginOperation): void { this.configurationScans.watch(instance, operation); }
+  matchingChanged(): void {
+    this.libraries.forEach((library) => { void library.refresh(); });
+    capabilityResources.invalidate();
+  }
   library(provider: string): LibraryState {
     if (!this.libraries.has(provider))
       this.libraries.set(
         provider,
         new LibraryState((p, cursor, signal) =>
-          this.libraryApi.page(p, cursor, signal),
+          this.libraryApi.page(p, cursor, signal, true),
         ),
       );
     return this.libraries.get(provider)!;
@@ -133,6 +140,7 @@ export class Services {
     this.auth.set({ ...this.auth.value, session, busy: false, error: null });
     this.scans.setSession(this.auth.value.ready!.instanceId, session.user.id);
     this.configurationScans.setSession(this.auth.value.ready!.instanceId, session.user.id);
+    this.matchingDecisions.setSession(this.auth.value.ready!.instanceId, session.user.id);
     this.profile.setUser(session.user.id);
     this.reloadSourceNames();
     this.capabilityEvents.start(session.csrfToken);
@@ -228,6 +236,7 @@ export class Services {
     }
   }
   clear(): void {
+    this.matchingDecisions.clear();
     this.configurationScans.clear();
     this.scans.clear();
     this.profile.setUser(null);

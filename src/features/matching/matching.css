@@ -1,0 +1,17 @@
+.matching-selected, .matching-candidates { display: grid; gap: 14px; margin: 16px 0; }
+.matching-track { min-width: 0; display: grid; gap: 5px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; overflow-wrap: anywhere; }
+.matching-track button { justify-self: start; }
+.matching-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.matching-candidate { border-bottom: 1px solid var(--line); padding-bottom: 16px; }
+.matching-reasons { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
+.tracks .track-versions td { background: var(--panel); max-width: none; white-space: normal; padding: 12px 24px; }
+.track-versions-list { display: grid; gap: 10px; padding: 14px 12px; }
+.track-version { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding: 8px; border-bottom: 1px solid var(--line); }
+.track-version-name { flex: 1; min-width: 160px; overflow-wrap: anywhere; }
+.track-version-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.track-expand { display: inline-flex; gap: 4px; align-items: center; padding: 4px 0; }
+@media (max-width: 600px) {
+  .matching-pair { grid-template-columns: 1fr; }
+  .track-version { gap: 8px; }
+  .filter-end { flex-wrap: wrap; }
+}

@@ -1,0 +1,11 @@
+.plugin-settings { margin: 14px 0; padding: 18px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+.plugin-settings h4 { margin: 0 0 12px; }
+.plugin-settings-fields { display: grid; gap: 16px; max-width: 650px; margin-bottom: 18px; }
+.plugin-setting-field > label { display: block; margin-bottom: 6px; }
+.plugin-setting-field > label.check-label { display: flex; flex-direction: row; align-items: center; gap: 9px; white-space: normal; }
+.plugin-setting-field .check-label input { width: auto; flex: none; }
+.plugin-setting-field > input, .plugin-setting-field > select { width: 100%; }
+.plugin-setting-field p, .plugin-settings-actions p { margin: 6px 0; }
+.plugin-settings-actions { display: grid; gap: 12px; margin-top: 20px; }
+.plugin-job { margin-top: 16px; padding: 12px; background: var(--hover); border-radius: 8px; }
+.plugin-job progress { width: 100%; accent-color: var(--accent); }

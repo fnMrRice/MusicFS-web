@@ -13,6 +13,8 @@ import {
 import { TrackTable } from "./TrackTable";
 import { scanStatusMessage } from "../library/scan-state";
 import { useSourceName } from "../components/use-source-name";
+import { Candidates } from "./matching/Candidates";
+import { MatchingRecovery } from "./matching/MatchingRecovery";
 
 export function Library() {
   useLocale();
@@ -36,8 +38,10 @@ export function Library() {
   );
   const snapshot = useSyncExternalStore(subscribe, () => state.snapshot);
   const [revision, setRevision] = useState(0);
+  const [candidates, setCandidates] = useState(false);
   useEffect(() => {
     if (!state.snapshot.revision) void state.select(provider);
+    else void state.refresh();
     return () => state.cancel();
   }, [provider, state]);
   const refresh = () => {
@@ -119,6 +123,7 @@ export function Library() {
               {tr("更多筛选")}
             </button>
             <div className="filter-end">
+              {snapshot.matchingRevision !== undefined && <button onClick={() => setCandidates(true)}>{tr("重复识别")}</button>}
               <input
                 placeholder={tr("搜索当前列表")}
                 aria-label={tr("搜索当前列表")}
@@ -133,6 +138,7 @@ export function Library() {
             </div>
           </div>
           <ErrorNotice error={providers.error} retry={providers.reload} />
+          <MatchingRecovery />
           {statuses.map(([name, message]) => (
             <p className="notice" key={name}>
               {name}: {statusText(message ?? "")}
@@ -143,6 +149,8 @@ export function Library() {
               tracks={snapshot.items}
               providers={providers.data ?? []}
               queryKey={`${provider}:${revision}`}
+              matchingRevision={snapshot.matchingRevision}
+              onMatchingChange={snapshot.matchingRevision !== undefined ? refresh : undefined}
               complete={
                 !snapshot.cursor && !snapshot.loading && !snapshot.error
               }
@@ -176,6 +184,7 @@ export function Library() {
           />
         </>
       )}
+      {candidates && <Candidates close={() => setCandidates(false)} refresh={refresh} />}
     </section>
   );
 }

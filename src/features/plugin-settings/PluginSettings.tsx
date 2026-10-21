@@ -1,0 +1,127 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ApiError, errorMessage } from "../../api/client";
+import { PluginSettingsApi, settingsValid, settingsValues, type PluginJob, type PluginSettings as Settings, type SettingValue, type SettingsRequest } from "../../api/plugin-settings";
+import { useServices } from "../../app/services";
+import { localizedPluginText } from "../../components/source-name";
+import { ErrorNotice } from "../../components/ui";
+import { tr, useLocale } from "../../i18n";
+import { SettingField } from "./SettingField";
+import { PluginJobStatus } from "./PluginJobStatus";
+import "./settings.css";
+
+type Pending = { key: string } & ({ kind: "save"; request: SettingsRequest } | { kind: "action"; action: string });
+
+export function PluginSettings({ pluginId }: { pluginId: string }) {
+  const { locale } = useLocale();
+  const services = useServices();
+  const api = useMemo(() => new PluginSettingsApi(services.client, pluginId), [services, pluginId]);
+  const [data, setData] = useState<Settings | null>(null);
+  const [values, setValues] = useState<Record<string, SettingValue>>({});
+  const [job, setJob] = useState<PluginJob | undefined>();
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [pollError, setPollError] = useState<string | null>(null);
+  const [conflict, setConflict] = useState(false);
+  const [message, setMessage] = useState("");
+  const [epoch, setEpoch] = useState(0);
+  const [pollEpoch, setPollEpoch] = useState(0);
+  const [uncertain, setUncertain] = useState(false);
+  const pending = useRef<Pending | null>(null);
+  const control = useRef<AbortController | null>(null);
+  const dirty = !!data && JSON.stringify(values) !== JSON.stringify(settingsValues(data));
+  const active = job?.status === "running" || job?.status === "queued";
+  useEffect(() => {
+    const controller = new AbortController();
+    setLoading(true); setError(null); setMessage("");
+    void api.get(controller.signal).then((result) => {
+      if (controller.signal.aborted) return;
+      setData(result); setValues(settingsValues(result)); setJob(result.job); setLoading(false);
+      pending.current = null; setUncertain(false); setConflict(false);
+    }, (cause) => {
+      if (!controller.signal.aborted) { setError(errorMessage(cause)); setLoading(false); }
+    });
+    return () => controller.abort();
+  }, [api, epoch]);
+  useEffect(() => {
+    if (!data || busy) return;
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout>;
+    async function poll() {
+      try {
+        const result = await api.get(controller.signal);
+        if (controller.signal.aborted) return;
+        setJob(result.job); setPollError(null);
+      } catch (cause) {
+        if (!controller.signal.aborted) setPollError(errorMessage(cause));
+      }
+      if (!controller.signal.aborted) timer = setTimeout(() => { void poll(); }, active ? 1500 : 8000);
+    }
+    timer = setTimeout(() => { void poll(); }, active ? 1500 : 8000);
+    return () => { controller.abort(); clearTimeout(timer); };
+  }, [api, data, active, busy, pollEpoch]);
+  useEffect(() => () => control.current?.abort(), []);
+  async function submit(input?: Pending) {
+    if (control.current || conflict) return;
+    if (!pending.current && input) pending.current = input;
+    const operation = pending.current;
+    if (!operation) return;
+    const controller = new AbortController();
+    control.current = controller;
+    setBusy(true); setError(null); setMessage("");
+    try {
+      if (operation.kind === "save") {
+        const result = await api.save(operation.request, operation.key, controller.signal);
+        if (controller.signal.aborted) return;
+        setData(result); setValues(settingsValues(result)); setJob(result.job); setMessage("设置已保存。");
+      } else {
+        const result = await api.action(operation.action, operation.key, controller.signal);
+        if (controller.signal.aborted) return;
+        setJob(result); setMessage("任务已提交，可离开此页面，服务端会继续执行。");
+      }
+      pending.current = null; setUncertain(false);
+    } catch (cause) {
+      if (controller.signal.aborted) return;
+      const stale = cause instanceof ApiError && (cause.status === 409 || cause.status === 412 || cause.code === "REVISION_CONFLICT");
+      setConflict(stale); setUncertain(!stale);
+      setError(stale ? "插件设置已发生变化，请重新加载后再编辑。" : errorMessage(cause));
+    } finally {
+      control.current = null;
+      if (!controller.signal.aborted) setBusy(false);
+    }
+  }
+  const title = data ? localizedPluginText(data.schema.title, data.schema.localizedTitles, locale) : tr("插件设置");
+  return <section className="plugin-settings" aria-label={title}>
+    <h4>{title}</h4>
+    {loading && <p role="status">{tr("正在读取设置…")}</p>}
+    <ErrorNotice error={error} />
+    {(!data || conflict || uncertain) && !loading && <div className="list-actions">
+      {uncertain && <button disabled={busy} onClick={() => { void submit(); }}>{tr("重试上次操作")}</button>}
+      <button disabled={busy} onClick={() => setEpoch((value) => value + 1)}>{tr("重新加载设置")}</button>
+    </div>}
+    {data && <>
+      {data.schema.description && <p className="muted">{localizedPluginText(data.schema.description, data.schema.localizedDescriptions, locale)}</p>}
+      <form onSubmit={(event) => {
+        event.preventDefault();
+        if (!settingsValid(data.schema, values) || !dirty || conflict || uncertain) return;
+        void submit({ kind: "save", key: crypto.randomUUID(), request: { expectedRevision: data.revision, schemaRevision: data.schema.revision, values } });
+      }}>
+        <div className="plugin-settings-fields">{data.schema.fields.map((field) => <SettingField key={field.key} field={field} value={values[field.key]}
+          disabled={loading || busy || conflict || uncertain} change={(value) => setValues((previous) => ({ ...previous, [field.key]: value }))} />)}</div>
+        {data.schema.fields.length > 0 && <button className="primary" disabled={loading || busy || !dirty || conflict || uncertain || !settingsValid(data.schema, values)}>
+          {busy ? tr("正在保存…") : tr("保存设置")}
+        </button>}
+      </form>
+      {dirty && <p className="muted">{tr("请先保存修改，再执行插件操作。")}</p>}
+      <div className="plugin-settings-actions">{data.schema.actions.map((action) => <div key={action.id}>
+        <button disabled={loading || busy || dirty || conflict || uncertain || active} onClick={() => {
+          void submit({ kind: "action", action: action.id, key: crypto.randomUUID() });
+        }}>{localizedPluginText(action.label, action.localizedLabels, locale)}</button>
+        {action.description && <p className="muted">{localizedPluginText(action.description, action.localizedDescriptions, locale)}</p>}
+      </div>)}</div>
+      {message && <p className="feedback" role="status">{tr(message)}</p>}
+      <PluginJobStatus job={job} />
+      <ErrorNotice error={pollError} retry={() => setPollEpoch((value) => value + 1)} />
+    </>}
+  </section>;
+}

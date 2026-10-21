@@ -5,6 +5,8 @@ import notices from "./notices";
 import plugins from "./plugins";
 import directories from "./directories";
 import scans from "./scans";
+import matching from "./matching";
+import pluginSettings from "./plugin-settings";
 
 export type Locale = "en" | "zh-CN" | "zh-TW" | "ja";
 export type Language = "browser" | Locale;
@@ -16,6 +18,8 @@ const messages: Record<string, readonly string[]> = {
   ...plugins,
   ...directories,
   ...scans,
+  ...matching,
+  ...pluginSettings,
 };
 const columns: Record<Locale, number> = {
   en: 0,

@@ -1,27 +1,36 @@
 import { tr, useLocale, statusText } from "../i18n";
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import type { SourceTrack, Provider } from "../api/types";
 import { useServices, useStore } from "../app/services";
-import { Cover, duration, IconButton } from "../components/ui";
+import { Cover, duration, Icon, IconButton } from "../components/ui";
 import { AddToPlaylist } from "./playlists/AddToPlaylist";
 import { useSourceName } from "../components/use-source-name";
+import { MergeSongs } from "./matching/MergeSongs";
+import { TrackVersions } from "./matching/TrackVersions";
+import "./matching/matching.css";
 
 export function TrackTable({
   tracks,
   providers = [],
   queryKey,
   complete = false,
+  matchingRevision,
+  onMatchingChange,
 }: {
   tracks: SourceTrack[];
   providers?: Provider[];
   queryKey: string;
   complete?: boolean;
+  matchingRevision?: number;
+  onMatchingChange?: () => void;
 }) {
   useLocale();
   const sourceName = useSourceName();
   const s = useServices();
+  const matchingPending = useStore(s.matchingDecisions.pending);
   const [selected, setSelected] = useState(new Set<string>());
   const [add, setAdd] = useState<SourceTrack[] | null>(null);
+  const [merge, setMerge] = useState<{ tracks: SourceTrack[]; revision?: number } | null>(null);
   const [message, setMessage] = useState("");
   const check = useRef<HTMLInputElement>(null);
   useEffect(() => {
@@ -48,6 +57,7 @@ export function TrackTable({
             <strong>{tr("已选择 {0} 首", { 0: chosen.length })}</strong>
             <button onClick={() => enqueue(chosen)}>{tr("加入队列")}</button>
             <button onClick={() => setAdd(chosen)}>{tr("添加到歌单")}</button>
+            {onMatchingChange && <button disabled={chosen.length < 2 || matchingPending.length > 0} onClick={() => setMerge({ tracks: chosen, revision: matchingRevision })}>{tr("合并歌曲")}</button>}
             <button disabled title={tr("收藏接口尚未提供")}>
               {tr("收藏")}
             </button>
@@ -149,12 +159,16 @@ export function TrackTable({
                   })
                 }
                 add={() => setAdd([t])}
+                matchingRevision={matchingRevision}
+                onMatchingChange={onMatchingChange}
               />
             ))}
           </tbody>
         </table>
       </div>
       {add && <AddToPlaylist tracks={add} close={() => setAdd(null)} />}
+      {merge && onMatchingChange && <MergeSongs tracks={merge.tracks} revision={merge.revision}
+        close={() => setMerge(null)} refresh={() => { setSelected(new Set()); onMatchingChange(); }} />}
     </>
   );
 }
@@ -165,6 +179,8 @@ function TrackRow({
   checked,
   toggle,
   add,
+  matchingRevision,
+  onMatchingChange,
 }: {
   track: SourceTrack;
   number: number;
@@ -172,11 +188,17 @@ function TrackRow({
   checked: boolean;
   toggle: () => void;
   add: () => void;
+  matchingRevision?: number;
+  onMatchingChange?: () => void;
 }) {
   useLocale();
   const s = useServices();
-  const playing = useStore(s.currentTrack) === t.sourceTrackId;
+  const currentTrack = useStore(s.currentTrack);
+  const [expanded, setExpanded] = useState(false);
+  const versions = t.versions ?? [t];
+  const playing = versions.some((version) => version.sourceTrackId === currentTrack);
   return (
+    <Fragment>
     <tr
       className={`${playing ? "current" : ""} ${checked ? "checked" : ""} ${t.availability !== "available" ? "unavailable" : ""}`}
     >
@@ -198,11 +220,18 @@ function TrackRow({
             <button
               className="track-play"
               aria-label={tr("播放 {0}", { "0": t.displayName })}
+              title={tr("播放 {0}", { "0": t.displayName })}
               disabled={t.availability !== "available"}
               onClick={() => s.play(t)}
             >
-              {t.title || t.displayName}
+              <Icon name="play" size={14} />
+              <span>{t.title || t.displayName}</span>
             </button>
+            {versions.length > 1 && <button className="text-button track-expand" aria-expanded={expanded}
+              aria-label={tr("展开 {0} 的来源版本", { 0: t.title || t.displayName })}
+              onClick={() => setExpanded(!expanded)}>
+              <Icon name="chevron" size={14} />{tr("{0} 个来源版本", { 0: versions.length })}
+            </button>}
             {t.availability !== "available" && (
               <small className="availability">
                 {t.availability === "offline"
@@ -232,5 +261,9 @@ function TrackRow({
         />
       </td>
     </tr>
+    {expanded && versions.length > 1 && <tr className="track-versions"><td colSpan={9}>
+      <TrackVersions tracks={versions} revision={matchingRevision} refresh={onMatchingChange} />
+    </td></tr>}
+    </Fragment>
   );
 }
