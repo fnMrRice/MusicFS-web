@@ -1,6 +1,6 @@
 # React UI 接口接入清单
 
-核对日期：2026-10-10。以当前 Server `docs/contracts/openapi.yaml` 与 `http.schema.json` 为依据。本轮 Server 已补齐搜索、完整查询、个人资料与记录、来源引用批量展示等接口；Web 本轮新增接入能力变更订阅，其他新增接口的页面适配仍待实施。完成对照见 [Server 交接](../../server/docs/web-ui-api-gaps.md)。
+核对日期：2026-10-10。以当前 Server `docs/contracts/openapi.yaml` 与 `http.schema.json` 为依据。本轮 Server 已补齐搜索、完整查询、个人资料与记录、来源引用批量展示等接口；Web 本轮新增接入能力变更订阅，其他新增接口的页面适配仍待实施。完成对照见 [Server 交接](../../server/docs/contracts/web-integration.md)。
 
 | 页面 | 接入范围 | 边界 |
 | --- | --- | --- |
@@ -25,7 +25,7 @@
 - `/playlists?q=...`、在线歌单 `tracks` 分页、`/source-refs/lookup` 和在线曲目批量读取：本人歌单搜索与引用展示。
 - `/me/favorites`、`/me/recently-played`：账号收藏和最近播放。最近播放需要在真实播放开始后上报，遵守会话去重和保存期限；昵称已通过 `/me/profile` 接入，头像上传仍未支持。
 
-目前 UI 的歌单本地曲目展示仍遍历固定修订曲库关联，批量读取接口已提供，尚待替换。`availableOnly` 仅表示扫描观测可用，不能承诺音频解码或播放授权；`playableOnly` 尚不支持。远程资料引用不构成音频播放许可，在线现网结果仍受配置、权限和来源状态影响，界面 Mock 测试不能代替平台验收。完整接口字段和保留边界见 [Server 完成对照](../../server/docs/web-ui-api-gaps.md)。
+目前 UI 的歌单本地曲目展示仍遍历固定修订曲库关联，批量读取接口已提供，尚待替换。`availableOnly` 仅表示扫描观测可用，不能承诺音频解码或播放授权；`playableOnly` 尚不支持。远程资料引用不构成音频播放许可，在线现网结果仍受配置、权限和来源状态影响，界面 Mock 测试不能代替平台验收。完整接口字段和保留边界见 [Server 完成对照](../../server/docs/contracts/web-integration.md)。
 
 ## 安全与一致性
 

@@ -2,7 +2,7 @@
 
 状态：2026-10-09，Windows / Edge 154.0.4258.62 真实无头浏览器完成3项联调，最终一次全通过（19.3秒）。仅验证本文的合成 MP3/FLAC 封装与错误样本。
 
-运行入口：[Server 本地运行](../../server/docs/running.md) → [YAML 配置模型](../../server/docs/configuration.md)与[NCM 插件配置](../../server/docs/ncm.md)。在 `plugins` 中配置 `musicfs.plugin.decoder.ncm` 的 `executable` 和音频实例，插件及实例均显式启用；重启、重新扫描后，页面直接选曲。FLAC 转码需同时配齐音频实例的 FFmpeg/ffprobe。逐项操作及预期见 [手动验收](manual-validation.md)。
+运行入口：[Server 本地运行](../../server/docs/operations/running.md) → [YAML 配置模型](../../server/docs/operations/configuration.md)与[NCM 插件配置](../../server/docs/playback/ncm.md)。在 `plugins` 中配置 `musicfs.plugin.decoder.ncm` 的 `executable` 和音频实例，插件及实例均显式启用；重启、重新扫描后，页面直接选曲。FLAC 转码需同时配齐音频实例的 FFmpeg/ffprobe。逐项操作及预期见 [手动验收](manual-validation.md)。
 
 ## 兼容处理
 
