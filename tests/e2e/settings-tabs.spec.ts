@@ -47,13 +47,13 @@ test("settings group existing controls and preserve playback preferences across 
   await expect(tabs.getByRole("tab")).toHaveText(tabNames);
   await expect(tabs.getByRole("tab", { name: "音乐源", exact: true })).toHaveAttribute("aria-selected", "true");
   await expect(page.getByRole("heading", { name: "本地音乐", exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "插件状态", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "插件列表", exact: true })).toHaveCount(0);
   await expect(page.getByLabel(processingLabel)).toHaveCount(0);
   await expect(page.locator(".language-select select")).toHaveCount(0);
   await page.screenshot({ path: info.outputPath("settings-sources-desktop.png") });
 
   await tabs.getByRole("tab", { name: "插件管理", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "插件状态", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "插件列表", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "本地音乐", exact: true })).toHaveCount(0);
   await tabs.getByRole("tab", { name: "播放配置", exact: true }).click();
   await page.getByLabel(processingLabel).check();
@@ -128,7 +128,7 @@ test("regular users retain all tabs and see plugin permissions without admin req
   await page.goto(`${origin}/#/settings?tab=plugins`);
   await expect(page.getByRole("tab")).toHaveText(tabNames);
   await expect(page.getByText("插件管理仅对管理员开放。", { exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "刷新插件状态", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "刷新插件列表", exact: true })).toHaveCount(0);
   await page.getByRole("tab", { name: "音乐源", exact: true }).click();
   await expect(page.getByRole("heading", { name: "本地音乐", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: /^(管理目录|管理音乐目录)$/ })).toHaveCount(0);

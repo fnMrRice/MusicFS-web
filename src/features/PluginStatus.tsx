@@ -6,6 +6,8 @@ import { tr, useLocale } from "../i18n";
 import { Link } from "react-router-dom";
 import type { PluginDisplayCount, PluginSnapshot } from "../api/directories";
 import { localizedPluginText, pluginName, sourceName } from "../components/source-name";
+import { matchesPlugin, pluginPurposes, pluginPurposeLabel } from "./plugin-filters";
+import { InfrastructurePluginBadges, InfrastructurePluginDetails } from "./InfrastructurePlugin";
 import "./plugin-status.css";
 const states: Record<string, string> = {
   disabled: "已禁用",
@@ -28,23 +30,53 @@ export function PluginStatus() {
   const s = useServices();
   const auth = useStore(s.auth);
   const [allUsers, setAllUsers] = useState(false);
+  const [query, setQuery] = useState("");
+  const [purposes, setPurposes] = useState<Set<string>>(() => new Set());
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const showAllUsers = auth.session?.user.role === "admin" && allUsers;
   const plugins = useResource(`settings-plugins-${showAllUsers}`, (signal) =>
     s.client.request<PluginSnapshot>(`/admin/plugins${showAllUsers ? "?allUsers=true" : ""}`, { signal }),
   );
   const online = useResource("platform-account-instances", (signal) => s.content.online(signal));
+  const items = plugins.data?.items ?? [];
+  const purposeOptions = [...new Set([...items.flatMap(pluginPurposes), ...purposes])];
+  const filtered = items.filter((plugin) => matchesPlugin(plugin, purposes, query));
   function reload() { plugins.reload(); online.reload(); }
+  function togglePurpose(purpose: string) {
+    setPurposes((previous) => {
+      const next = new Set(previous);
+      if (next.has(purpose)) next.delete(purpose); else next.add(purpose);
+      return next;
+    });
+  }
   return (
     <div className="settings-card plugin-status">
       <div className="plugin-status-heading">
-        <h3>{tr("插件状态")}</h3>
-        <button className="icon-button" aria-label={tr("刷新插件状态")} title={tr("刷新插件状态")}
+        <h3>{tr("插件列表")}</h3>
+        <button className="icon-button" aria-label={tr("刷新插件列表")} title={tr("刷新插件列表")}
           disabled={plugins.loading || online.loading} onClick={reload}>
           <Icon name="refresh" size={18} />
         </button>
       </div>
-      <p className="muted">{tr("随包插件在配置齐全且未禁用时自动启动。待配置的插件不会阻止服务运行。")}</p>
+      <p className="muted">{tr("列表包含可选插件、数据库与 DSP；具体配置方式见各条目详情。")}</p>
+      <div className="plugin-filters">
+        <input type="search" aria-label={tr("按 ID 或名称筛选插件")}
+          placeholder={tr("按 ID 或名称筛选插件")} value={query}
+          onChange={(event) => setQuery(event.target.value)} />
+        <fieldset className="plugin-type-filter">
+          <legend>{tr("插件类型")}</legend>
+          <div className="plugin-type-options">
+            <button type="button" aria-pressed={purposes.size === 0} onClick={() => setPurposes(new Set())}>
+              {tr("全部")}
+            </button>
+            {purposeOptions.map((purpose) => <label className="check-label" key={purpose}>
+              <input type="checkbox" checked={purposes.has(purpose)} onChange={() => togglePurpose(purpose)} />
+              {pluginPurposeLabel(purpose)}
+            </label>)}
+          </div>
+          <p className="muted">{tr("类型可多选，未选择时显示全部。")}</p>
+        </fieldset>
+      </div>
       {auth.session?.user.role === "admin" && <label className="check-label plugin-scope">
         <input type="checkbox" checked={allUsers} onChange={(event) => setAllUsers(event.target.checked)} />
         {tr("显示所有用户实例")}
@@ -54,7 +86,7 @@ export function PluginStatus() {
       {plugins.data?.restartRequired && <p>{tr("配置变更需要重启服务端后生效。")}</p>}
       {plugins.loading && <p className="muted" role="status">{tr("正在读取插件…")}</p>}
       <div className="plugin-list">
-        {plugins.data?.items.map((p) => (
+        {filtered.map((p) => (
           <details className="plugin-entry" key={p.pluginId} open={expanded.has(p.pluginId)}
             onToggle={(event) => {
               const open = event.currentTarget.open;
@@ -69,6 +101,11 @@ export function PluginStatus() {
               <Icon name="chevron" size={18} />
               <span className="plugin-information">
                 <strong>{pluginName(p.plugin, locale)}</strong>
+                <InfrastructurePluginBadges plugin={p} />
+                <span className="plugin-purposes">
+                  <span>{tr("用途")}：</span>
+                  {pluginPurposes(p).map((purpose) => <span className="badge" key={purpose}>{pluginPurposeLabel(purpose)}</span>)}
+                </span>
                 <span className="plugin-metadata">
                   <span>{tr("插件 ID")}：<code>{p.pluginId}</code></span>
                   <span>{tr("版本")}：{p.version?.trim() || tr("未知版本")}</span>
@@ -76,7 +113,7 @@ export function PluginStatus() {
               </span>
               <PluginCount count={p.displayCount} locale={locale} />
             </summary>
-            <div className="plugin-instances">
+            {p.storage || p.dsp ? <InfrastructurePluginDetails plugin={p} /> : <div className="plugin-instances">
               <h4>{tr("插件实例")}</h4>
               {p.instances.map((i) => (
                 <div className="plugin-instance" key={i.instanceId}>
@@ -101,11 +138,12 @@ export function PluginStatus() {
                 </div>
               ))}
               {p.instances.length === 0 && <p className="muted">{tr("暂无插件实例。")}</p>}
-            </div>
+            </div>}
           </details>
         ))}
       </div>
       {plugins.data?.items.length === 0 && <p>{tr("未发现已安装插件。")}</p>}
+      {items.length > 0 && filtered.length === 0 && <p role="status">{tr("没有符合筛选条件的插件。")}</p>}
     </div>
   );
 }

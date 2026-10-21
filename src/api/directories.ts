@@ -42,9 +42,37 @@ export interface PluginDisplayCount {
   unit: string;
   localizedUnits: Record<string, string>;
 }
+export interface PluginStorage {
+  backend: string;
+  mode: "builtin" | "process";
+  runtimeState: "ready" | "unavailable" | "unknown";
+}
+export interface PluginDSP {
+  configured: boolean;
+  chainState: "not_configured" | "not_in_chain" | "in_chain";
+  nodes: {
+    position: number;
+    name: string;
+    version: number;
+    params: Record<string, number>;
+    mode: "builtin" | "process";
+  }[];
+}
+export interface ManagedPlugin {
+  pluginId: string;
+  plugin: PluginIdentity;
+  version: string;
+  displayCount?: PluginDisplayCount;
+  supportsMultipleInstances: boolean;
+  instances: ManagedInstance[];
+  required?: boolean;
+  stateMutable?: boolean;
+  storage?: PluginStorage;
+  dsp?: PluginDSP;
+}
 export interface PluginSnapshot {
   restartRequired?: boolean;
-  items: { pluginId: string; plugin: PluginIdentity; version?: string; displayCount?: PluginDisplayCount; supportsMultipleInstances: boolean; instances: ManagedInstance[] }[];
+  items: ManagedPlugin[];
 }
 
 export class DirectoriesApi {

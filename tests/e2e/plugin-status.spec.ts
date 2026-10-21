@@ -34,7 +34,7 @@ function pluginEntry(card: Locator, pluginId: string) {
   return card.locator(".plugin-entry").filter({ has: card.page().getByText(pluginId, { exact: true }) });
 }
 
-async function expectRefreshBesideHeading(card: Locator, label = "刷新插件状态") {
+async function expectRefreshBesideHeading(card: Locator, label = "刷新插件列表") {
   const heading = card.locator(".plugin-status-heading h3");
   const refresh = card.locator(".plugin-status-heading").getByRole("button", { name: label, exact: true });
   await expect(refresh).toBeVisible();
@@ -107,7 +107,7 @@ test("plugin groups show identity, separate rows and expandable instances with r
   await expect(ncm).not.toHaveAttribute("open");
   localState = "ready";
   localSources = 2;
-  await card.getByRole("button", { name: "刷新插件状态" }).click();
+  await card.getByRole("button", { name: "刷新插件列表" }).click();
   await expect(local.locator(".plugin-count")).toHaveText("2 个来源");
   await expect(local.getByText("可用", { exact: true })).toBeVisible();
   await expect(scraper.getByText("可用", { exact: true })).toBeVisible();
@@ -134,7 +134,7 @@ test("settings show restart-required disable while the plugin remains available"
   await expect(card.getByText("可用", { exact: true })).toBeVisible();
   await expect(card.getByText("已禁用", { exact: true })).toHaveCount(0);
   restartRequired = false;
-  await card.getByRole("button", { name: "刷新插件状态" }).click();
+  await card.getByRole("button", { name: "刷新插件列表" }).click();
   await expect(card.getByText("已禁用", { exact: true })).toBeVisible();
   await expect(card.getByText("配置变更需要重启服务端后生效。", { exact: true })).toHaveCount(0);
   await expect(card.getByText("等待重启后停用。", { exact: true })).toHaveCount(0);
@@ -173,7 +173,7 @@ test("plugin-provided user counts and account names refresh after logout", async
   await expect(ncm.locator(".plugin-instance").getByText("NCM 解密", { exact: true })).toBeVisible();
   await expect(card.getByText(/Ignored config|Never use|ab4dfbab|87d29d7b/)).toHaveCount(0);
   bound = false;
-  await card.getByRole("button", { name: "刷新插件状态" }).click();
+  await card.getByRole("button", { name: "刷新插件列表" }).click();
   await expect(entry.locator(".plugin-count")).toHaveText("1 个用户");
   await expect(instances).toHaveCount(2);
   await expect(instances.nth(0).getByText("自定义来源", { exact: true })).toBeVisible();
@@ -274,9 +274,9 @@ test("malformed plugin counts never become instance-count fallbacks", async ({ p
 });
 
 for (const [locale, heading, name, version, refresh, count] of [
-  ["en", "Plugin status", "Local Music", "Unknown version", "Refresh plugin status", "3 sources"],
-  ["zh-TW", "外掛程式狀態", "本地音樂", "未知版本", "重新整理外掛程式狀態", "3 個來源"],
-  ["ja", "プラグインの状態", "Local Music", "不明なバージョン", "プラグインの状態を更新", "3 sources"],
+  ["en", "Plugin list", "Local Music", "Unknown version", "Refresh plugin list", "3 sources"],
+  ["zh-TW", "外掛程式清單", "本地音樂", "未知版本", "重新整理外掛程式清單", "3 個來源"],
+  ["ja", "プラグイン一覧", "Local Music", "不明なバージョン", "プラグイン一覧を更新", "3 sources"],
 ] as const) {
   test(`plugin group labels and controls follow the ${locale} language preference`, async ({ page }) => {
     await page.addInitScript(language => localStorage.setItem("musicfs:language", language), locale);
@@ -328,7 +328,7 @@ test("mobile plugin groups wrap long identifiers without horizontal overflow", a
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.evaluate(() => localStorage.setItem("musicfs:language", "ja"));
   await page.reload();
-  await expectRefreshBesideHeading(pluginCard(page), "プラグインの状態を更新");
+  await expectRefreshBesideHeading(pluginCard(page), "プラグイン一覧を更新");
   expect(await pluginCard(page).evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
 });
 
@@ -338,5 +338,5 @@ test("an empty installed-plugin list keeps the refresh control available", async
   const card = pluginCard(page);
   await expect(card.getByText("未发现已安装插件。", { exact: true })).toBeVisible();
   await expect(card.locator(".plugin-entry")).toHaveCount(0);
-  await expect(card.getByRole("button", { name: "刷新插件状态", exact: true })).toBeEnabled();
+  await expect(card.getByRole("button", { name: "刷新插件列表", exact: true })).toBeEnabled();
 });
