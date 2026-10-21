@@ -1,5 +1,5 @@
 import { tr, useLocale, statusText } from "../i18n";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { useServices, useStore } from "../app/services";
 import { Cover, duration, IconButton } from "../components/ui";
 import { MediaPanel } from "./MediaPanel";
@@ -36,6 +36,12 @@ export function PlayerBar() {
   }, []);
   const playback = state.playback;
   const range = playback?.seekableRange;
+  const timelineStart = range?.startMs ?? 0;
+  const timelineEnd = range?.endMs || state.track?.durationMs || 1;
+  const timelinePosition = seek ?? state.positionMs;
+  const progress = timelineEnd > timelineStart
+    ? Math.min(1, Math.max(0, (timelinePosition - timelineStart) / (timelineEnd - timelineStart)))
+    : 0;
   const decrypted = playback?.effectiveProcessing.some(
     (p) =>
       !!p && typeof p === "object" && "type" in p && p.type === "ncmDecrypt",
@@ -55,12 +61,13 @@ export function PlayerBar() {
     <section className="player" aria-label={tr("播放器")}>
       <input
         className="timeline"
+        style={{ "--timeline-progress": `${progress * 100}%` } as CSSProperties}
         type="range"
         aria-label={tr("曲目进度")}
-        min={range?.startMs ?? 0}
-        max={range?.endMs || state.track?.durationMs || 1}
+        min={timelineStart}
+        max={timelineEnd}
         step={100}
-        value={seek ?? state.positionMs}
+        value={timelinePosition}
         disabled={!range || playback?.seekMode === "none"}
         onChange={(e) => setSeek(Number(e.target.value))}
         onPointerUp={(e) => commit(Number(e.currentTarget.value))}
