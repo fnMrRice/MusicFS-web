@@ -207,11 +207,20 @@
 .player-panel .section-title {
   gap: 8px;
 }
-.player-panel .section-title h2 {
+.player-panel-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
   margin-right: auto;
 }
+.player-panel-heading h2 {
+  white-space: nowrap;
+}
+.queue-toggle[aria-pressed="true"],
 .lyrics-toggle[aria-pressed="true"],
-.pin-lyrics[aria-pressed="true"] {
+.pin-panel[aria-pressed="true"] {
   color: var(--accent);
   background: var(--hover);
 }
@@ -219,7 +228,6 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  margin-left: auto;
   white-space: nowrap;
 }
 .queue-list {

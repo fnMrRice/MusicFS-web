@@ -26,15 +26,29 @@ export function PlayerBar() {
   const mode = playbackModes[modeIndex];
   const dsp = useStore(s.localDSP);
   const prefs = useStore(s.preferences);
-  const [queueOpen, setQueueOpen] = useState(false);
+  const [queueOpen, setQueueOpen] = useState(prefs.queuePinned);
   const [lyricsOpen, setLyricsOpen] = useState(prefs.lyricsPinned);
-  const panel = queueOpen ? "queue" : lyricsOpen && state.track ? "media" : null;
+  const [activePanel, setActivePanel] = useState<"queue" | "media">("queue");
+  const visiblePanels = { queue: queueOpen, media: lyricsOpen && !!state.track };
+  const panel = visiblePanels[activePanel] ? activePanel : visiblePanels.queue ? "queue" : visiblePanels.media ? "media" : null;
+  const panelPinned = panel === "queue" ? prefs.queuePinned : prefs.lyricsPinned;
   const panelRef = useRef<HTMLDivElement>(null);
   const panelId = useId();
   const [seek, setSeek] = useState<number | null>(null);
   const closePanel = () => {
-    if (queueOpen) setQueueOpen(false);
+    if (panel === "queue") setQueueOpen(false);
     else setLyricsOpen(false);
+  };
+  const togglePanel = (next: "queue" | "media") => {
+    const open = panel !== next;
+    if (next === "queue") {
+      setQueueOpen(open);
+      if (open && !prefs.lyricsPinned) setLyricsOpen(false);
+    } else {
+      setLyricsOpen(open);
+      if (open && !prefs.queuePinned) setQueueOpen(false);
+    }
+    if (open) setActivePanel(next);
   };
   useEffect(() => {
     setSeek(null);
@@ -49,7 +63,7 @@ export function PlayerBar() {
       if (event.key === "Escape") close();
     };
     const outside = (event: PointerEvent) => {
-      if (panel !== "media" || prefs.lyricsPinned) return;
+      if (panelPinned) return;
       if (!(event.target instanceof Node) || panelRef.current?.contains(event.target)) return;
       if (event.target instanceof Element && event.target.closest("[data-player-panel-trigger]")) return;
       close();
@@ -60,7 +74,7 @@ export function PlayerBar() {
       document.removeEventListener("keydown", keydown);
       document.removeEventListener("pointerdown", outside);
     };
-  }, [panel, prefs.lyricsPinned]);
+  }, [panel, panelPinned]);
   const playback = state.playback;
   const range = playback?.seekableRange;
   const timelineStart = range?.startMs ?? 0;
@@ -158,13 +172,12 @@ export function PlayerBar() {
         <IconButton
           icon="queue"
           label={tr("播放队列")}
+          className="queue-toggle"
           aria-expanded={panel === "queue"}
+          aria-pressed={prefs.queuePinned ? panel === "queue" : undefined}
           aria-controls={panel === "queue" ? panelId : undefined}
           data-player-panel-trigger="queue"
-          onClick={() => {
-            if (!queueOpen && !prefs.lyricsPinned) setLyricsOpen(false);
-            setQueueOpen(!queueOpen);
-          }}
+          onClick={() => togglePanel("queue")}
         />
         <IconButton
           icon="lyrics"
@@ -175,10 +188,7 @@ export function PlayerBar() {
           aria-controls={panel === "media" ? panelId : undefined}
           data-player-panel-trigger="lyrics"
           disabled={!state.track}
-          onClick={() => {
-            setLyricsOpen(panel !== "media");
-            setQueueOpen(false);
-          }}
+          onClick={() => togglePanel("media")}
         />
         <VolumeControl />
       </div>
@@ -202,22 +212,24 @@ export function PlayerBar() {
         <div className="player-panel" ref={panelRef} id={panelId} role="dialog"
           aria-label={panel === "queue" ? tr("播放队列") : tr("歌词")}>
           <div className="section-title">
-            <h2>{panel === "queue" ? tr("播放队列") : tr("歌词")}</h2>
-            {panel === "queue" && (
-              <button className="shuffle-queue" disabled={q.items.length < 2} onClick={() => s.shuffleQueue()}>
-                <Icon name="shuffle" size={16} />
-                {tr("打乱队列")}
-              </button>
-            )}
-            {panel === "media" && (
-              <IconButton
-                icon="pin"
-                className="pin-lyrics"
-                label={prefs.lyricsPinned ? tr("取消固定歌词") : tr("固定歌词")}
-                aria-pressed={prefs.lyricsPinned}
-                onClick={() => s.preference({ lyricsPinned: !prefs.lyricsPinned })}
-              />
-            )}
+            <div className="player-panel-heading">
+              <h2>{panel === "queue" ? tr("播放队列") : tr("歌词")}</h2>
+              {panel === "queue" && (
+                <button className="shuffle-queue" disabled={q.items.length < 2} onClick={() => s.shuffleQueue()}>
+                  <Icon name="shuffle" size={16} />
+                  {tr("打乱队列")}
+                </button>
+              )}
+            </div>
+            <IconButton
+              icon="pin"
+              className={`pin-panel ${panel === "queue" ? "pin-queue" : "pin-lyrics"}`}
+              label={panel === "queue"
+                ? panelPinned ? tr("取消固定播放队列") : tr("固定播放队列")
+                : panelPinned ? tr("取消固定歌词") : tr("固定歌词")}
+              aria-pressed={panelPinned}
+              onClick={() => s.preference(panel === "queue" ? { queuePinned: !panelPinned } : { lyricsPinned: !panelPinned })}
+            />
             <IconButton
               icon="close"
               label={tr("关闭面板")}

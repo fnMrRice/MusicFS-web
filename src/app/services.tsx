@@ -47,6 +47,7 @@ interface PreferencesState {
   volume: number;
   lastVolume: number;
   lyricsPinned: boolean;
+  queuePinned: boolean;
   mine: boolean;
   playlists: boolean;
   works: boolean;
@@ -60,6 +61,7 @@ const defaults: PreferencesState = {
   volume: 0.8,
   lastVolume: 0.8,
   lyricsPinned: false,
+  queuePinned: false,
   mine: true,
   playlists: true,
   works: false,
@@ -223,6 +225,7 @@ export class Services {
           : defaults.theme,
       ...volumePreferences(saved),
       lyricsPinned: saved?.lyricsPinned === true,
+      queuePinned: saved?.queuePinned === true,
       mine: saved?.mine !== false,
       playlists: saved?.playlists !== false,
       works: saved?.works === true,

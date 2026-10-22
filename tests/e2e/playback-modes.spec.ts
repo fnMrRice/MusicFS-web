@@ -176,6 +176,7 @@ test('shuffling preserves queue members, current audio, selected item and pause 
   const audio = page.locator('audio'), original = await audio.elementHandle();
   const src = await audio.getAttribute('src');
   await page.getByRole('button', { name: '播放队列', exact: true }).click();
+  await page.getByRole('button', { name: '固定播放队列', exact: true }).click();
   await expect(selected(page)).toHaveText('Beta.wav');
   const buttons = page.locator('.queue-list button');
   const before = await buttons.allTextContents();
