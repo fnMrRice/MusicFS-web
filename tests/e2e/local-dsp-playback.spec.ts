@@ -63,6 +63,7 @@ test('real browser output changes live without replacing the stream or requestin
   await page.getByRole('button', { name: '设置', exact: true }).click();
   await page.getByRole('tab', { name: 'DSP 配置', exact: true }).click();
   await page.getByRole('button', { name: '添加效果', exact: true }).click();
+  await page.getByRole('button', { name: '展开 增益', exact: true }).click();
   await page.getByRole('slider', { name: '调节 增益（dB）', exact: true }).fill('-12');
   await expect.poll(async () => (await outputSignal(page)).rms / baseline.rms).toBeLessThan(0.28);
   const attenuated = await outputSignal(page);
@@ -106,6 +107,7 @@ test('automatic volume balances real output live and preserves pause, mute and t
   await page.getByRole('button', { name: '设置', exact: true }).click();
   await page.getByRole('tab', { name: 'DSP 配置', exact: true }).click();
   await page.getByRole('button', { name: '添加效果', exact: true }).click();
+  await page.getByRole('button', { name: '展开 增益', exact: true }).click();
   await page.getByRole('slider', { name: '调节 增益（dB）', exact: true }).fill('12');
   const loud = await outputSignal(page);
   expect(loud.rms).toBeGreaterThan(0.4);

@@ -1,4 +1,5 @@
 import type { LocalDSPNode } from './model';
+import { graphicEqualizerBands } from './graphic-equalizer';
 
 export interface EffectUnit {
   kind: LocalDSPNode['kind'];
@@ -55,6 +56,30 @@ export function createEffectUnit(context: BaseAudioContext, node: LocalDSPNode, 
         set(effect.frequency, Math.min(params.frequency, context.sampleRate / 2));
         set(effect.Q, params.q);
         set(effect.gain, params.gain);
+      };
+    } else if (node.kind === 'graphicEqualizer') {
+      let previous: AudioNode = gate;
+      const bands = graphicEqualizerBands.map((band) => {
+        const effect = own(context.createBiquadFilter());
+        effect.type = 'peaking';
+        effect.frequency.value = Math.min(band.frequency, context.sampleRate / 2);
+        effect.Q.value = Math.SQRT2;
+        previous.connect(effect);
+        previous = effect;
+        return { key: band.key, effect };
+      });
+      // 低音与高音增强是效果链末端的真实棚式滤波，不改变其他频段滑块的数值。
+      const bass = own(context.createBiquadFilter());
+      bass.type = 'lowshelf';
+      bass.frequency.value = Math.min(120, context.sampleRate / 2);
+      const treble = own(context.createBiquadFilter());
+      treble.type = 'highshelf';
+      treble.frequency.value = Math.min(6000, context.sampleRate / 2);
+      previous.connect(bass).connect(treble).connect(wet);
+      updateEffect = (params) => {
+        for (const band of bands) set(band.effect.gain, params[band.key]);
+        set(bass.gain, params.bassGain);
+        set(treble.gain, params.trebleGain);
       };
     } else if (node.kind === 'compressor') {
       // 原生压缩器最多支持双声道；环绕声按声道独立处理后恢复原有布局。

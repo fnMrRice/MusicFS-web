@@ -95,6 +95,58 @@ test('six-channel compression retains channel positions and does not leak into s
   for (const channel of [0, 1, 3, 4]) expect(levels[channel]).toBeLessThan(1e-9);
 });
 
+test('graphic equalizer renders independent bands and shelves while preserving multichannel audio', async ({ page }, info) => {
+  await page.goto(`${origin}audio-render-test`);
+  const rendered = await page.evaluate(async () => {
+    const graphModule = '/src/player/dsp/graph.ts'; const modelModule = '/src/player/dsp/model.ts';
+    const { LocalDSPGraph } = await import(graphModule); const { createLocalDSPNode } = await import(modelModule);
+    async function render(params: Record<string, number>, sampleRate = 48000) {
+      const context = new OfflineAudioContext(6, sampleRate * 2, sampleRate);
+      const node = createLocalDSPNode('graphicEqualizer'); Object.assign(node.params, params);
+      const graph = new LocalDSPGraph(context, { enabled: true, chain: [node] }, 6);
+      const buffer = context.createBuffer(6, sampleRate * 2, sampleRate);
+      // 各声道使用独立频率，第六声道保持静音；同次渲染同时验证频段响应与声道隔离。
+      for (const [channel, frequency] of [31, 63, 1000, 8000, 16000].entries()) {
+        const data = buffer.getChannelData(channel);
+        const playableFrequency = Math.min(frequency, sampleRate * 0.4);
+        for (let sample = 0; sample < data.length; sample++) data[sample] = 0.08 * Math.sin(2 * Math.PI * playableFrequency * sample / sampleRate);
+      }
+      const source = context.createBufferSource(); source.buffer = buffer; source.connect(graph.input); source.start();
+      const output = await context.startRendering(); graph.dispose();
+      return Array.from({ length: 6 }, (_, channel) => {
+        const data = output.getChannelData(channel);
+        // 跳过滤波器起始瞬态，用最后一秒的完整周期比较实际输出响度。
+        const steady = data.slice(sampleRate);
+        return { finite: data.every(Number.isFinite), rms: Math.sqrt(steady.reduce((sum, value) => sum + value * value, 0) / steady.length) };
+      });
+    }
+    return {
+      flat: await render({}),
+      middle: await render({ band1000: 6 }),
+      bass: await render({ bassGain: 6 }),
+      treble: await render({ trebleGain: 6 }),
+      // 8k 与 16k 频段均达到低采样率的奈奎斯特上限，仍应输出有限且声道隔离的信号。
+      lowSampleRate: await render({ band8000: 12, band16000: 12, trebleGain: 6 }, 16000),
+    };
+  });
+  await info.attach('graphic-equalizer-rendered-levels', { body: JSON.stringify(rendered), contentType: 'application/json' });
+  for (const channels of Object.values(rendered)) {
+    expect(channels.every((channel) => channel.finite)).toBe(true);
+    expect(channels[5].rms).toBeLessThan(1e-9);
+    for (const channel of channels.slice(0, 5)) expect(channel.rms).toBeGreaterThan(0.01);
+  }
+  for (const channel of rendered.flat.slice(0, 5)) expect(channel.rms).toBeCloseTo(0.08 / Math.sqrt(2), 5);
+  const decibels = (kind: 'middle' | 'bass' | 'treble', channel: number) => 20 * Math.log10(rendered[kind][channel].rms / rendered.flat[channel].rms);
+  expect(decibels('middle', 2)).toBeCloseTo(6, 1);
+  expect(Math.abs(decibels('middle', 0))).toBeLessThan(0.1);
+  expect(decibels('bass', 0)).toBeGreaterThan(5.5);
+  expect(decibels('bass', 0)).toBeLessThan(6.1);
+  expect(Math.abs(decibels('bass', 3))).toBeLessThan(0.1);
+  expect(decibels('treble', 4)).toBeGreaterThan(5.5);
+  expect(decibels('treble', 4)).toBeLessThan(6.1);
+  expect(Math.abs(decibels('treble', 1))).toBeLessThan(0.1);
+});
+
 test('song fades render a linear envelope without overriding volume or pause', async ({ page }) => {
   await page.goto(`${origin}audio-render-test`);
   const rendered = await page.evaluate(async () => {

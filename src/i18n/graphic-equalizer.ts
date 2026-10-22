@@ -1,0 +1,18 @@
+export default {
+  '均衡器': ['Equalizer', '等化器', 'イコライザー'],
+  '十段均衡器': ['10-band equalizer', '十段等化器', '10 バンドイコライザー'],
+  '十段频率调节，配合低音与高音增强，实时塑造听感。': ['Adjust ten frequency bands with bass and treble enhancement in real time.', '十段頻率調整，配合低音與高音增強，即時塑造聽感。', '10 個の周波数帯と低音・高音の強調をリアルタイムに調整します。'],
+  '均衡器预设': ['Equalizer preset', '等化器預設', 'イコライザーのプリセット'],
+  '平直': ['Flat', '平直', 'フラット'],
+  '流行': ['Pop', '流行', 'ポップ'],
+  '摇滚': ['Rock', '搖滾', 'ロック'],
+  '人声': ['Vocal', '人聲', 'ボーカル'],
+  '自定义': ['Custom', '自訂', 'カスタム'],
+  '重置均衡器': ['Reset equalizer', '重設等化器', 'イコライザーをリセット'],
+  '调节 {frequency} Hz': ['Adjust {frequency} Hz', '調整 {frequency} Hz', '{frequency} Hz を調整'],
+  '低音增强': ['Bass enhancement', '低音增強', '低音の強調'],
+  '高音增强': ['Treble enhancement', '高音增強', '高音の強調'],
+  '{name}（dB）': ['{name} (dB)', '{name}（dB）', '{name}（dB）'],
+  '增强低频的厚度与力度。': ['Add weight and presence to low frequencies.', '增強低頻的厚度與力度。', '低音の厚みと力強さを高めます。'],
+  '增强高频的明亮感与细节。': ['Add brightness and detail to high frequencies.', '增強高頻的明亮感與細節。', '高音の明るさと細部を強調します。'],
+} satisfies Record<string, readonly [string, string, string]>;

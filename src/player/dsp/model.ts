@@ -1,4 +1,6 @@
-export type LocalDSPKind = 'gain' | 'equalizer' | 'compressor' | 'reverb';
+import { graphicEqualizerParameters } from './graphic-equalizer';
+
+export type LocalDSPKind = 'gain' | 'equalizer' | 'graphicEqualizer' | 'compressor' | 'reverb';
 
 export interface LocalDSPNode {
   id: string;
@@ -35,6 +37,7 @@ export const localDSPCatalog: LocalDSPDefinition[] = [
   { kind: 'gain', name: '增益', description: '调整信号电平；提升多个效果的增益可能导致失真。', params: [
     { key: 'gain', label: '增益', min: -24, max: 12, step: 0.1, defaultValue: 0, unit: 'dB' },
   ] },
+  { kind: 'graphicEqualizer', name: '均衡器', description: '十段频率调节，配合低音与高音增强，实时塑造听感。', params: graphicEqualizerParameters },
   { kind: 'equalizer', name: '参数均衡器', description: '调整一个频段，可添加多个均衡器组合调音。', params: [
     { key: 'frequency', label: '中心频率', min: 20, max: 20000, step: 1, defaultValue: 1000, unit: 'Hz' },
     { key: 'q', label: 'Q 值', min: 0.1, max: 18, step: 0.1, defaultValue: 1 },

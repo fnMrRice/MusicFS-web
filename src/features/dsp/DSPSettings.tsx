@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { tr, useLocale } from "../../i18n";
+import "./dsp.css";
 import { LocalDSPSettings } from "./LocalDSPSettings";
 import { ServerDSPSettings } from "./ServerDSPSettings";
-import "./dsp.css";
 
 export function DSPSettings() {
   useLocale();

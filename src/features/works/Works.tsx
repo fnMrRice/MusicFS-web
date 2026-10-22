@@ -26,6 +26,7 @@ export function Works() {
   }, (work) => work.workId);
   const [creating, setCreating] = useState(false);
   const availableTypes = types.data ?? [];
+  const selectedType = availableTypes.find((type) => type.id === filters.contentType);
   const filtered = Object.values(filters).some(Boolean);
   return <section className="works-page" aria-label={tr("作品库")}>
     <div className="work-heading">
@@ -43,6 +44,7 @@ export function Works() {
             setParams(next);
           }}>{type.name}</button>)}
     </div>
+    {selectedType?.description && <p className="muted">{selectedType.description}</p>}
     <form className="work-filters" onSubmit={(event) => {
       event.preventDefault();
       const next = new URLSearchParams();

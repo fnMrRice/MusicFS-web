@@ -1,0 +1,62 @@
+.graphic-equalizer {
+  --eq-accent: var(--accent);
+  --eq-text: var(--text);
+  --eq-muted: var(--muted);
+  min-width: 0;
+  max-width: 100%;
+  padding: 20px 22px;
+  color: var(--eq-text);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+
+.graphic-equalizer-toolbar {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.graphic-equalizer-toolbar > label { display: grid; gap: 7px; min-width: 150px; max-width: 250px; flex: 1; font-size: 12px; color: var(--eq-muted); }
+.graphic-equalizer-toolbar select { width: 100%; min-height: 38px; padding: 7px 30px 7px 12px; border: 1px solid color-mix(in srgb, var(--muted) 30%, var(--line)); border-radius: 8px; color: var(--eq-text); background-color: var(--panel); font-size: 13px; }
+.graphic-equalizer-toolbar button { min-height: 38px; padding: 7px 12px; color: var(--eq-accent); background: transparent; border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line)); border-radius: 8px; white-space: nowrap; font-size: 12px; }
+.graphic-equalizer-toolbar button:hover { color: var(--text); background: color-mix(in srgb, var(--accent) 12%, var(--panel)); }
+.graphic-equalizer :is(button, select):focus-visible { outline: 2px solid var(--eq-accent); outline-offset: 3px; }
+.graphic-equalizer-scroll { max-width: 100%; min-width: 0; overflow-x: auto; overscroll-behavior-inline: contain; scrollbar-color: var(--muted) var(--bg); scrollbar-width: thin; padding-bottom: 12px; }
+.graphic-equalizer-chart { display: grid; grid-template-columns: 42px minmax(0, 1fr); gap: 12px; min-width: 600px; }
+.graphic-equalizer-scale { position: relative; height: 176px; margin-top: 30px; color: var(--eq-muted); font-size: 10px; white-space: nowrap; }
+.graphic-equalizer-scale span { position: absolute; right: 0; }
+.graphic-equalizer-scale span:first-child { top: 10px; transform: translateY(-50%); }
+.graphic-equalizer-scale span:nth-child(2) { top: 50%; transform: translateY(-50%); }
+.graphic-equalizer-scale span:last-child { bottom: 10px; transform: translateY(50%); }
+.graphic-equalizer-bands { display: grid; grid-template-columns: repeat(10, minmax(40px, 1fr)); gap: 10px; }
+.graphic-equalizer-band { display: grid; justify-items: center; grid-template-rows: 30px 176px 26px; min-width: 0; }
+.graphic-equalizer-band output { align-self: start; padding-top: 1px; color: var(--eq-text); font-size: 10px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.graphic-equalizer-band > label { align-self: end; color: var(--eq-text); font-size: 12px; letter-spacing: 0.02em; }
+.graphic-equalizer-fader { position: relative; width: 34px; height: 176px; border-radius: 8px; }
+.graphic-equalizer-fader:focus-within { outline: 2px solid color-mix(in srgb, var(--accent) 60%, transparent); outline-offset: 3px; }
+.graphic-equalizer-rail { position: absolute; top: 10px; bottom: 10px; width: 4px; left: 15px; background: color-mix(in srgb, var(--muted) 35%, transparent); border-radius: 8px; }
+.graphic-equalizer-rail::after { position: absolute; content: ""; left: -5px; right: -5px; top: 50%; border-top: 1px solid color-mix(in srgb, var(--muted) 45%, transparent); }
+.graphic-equalizer-fill { position: absolute; bottom: 0; width: 100%; height: var(--eq-level); background: var(--eq-accent); border-radius: inherit; }
+.graphic-equalizer-thumb { position: absolute; z-index: 1; width: 16px; height: 16px; left: -6px; bottom: calc(var(--eq-level) - 8px); border-radius: 50%; background: #fff; box-shadow: 0 1px 6px #0008; }
+
+/* 原生滑块保留键盘与读屏操作；独立轨道确保竖排控件在浏览器间视觉一致。 */
+.graphic-equalizer-fader input[type="range"] { position: absolute; inset: 0; width: 34px; height: 176px; margin: 0; padding: 0; opacity: 0; writing-mode: vertical-lr; direction: rtl; appearance: none; cursor: ns-resize; }
+.graphic-equalizer-fader input[type="range"]::-webkit-slider-thumb { appearance: none; width: 20px; height: 20px; }
+.graphic-equalizer-fader input[type="range"]::-moz-range-thumb { width: 20px; height: 20px; border: 0; }
+.graphic-equalizer-enhancements { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px; margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--line); }
+.graphic-equalizer-enhancement { min-width: 0; }
+.graphic-equalizer-enhancement-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 10px; }
+.graphic-equalizer-enhancement-heading label { color: var(--eq-text); font-size: 13px; }
+.graphic-equalizer-enhancement-heading output { color: var(--eq-text); font-size: 11px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.graphic-equalizer-enhancement input[type="range"] { display: block; width: 100%; height: 20px; padding: 0; margin: 0; accent-color: var(--eq-accent); cursor: pointer; }
+.graphic-equalizer-enhancement p { margin: 8px 0 0; color: var(--eq-muted); font-size: 11px; line-height: 1.5; }
+
+@media (max-width: 600px) {
+  .graphic-equalizer { padding: 16px 14px; }
+  .graphic-equalizer-enhancements { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+  .graphic-equalizer-toolbar > label { min-width: 140px; }
+}

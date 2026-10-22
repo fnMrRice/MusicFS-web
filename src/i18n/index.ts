@@ -9,6 +9,7 @@ import matching from "./matching";
 import pluginSettings from "./plugin-settings";
 import dsp from "./dsp";
 import localDSP from "./local-dsp";
+import graphicEqualizer from "./graphic-equalizer";
 
 export type Locale = "en" | "zh-CN" | "zh-TW" | "ja";
 export type Language = "browser" | Locale;
@@ -24,6 +25,7 @@ const messages: Record<string, readonly string[]> = {
   ...pluginSettings,
   ...dsp,
   ...localDSP,
+  ...graphicEqualizer,
 };
 const columns: Record<Locale, number> = {
   en: 0,

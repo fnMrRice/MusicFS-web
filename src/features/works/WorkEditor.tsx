@@ -93,6 +93,7 @@ export function WorkEditor({ api, types, work, initialType, close, saved, refres
             {types.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}
           </select>
         </label>
+        {type?.description && <p className="muted">{type.description}</p>}
         <label>{tr("作品标题")}
           <input required maxLength={256} value={data.title} onChange={(event) => update({ title: event.target.value })} />
         </label>

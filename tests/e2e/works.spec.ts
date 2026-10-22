@@ -12,12 +12,12 @@ test.afterAll(async () => {
 });
 
 const types: ContentType[] = [
-  { id: "music", name: "音乐", creditRoles: [{ id: "artist", name: "艺术家" }], externalIdNamespaces: [] },
+  { id: "music", name: "音乐专辑", description: "管理专辑、EP 与单曲发行，可导入 CD 抓轨或数字发行的本地音频及附带资料。", creditRoles: [{ id: "artist", name: "艺术家" }], externalIdNamespaces: [] },
   { id: "asmr", name: "音声作品", creditRoles: [{ id: "circle", name: "社团" }, { id: "voice_actor", name: "声优" }],
     externalIdNamespaces: [{ id: "dlsite", name: "作品编号" }] },
   { id: "spoken", name: "演播作品", creditRoles: [{ id: "reader", name: "朗读者" }],
     externalIdNamespaces: [{ id: "book_number", name: "书籍编号" }] },
-].map((type) => ({ ...type, pluginId: `example.${type.id}`, pluginVersion: "0.1.0", description: "", views: ["work-list", "work-detail"] }));
+].map((type) => ({ ...type, pluginId: `example.${type.id}`, pluginVersion: "0.1.0", description: type.description ?? "", views: ["work-list", "work-detail"] }));
 
 function fixture(id: string, title: string, contentType = "asmr"): Work {
   return { workId: id, title, contentType, description: "雨声中的夜晚。", credits: [{ role: "circle", name: "雨夜社" }],
