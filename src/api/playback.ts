@@ -20,8 +20,12 @@ export class PlaybackApi {
     return validatePlayback(await this.client.request('/playback/sessions', { method: 'POST', body: { sourceTrackId, capabilities, preferences }, idempotencyKey: key, signal }));
   }
   async control(sessionId: string, kind: 'seek' | 'recover', attemptId: string, positionMs: number, key: string, observedError?: ObservedError, signal?: AbortSignal): Promise<Playback> {
+    // 协议接收整数毫秒；浏览器 currentTime 可能包含亚毫秒精度。
+    const integerPositionMs = Math.round(positionMs);
+    if (positionMs < 0 || !Number.isSafeInteger(integerPositionMs))
+      throw new ApiError('INVALID_ARGUMENT', 'Playback position must be finite, nonnegative and safely representable');
     return validatePlayback(await this.client.request(`/playback/sessions/${encodeURIComponent(sessionId)}/${kind}`, {
-      method: 'POST', body: { attemptId, positionMs, ...(observedError ? { observedError } : {}) }, idempotencyKey: key, signal,
+      method: 'POST', body: { attemptId, positionMs: integerPositionMs, ...(observedError ? { observedError } : {}) }, idempotencyKey: key, signal,
     }));
   }
   async close(sessionId: string): Promise<void> {
