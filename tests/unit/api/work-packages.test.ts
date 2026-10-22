@@ -10,9 +10,10 @@ describe("Work package API and directory selection", () => {
     const fetcher = vi.fn().mockResolvedValueOnce(response(previewFixture())).mockResolvedValueOnce(response(packageFixture()));
     const client = new ApiClient(fetcher); client.csrfToken = "csrf";
     const api = new WorkPackagesApi(client, "one");
-    await api.preview({ providerInstanceId: "local", rootId: "root", path: "作品/WAV" });
+    await api.preview({ providerInstanceId: "local", rootId: "root", path: "作品/WAV", kind: "directory" });
     await api.confirm("preview-1", "retry-key");
     expect(fetcher.mock.calls[0][1].headers.get("Idempotency-Key")).toBeNull();
+    expect(JSON.parse(fetcher.mock.calls[0][1].body)).toEqual({ providerInstanceId: "local", rootId: "root", path: "作品/WAV", kind: "directory" });
     expect(fetcher.mock.calls[1][1].headers.get("Idempotency-Key")).toBe("retry-key");
     expect(fetcher.mock.calls[1][1].headers.get("X-CSRF-Token")).toBe("csrf");
     expect(JSON.parse(fetcher.mock.calls[1][1].body)).toEqual({ previewId: "preview-1" });
@@ -22,10 +23,21 @@ describe("Work package API and directory selection", () => {
     const wrong = packageFixture(); wrong.workId = "another";
     const duplicate = packageFixture(); duplicate.nodes.push(duplicate.nodes[0]);
     const cycle = packageFixture(); cycle.nodes.find((node) => node.nodeId === "WAV")!.parentId = "WAV/特典";
-    for (const value of [wrong, duplicate, cycle]) {
+    for (const value of [wrong, duplicate, cycle, { ...packageFixture(), kind: "physical_cd" }, { ...packageFixture(), kind: undefined }]) {
       const api = new WorkPackagesApi(new ApiClient(vi.fn().mockResolvedValue(response({ items: [value] }))), "one");
       await expect(api.list()).rejects.toMatchObject({ code: "INVALID_RESPONSE" });
     }
+  });
+  it("keeps copy kind in previews and omits it from directory browsing", async () => {
+    const fetcher = vi.fn().mockResolvedValueOnce(response({ path: ".", directories: [] }))
+      .mockResolvedValueOnce(response(previewFixture(1, "cd_dump"))).mockResolvedValueOnce(response(previewFixture()));
+    const client = new ApiClient(fetcher); client.csrfToken = "csrf";
+    const api = new WorkPackagesApi(client, "one");
+    const selection = { providerInstanceId: "local", rootId: "root", path: ".", kind: "cd_dump" as const };
+    await api.directories(selection);
+    expect(new URL(fetcher.mock.calls[0][0], "https://example.test").searchParams.has("kind")).toBe(false);
+    expect((await api.preview(selection)).package.kind).toBe("cd_dump");
+    await expect(api.preview(selection)).rejects.toMatchObject({ code: "INVALID_RESPONSE" });
   });
   it("collects recursively in server order and excludes sibling versions and unavailable tracks", () => {
     const children = packageChildren(packageFixture().nodes);

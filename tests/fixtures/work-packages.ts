@@ -1,4 +1,4 @@
-import type { PackageNode, PackagePreview, WorkPackage } from "../../src/api/work-packages";
+import type { PackageKind, PackageNode, PackagePreview, WorkPackage } from "../../src/api/work-packages";
 import { track } from "./dto";
 
 export const packagePNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2WPcAAAAASUVORK5CYII=", "base64");
@@ -13,10 +13,10 @@ const audio = (path: string, available = true) => node(path, "audio", {
   track: available ? { ...track, sourceTrackId: `track-${path}`, displayName: path.split("/").at(-1)!, assetId: `asset-${path}`,
     codec: path.endsWith(".mp3") ? "mp3" : "pcm_s16le", container: path.endsWith(".mp3") ? "mp3" : "wav" } : null,
 });
-export function packageFixture(revision = 1): WorkPackage {
+export function packageFixture(revision = 1, kind: PackageKind = "directory"): WorkPackage {
   return {
     packageId: "package-one", workId: "one", providerInstanceId: "local", rootId: "root", relativePath: "RJ123456 雨夜",
-    name: "RJ123456 雨夜", revision, importedAt: "2026-10-22T00:00:00Z",
+    name: "RJ123456 雨夜", kind, revision, importedAt: "2026-10-22T00:00:00Z",
     nodes: [node(".", "directory"), node("WAV", "directory"), audio("WAV/01.wav"), node("WAV/特典", "directory"),
       audio("WAV/特典/02.wav"), node("MP3", "directory"), audio("MP3/01.mp3"), audio("MP3/失效.mp3", false),
       node("说明.txt", "attachment", { attachmentKind: "text", mime: "text/plain", sizeBytes: 100 }),
@@ -26,8 +26,8 @@ export function packageFixture(revision = 1): WorkPackage {
     ].map((value, order) => ({ ...value, order })),
   };
 }
-export function previewFixture(index = 1): PackagePreview {
-  const value = packageFixture();
+export function previewFixture(index = 1, kind: PackageKind = "directory"): PackagePreview {
+  const value = packageFixture(1, kind);
   return { previewId: `preview-${index}`, workId: "one", expiresAt: "2099-01-01T00:00:00Z",
     package: { ...value, packageId: "", revision: 0, nodes: value.nodes.map((item) => ({ ...item, sourceTrackId: "", assetId: "", track: null })) },
     counts: { directories: 4, audio: 4, attachments: 4 }, warnings: ["请在确认前核对版本目录。"] };

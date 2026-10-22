@@ -2,7 +2,9 @@ import { ApiClient, ApiError } from "./client";
 import type { SourceTrack } from "./types";
 
 export interface PackageSource { providerInstanceId: string; name: string; roots: { id: string; name: string }[] }
+export type PackageKind = "directory" | "cd_dump";
 export interface PackageLocation { providerInstanceId: string; rootId: string; path: string }
+export interface PackageSelection extends PackageLocation { kind: PackageKind }
 export interface PackageDirectories { path: string; directories: { name: string; path: string }[] }
 export interface PackageNode {
   nodeId: string; parentId: string; path: string; name: string;
@@ -11,7 +13,7 @@ export interface PackageNode {
 }
 export interface WorkPackage {
   packageId: string; workId: string; providerInstanceId: string; rootId: string;
-  relativePath: string; name: string; revision: number; importedAt: string; nodes: PackageNode[];
+  relativePath: string; name: string; kind: PackageKind; revision: number; importedAt: string; nodes: PackageNode[];
 }
 export interface PackagePreview {
   previewId: string; workId: string; expiresAt: string; package: WorkPackage;
@@ -20,6 +22,7 @@ export interface PackagePreview {
 const record = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === "object" && !Array.isArray(value);
 const text = (value: unknown): value is string => typeof value === "string";
 const integer = (value: unknown): value is number => typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
+const packageKind = (value: unknown): value is PackageKind => value === "directory" || value === "cd_dump";
 function track(value: unknown): value is SourceTrack {
   return record(value) && text(value.sourceTrackId) && text(value.providerInstanceId) && text(value.displayName) &&
     text(value.availability) && (value.durationMs === null || integer(value.durationMs)) &&
@@ -33,7 +36,7 @@ function node(value: unknown): value is PackageNode {
 }
 function validPackage(value: unknown, workId: string): value is WorkPackage {
   if (!record(value) || !text(value.packageId) || value.workId !== workId || !text(value.providerInstanceId) ||
-    !text(value.rootId) || !text(value.relativePath) || !text(value.name) || !integer(value.revision) ||
+    !text(value.rootId) || !text(value.relativePath) || !text(value.name) || !packageKind(value.kind) || !integer(value.revision) ||
     !text(value.importedAt) || !Array.isArray(value.nodes) || !value.nodes.every(node)) return false;
   const byId = new Map(value.nodes.map((item) => [item.nodeId, item]));
   if (byId.size !== value.nodes.length) return false;
@@ -68,16 +71,16 @@ export class WorkPackagesApi {
     return value.items as PackageSource[];
   }
   async directories(location: PackageLocation, signal?: AbortSignal): Promise<PackageDirectories> {
-    const query = new URLSearchParams({ ...location });
+    const query = new URLSearchParams({ providerInstanceId: location.providerInstanceId, rootId: location.rootId, path: location.path });
     const value = await this.client.request<unknown>(`${this.base}/package-directories?${query}`, { signal });
     if (!record(value) || !text(value.path) || !Array.isArray(value.directories) || !value.directories.every((item) =>
       record(item) && text(item.name) && text(item.path))) throw invalid();
     return value as unknown as PackageDirectories;
   }
-  async preview(location: PackageLocation, signal?: AbortSignal): Promise<PackagePreview> {
-    const value = await this.client.request<unknown>(`${this.base}/package-previews`, { method: "POST", body: location, signal, timeoutMs: 100_000 });
+  async preview(selection: PackageSelection, signal?: AbortSignal): Promise<PackagePreview> {
+    const value = await this.client.request<unknown>(`${this.base}/package-previews`, { method: "POST", body: selection, signal, timeoutMs: 100_000 });
     if (!record(value) || !text(value.previewId) || !value.previewId || value.workId !== this.workId || !text(value.expiresAt) ||
-      !validPackage(value.package, this.workId) || !record(value.counts) || !integer(value.counts.directories) ||
+      !validPackage(value.package, this.workId) || value.package.kind !== selection.kind || !record(value.counts) || !integer(value.counts.directories) ||
       !integer(value.counts.audio) || !integer(value.counts.attachments) || !Array.isArray(value.warnings) || !value.warnings.every(text)) throw invalid();
     return value as unknown as PackagePreview;
   }

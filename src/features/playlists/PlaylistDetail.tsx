@@ -7,7 +7,7 @@ import { Cover, Empty, ErrorNotice, Sentinel } from "../../components/ui";
 import { errorMessage } from "../../api/client";
 import { TrackTable } from "../TrackTable";
 import { PlaylistEditor } from "./PlaylistEditor";
-import { useCatalog } from "../catalog";
+import { resolvePlaylistTracks } from "./playlist-tracks";
 
 export function PlaylistDetail() {
   useLocale();
@@ -99,7 +99,6 @@ function PlaylistTracks({ id, revision }: { id: string; revision: number }) {
   useLocale();
   const s = useServices();
   const [confirmation, setConfirmation] = useState(false);
-  const catalog = useCatalog();
   const pages = usePages(
     `snapshot:${id}:${revision}`,
     async (cursor, signal) => {
@@ -111,24 +110,14 @@ function PlaylistTracks({ id, revision }: { id: string; revision: number }) {
       );
       if (!signal.aborted) setConfirmation(p.needsConfirmation.length > 0);
       return {
-        items: p.items,
+        items: await resolvePlaylistTracks(p.items, (sourceTrackId) => s.libraryApi.track(sourceTrackId, signal), signal),
         cursor: p.nextOffset === null ? null : String(p.nextOffset),
       };
     },
     (e) => e.entryId,
   );
-  const tracks = pages.items.flatMap((e) => {
-    const track = catalog.data?.find(
-      (t) => t.sourceTrackId === e.source.sourceTrackId,
-    );
-    return track ? [track] : [];
-  });
-  const unresolved = pages.items.filter(
-    (e) =>
-      !e.source.sourceTrackId ||
-      (catalog.data &&
-        !catalog.data.some((t) => t.sourceTrackId === e.source.sourceTrackId)),
-  );
+  const tracks = pages.items.flatMap((e) => e.track ? [e.track] : []);
+  const unresolved = pages.items.filter((e) => !e.track);
   return (
     <>
       {confirmation && (
@@ -144,8 +133,7 @@ function PlaylistTracks({ id, revision }: { id: string; revision: number }) {
         </p>
       )}
       <ErrorNotice error={pages.error} retry={pages.retry} />
-      <ErrorNotice error={catalog.error} retry={catalog.reload} />
-      {(pages.loading || catalog.loading) && (
+      {pages.loading && (
         <p className="loading">{tr("正在读取曲目…")}</p>
       )}
       {tracks.length > 0 && (
@@ -156,8 +144,6 @@ function PlaylistTracks({ id, revision }: { id: string; revision: number }) {
             !pages.cursor &&
             !pages.loading &&
             !pages.error &&
-            !catalog.loading &&
-            !catalog.error &&
             !unresolved.length
           }
         />

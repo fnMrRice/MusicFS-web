@@ -41,6 +41,7 @@ interface PreferencesState {
   volume: number;
   mine: boolean;
   playlists: boolean;
+  works: boolean;
   processing: boolean;
   fadeEnabled: boolean;
   fadeDurationMs: number;
@@ -51,6 +52,7 @@ const defaults: PreferencesState = {
   volume: 0.8,
   mine: true,
   playlists: true,
+  works: false,
   processing: false,
   fadeEnabled: false,
   fadeDurationMs: 300,
@@ -105,6 +107,12 @@ export class Services {
   matchingChanged(): void {
     this.libraries.forEach((library) => { void library.refresh(); });
     capabilityResources.invalidate();
+  }
+  invalidateLibraries(): void {
+    this.libraries.forEach((library, provider) => {
+      library.clear();
+      if (library.onChange) void library.select(provider);
+    });
   }
   library(provider: string): LibraryState {
     if (!this.libraries.has(provider))
@@ -195,6 +203,7 @@ export class Services {
           : 0.8,
       mine: saved?.mine !== false,
       playlists: saved?.playlists !== false,
+      works: saved?.works === true,
       processing: saved?.processing === true,
       fadeEnabled: saved?.fadeEnabled === true,
       fadeDurationMs: typeof saved?.fadeDurationMs === "number" && Number.isFinite(saved.fadeDurationMs)

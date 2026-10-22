@@ -1,5 +1,7 @@
-import type { PackageNode } from "../../../api/work-packages";
+import type { PackageKind, PackageNode } from "../../../api/work-packages";
 import type { SourceTrack } from "../../../api/types";
+
+export const packageKindName = (kind: PackageKind) => kind === "cd_dump" ? "CD 抓轨" : "普通目录";
 
 export function packageChildren(nodes: PackageNode[]): Map<string, PackageNode[]> {
   const children = new Map<string, PackageNode[]>();

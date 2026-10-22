@@ -1,9 +1,9 @@
 import type { Page } from "@playwright/test";
-import type { WorkPackage } from "../../src/api/work-packages";
+import type { PackagePreview, PackageSelection, WorkPackage } from "../../src/api/work-packages";
 import { packageFixture, packagePNG, packageText, previewFixture } from "../fixtures/work-packages";
 
 export async function mockPackages(page: Page) {
-  const state = { packages: [] as WorkPackage[], previews: [] as Record<string, string>[], directories: [] as URL[],
+  const state = { packages: [] as WorkPackage[], previews: [] as PackageSelection[], previewReplies: new Map<string, PackagePreview>(), directories: [] as URL[],
     writes: [] as { body: unknown; key: string }[], replies: new Map<string, WorkPackage>(), attachments: [] as string[],
     failure: null as "network" | "gateway" | "invalid" | "conflict" | null, gate: null as Promise<void> | null,
     play: [] as Record<string, unknown>[], failPreview: false };
@@ -23,9 +23,13 @@ export async function mockPackages(page: Page) {
         : selected === "RJ123456 雨夜" ? [{ name: "WAV", path: "RJ123456 雨夜/WAV" }] : [] } });
     }
     if (path.endsWith("/package-previews")) {
-      state.previews.push(request.postDataJSON());
+      const selection = request.postDataJSON() as PackageSelection;
+      state.previews.push(selection);
       if (state.failPreview) { state.failPreview = false; return route.fulfill({ status: 500, json: { error: { code: "TEMPORARY_FAILURE" } } }); }
-      return route.fulfill({ json: previewFixture(state.previews.length) });
+      const preview = previewFixture(state.previews.length, selection.kind);
+      if (state.packages.length) { preview.package.packageId = state.packages[0].packageId; preview.package.revision = state.packages[0].revision; }
+      state.previewReplies.set(preview.previewId, preview);
+      return route.fulfill({ json: preview });
     }
     if (path.endsWith("/packages") && request.method() === "GET") return route.fulfill({ json: { items: state.packages } });
     if (path.endsWith("/packages") && request.method() === "POST") {
@@ -35,7 +39,8 @@ export async function mockPackages(page: Page) {
       const cached = state.replies.get(key); if (cached) return route.fulfill({ json: cached });
       const failure = state.failure; state.failure = null;
       if (failure === "conflict") return route.fulfill({ status: 409, json: { error: { code: "CONFLICT" } } });
-      const value = packageFixture((state.packages[0]?.revision ?? 0) + 1);
+      const preview = state.previewReplies.get(request.postDataJSON().previewId)!;
+      const value = packageFixture((state.packages[0]?.revision ?? 0) + 1, preview.package.kind);
       state.packages = [value]; state.replies.set(key, value);
       if (failure === "network") return route.abort("failed");
       if (failure === "gateway") return route.fulfill({ status: 502, body: "Bad gateway" });

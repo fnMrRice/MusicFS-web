@@ -9,12 +9,12 @@ import { ErrorBoundary } from "../app/ErrorBoundary";
 import { useMusicSources, useSourceName } from "../components/use-source-name";
 import { NicknameEditor } from "../features/profile/NicknameEditor";
 import { ServiceStatus } from "./ServiceStatus";
+import { LibraryNavigation } from "./LibraryNavigation";
+import { workSectionTitle } from "../features/works/navigation";
 
 const links = [
   ["/search", "search", "搜索"],
   ["/recommendations", "home", "推荐"],
-  ["/works", "album", "作品库"],
-  ["/library", "music", "曲目列表"],
   ["/playlists", "folder", "歌单管理"],
 ];
 export function AppShell() {
@@ -96,6 +96,7 @@ export function AppShell() {
     nicknameWasOpen.current = editingNickname;
   }, [editingNickname]);
   const title =
+    workSectionTitle(location.pathname, location.search) ??
     links.find(([path]) => location.pathname === path)?.[2] ??
     (location.pathname === "/settings"
       ? "设置"
@@ -132,7 +133,9 @@ export function AppShell() {
           className={styles.navigation}
           aria-label={tr("主导航")}
         >
-          {links.map(([path, icon, label]) => nav(path, icon, tr(label)))}
+          {links.slice(0, 2).map(([path, icon, label]) => nav(path, icon, tr(label)))}
+          <LibraryNavigation />
+          {links.slice(2).map(([path, icon, label]) => nav(path, icon, tr(label)))}
           <div className={styles.group}>
             <button
               className={styles.groupToggle}

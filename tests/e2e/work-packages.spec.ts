@@ -8,8 +8,8 @@ const origin = "http://127.0.0.1:18187";
 test.beforeAll(async () => { server = await preview({ preview: { host: "127.0.0.1", port: 18187, strictPort: true } }); });
 test.afterAll(async () => { await new Promise<void>((resolve) => server?.httpServer.close(() => resolve())); });
 async function openPreview(page: Page) {
-  await page.getByRole("button", { name: "导入本地作品包", exact: true }).click();
-  const dialog = page.getByRole("dialog", { name: "导入本地作品包", exact: true });
+  await page.getByRole("button", { name: "导入本地副本", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "导入本地副本", exact: true });
   await dialog.getByRole("button", { name: "进入目录 RJ123456 雨夜", exact: true }).click();
   await dialog.getByRole("button", { name: "预览当前目录", exact: true }).click();
   await expect(dialog.getByText("4 个目录 · 4 条音轨 · 4 个附件", { exact: true })).toBeVisible();
@@ -19,8 +19,8 @@ async function openPreview(page: Page) {
 test("package directory selection previews before importing and directory playback stays in its version", async ({ page }, info) => {
   const state = await mockPackages(page);
   await page.goto(`${origin}/#/works/one`);
-  await page.getByRole("button", { name: "导入本地作品包", exact: true }).click();
-  const picker = page.getByRole("dialog", { name: "导入本地作品包", exact: true });
+  await page.getByRole("button", { name: "导入本地副本", exact: true }).click();
+  const picker = page.getByRole("dialog", { name: "导入本地副本", exact: true });
   await picker.getByRole("button", { name: "进入目录 RJ123456 雨夜", exact: true }).click();
   await picker.getByRole("button", { name: "进入目录 WAV", exact: true }).click();
   await expect(picker.getByText("此目录没有子目录，可以直接预览当前目录。", { exact: true })).toBeVisible();
@@ -29,12 +29,12 @@ test("package directory selection previews before importing and directory playba
   await expect(picker.getByText("请在确认前核对版本目录。", { exact: true })).toBeVisible();
   await expect(picker.getByText("02.wav", { exact: true })).toBeVisible();
   expect(state.writes).toHaveLength(0);
-  expect(state.previews).toEqual([{ providerInstanceId: "local", rootId: "root", path: "RJ123456 雨夜" }]);
+  expect(state.previews).toEqual([{ providerInstanceId: "local", rootId: "root", path: "RJ123456 雨夜", kind: "directory" }]);
   expect(state.directories.some((url) => url.searchParams.get("path") === "RJ123456 雨夜/WAV")).toBe(true);
   await picker.getByRole("button", { name: "确认导入", exact: true }).click();
   await expect(picker).toHaveCount(0);
-  await expect(page.getByLabel("选择作品包", { exact: true })).toHaveValue("package-one");
-  await expect(page.getByRole("list", { name: "作品包目录", exact: true })).not.toContainText(/pcm_s16le|audio\/wav|text\/plain|application\//);
+  await expect(page.getByLabel("选择本地副本", { exact: true })).toHaveValue("package-one");
+  await expect(page.getByRole("list", { name: "副本目录", exact: true })).not.toContainText(/pcm_s16le|audio\/wav|text\/plain|application\//);
   await expect(page.getByText("WAV · 00:30", { exact: true })).toHaveCount(2);
   await expect(page.getByRole("button", { name: "播放音轨 失效.mp3", exact: true })).toBeDisabled();
   await page.getByRole("button", { name: "收起目录 WAV", exact: true }).click();
@@ -45,7 +45,7 @@ test("package directory selection previews before importing and directory playba
   await page.screenshot({ path: info.outputPath("work-package-desktop.png"), fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  await page.getByRole("list", { name: "作品包目录", exact: true }).evaluate((element) => element.scrollIntoView({ block: "start" }));
+  await page.getByRole("list", { name: "副本目录", exact: true }).evaluate((element) => element.scrollIntoView({ block: "start" }));
   await page.screenshot({ path: info.outputPath("work-package-mobile.png"), fullPage: true });
   await page.getByRole("button", { name: "播放目录 WAV", exact: true }).click();
   await expect.poll(() => state.play.length).toBe(1);
@@ -85,6 +85,7 @@ test("uncertain committed imports reuse the preview and key and stale previews r
     const before = state.writes.length;
     await dialog.getByRole("button", { name: "确认导入", exact: true }).click();
     await expect(dialog.getByRole("alert")).toContainText("暂时无法确认导入结果");
+    await expect(dialog.getByLabel("副本类型", { exact: true })).toBeDisabled();
     await expect(dialog.getByRole("button", { name: "返回选择目录", exact: true })).toBeDisabled();
     await dialog.getByRole("button", { name: "重试确认导入", exact: true }).click();
     await expect(dialog).toHaveCount(0);
@@ -107,6 +108,43 @@ test("uncertain committed imports reuse the preview and key and stale previews r
   expect(state.writes.at(-1)?.body).not.toEqual(state.writes.at(-2)?.body);
 });
 
+test("CD entry opens once and changing or reimporting copy kind requires a fresh preview", async ({ page }) => {
+  const state = await mockPackages(page);
+  await page.goto(`${origin}/#/works/one?packageKind=cd_dump&import=1`);
+  const dialog = page.getByRole("dialog", { name: "导入本地副本", exact: true });
+  await expect(dialog).toBeVisible();
+  await expect(page).toHaveURL(/#\/works\/one\?packageKind=cd_dump$/);
+  await expect(dialog.getByLabel("副本类型", { exact: true })).toHaveValue("cd_dump");
+  await dialog.getByRole("button", { name: "进入目录 RJ123456 雨夜", exact: true }).click();
+  await dialog.getByRole("button", { name: "预览当前目录", exact: true }).click();
+  await expect(dialog.getByText("副本类型：CD 抓轨", { exact: true })).toBeVisible();
+  await dialog.getByLabel("副本类型", { exact: true }).selectOption("directory");
+  await expect(dialog.getByRole("button", { name: "确认导入", exact: true })).toHaveCount(0);
+  await dialog.getByRole("button", { name: "预览当前目录", exact: true }).click();
+  await expect(dialog.getByText("副本类型：普通目录", { exact: true })).toBeVisible();
+  await dialog.getByRole("button", { name: "确认导入", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  expect(state.previews.map((preview) => preview.kind)).toEqual(["cd_dump", "directory"]);
+  expect(state.writes[0].body).toEqual({ previewId: "preview-2" });
+  expect(state.directories.every((url) => !url.searchParams.has("kind"))).toBe(true);
+  await expect(page.getByRole("button", { name: "导入 CD 抓轨", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "重新导入", exact: true }).click();
+  await expect(dialog.getByLabel("副本类型", { exact: true })).toHaveValue("directory");
+  await expect(dialog.getByText("当前目录：RJ123456 雨夜", { exact: true })).toBeVisible();
+  await dialog.getByLabel("副本类型", { exact: true }).selectOption("cd_dump");
+  await dialog.getByRole("button", { name: "预览当前目录", exact: true }).click();
+  await expect(dialog.getByText("此位置已导入，确认后将更新原副本及其类型。", { exact: true })).toBeVisible();
+  await dialog.getByRole("button", { name: "确认导入", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByLabel("选择本地副本", { exact: true }).locator("option")).toHaveText("CD 抓轨 · RJ123456 雨夜 · RJ123456 雨夜");
+  expect(state.packages).toHaveLength(1);
+  expect(state.packages[0]).toMatchObject({ packageId: "package-one", kind: "cd_dump", revision: 2 });
+  await page.reload();
+  await expect(page.getByRole("button", { name: "导入 CD 抓轨", exact: true })).toBeVisible();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "返回作品库", exact: true })).toHaveAttribute("href", "#/works?packageKind=cd_dump");
+});
+
 test("closing an unknown import refreshes packages and completing after navigation does not change the route", async ({ page }) => {
   const state = await mockPackages(page);
   await page.goto(`${origin}/#/works/one`);
@@ -114,7 +152,7 @@ test("closing an unknown import refreshes packages and completing after navigati
   await first.getByRole("button", { name: "确认导入", exact: true }).click();
   await expect(first.getByRole("alert")).toContainText("暂时无法确认导入结果");
   await first.getByRole("button", { name: "关闭并刷新查看", exact: true }).click();
-  await expect(page.getByLabel("选择作品包", { exact: true })).toHaveValue("package-one");
+  await expect(page.getByLabel("选择本地副本", { exact: true })).toHaveValue("package-one");
   const dialog = await openPreview(page);
   let release!: () => void; state.gate = new Promise<void>((resolve) => { release = resolve; });
   await dialog.getByRole("button", { name: "确认导入", exact: true }).click();

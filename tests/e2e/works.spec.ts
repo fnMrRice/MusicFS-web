@@ -102,7 +102,8 @@ async function mock(page: Page) {
 test("work categories preserve filters across pages and expose readable detail", async ({ page }, info) => {
   const state = await mock(page);
   await page.goto(`${origin}/#/works`);
-  await page.getByRole("group", { name: "作品分类" }).getByRole("button", { name: "音声作品", exact: true }).click();
+  await page.getByRole("button", { name: "展开作品库", exact: true }).click();
+  await page.getByRole("navigation", { name: "主导航" }).getByRole("link", { name: "ASMR", exact: true }).click();
   await expect(page).toHaveURL(/contentType=asmr$/);
   await page.getByLabel("作品关键词", { exact: true }).fill("雨夜");
   await page.getByLabel("标签筛选", { exact: true }).fill("雨声");

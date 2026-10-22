@@ -10,6 +10,7 @@ import pluginSettings from "./plugin-settings";
 import dsp from "./dsp";
 import localDSP from "./local-dsp";
 import graphicEqualizer from "./graphic-equalizer";
+import workNavigation from "./work-navigation";
 
 export type Locale = "en" | "zh-CN" | "zh-TW" | "ja";
 export type Language = "browser" | Locale;
@@ -26,6 +27,7 @@ const messages: Record<string, readonly string[]> = {
   ...dsp,
   ...localDSP,
   ...graphicEqualizer,
+  ...workNavigation,
 };
 const columns: Record<Locale, number> = {
   en: 0,

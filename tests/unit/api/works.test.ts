@@ -12,10 +12,11 @@ describe("Work metadata API", () => {
   it("encodes filters and cursors while omitting empty values", async () => {
     const fetcher = vi.fn().mockResolvedValue(response({ items: [work], nextAfter: null }));
     const api = new WorksApi(new ApiClient(fetcher));
-    await api.list({ contentType: "asmr", q: "声音 & 夜间", tag: "", credit: "朗读者" }, "opaque+/=");
+    await api.list({ contentType: "asmr", packageKind: "cd_dump", q: "声音 & 夜间", tag: "", credit: "朗读者" }, "opaque+/=");
     const url = new URL(fetcher.mock.calls[0][0], "https://example.test");
     expect(url.searchParams.get("q")).toBe("声音 & 夜间");
     expect(url.searchParams.get("credit")).toBe("朗读者");
+    expect(url.searchParams.get("packageKind")).toBe("cd_dump");
     expect(url.searchParams.get("after")).toBe("opaque+/=");
     expect(url.searchParams.has("tag")).toBe(false);
   });

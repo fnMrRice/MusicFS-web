@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { WorksApi } from "../../api/works";
 import { useServices } from "../../app/services";
 import { useResource } from "../../components/query";
@@ -12,6 +12,8 @@ import "./works.css";
 export function WorkDetail() {
   useLocale();
   const { id = "" } = useParams();
+  const [query, setQuery] = useSearchParams();
+  const initialKind = query.get("packageKind") === "cd_dump" ? "cd_dump" : "directory";
   const services = useServices();
   const api = useMemo(() => new WorksApi(services.client), [services]);
   const resource = useResource(`work:${id}`, (signal) => api.get(id, signal));
@@ -20,7 +22,7 @@ export function WorkDetail() {
   const work = resource.data;
   const type = types.data?.find((item) => item.id === work?.contentType);
   return <section className="works-page" aria-label={tr("作品详情")}>
-    <Link className="button" to="/works">{tr("返回作品库")}</Link>
+    <Link className="button" to={initialKind === "cd_dump" ? "/works?packageKind=cd_dump" : "/works"}>{tr("返回作品库")}</Link>
     <ErrorNotice error={resource.error} retry={resource.reload} />
     <ErrorNotice error={types.error} retry={types.reload} />
     {resource.loading && <p role="status">{tr("正在加载…")}</p>}
@@ -54,7 +56,10 @@ export function WorkDetail() {
           </section>
         </div>
       </div>
-      <WorkPackages key={work.workId} workId={work.workId} editable={!!type && !types.loading} />
+      <WorkPackages key={work.workId} workId={work.workId} editable={!!type && !types.loading} initialKind={initialKind}
+        autoImport={query.get("import") === "1"} importOpened={() => {
+          const next = new URLSearchParams(query); next.delete("import"); setQuery(next, { replace: true });
+        }} />
       {editing && type && <WorkEditor api={api} types={types.data ?? []} work={work}
         close={() => setEditing(false)} refresh={resource.reload}
         saved={() => { setEditing(false); resource.reload(); }} />}

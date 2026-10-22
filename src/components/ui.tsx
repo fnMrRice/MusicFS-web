@@ -112,6 +112,14 @@ const paths: Record<string, ReactNode> = {
       <circle cx="12" cy="12" r="1" />
     </>
   ),
+  disc: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <circle cx="12" cy="12" r="2" />
+      <path d="M5.5 10A7 7 0 0 1 10 5.5M14 18.5a7 7 0 0 0 4.5-4.5" />
+    </>
+  ),
+  headphones: <path d="M4 14v-3a8 8 0 0 1 16 0v3M4 12H3v8h4v-8Zm16 0h1v8h-4v-8Z" />,
   lyrics: (
     <>
       <path d="M4 5h16M4 10h10M4 15h16M4 20h10" />

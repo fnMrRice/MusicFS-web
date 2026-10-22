@@ -15,7 +15,7 @@ export function PackageTree({ value, preview = false, attachment }: {
   const [collapsed, setCollapsed] = useState(new Set<string>());
   const [message, setMessage] = useState("");
   function render(parentId: string, depth: number) {
-    return <ul className="package-tree-level" aria-label={depth === 0 ? tr("作品包目录") : undefined}>
+    return <ul className="package-tree-level" aria-label={depth === 0 ? tr("副本目录") : undefined}>
       {(children.get(parentId) ?? []).map((node) => {
         const isDirectory = node.kind === "directory";
         const expanded = !collapsed.has(node.nodeId);

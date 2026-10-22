@@ -1,0 +1,32 @@
+.libraryGroup { margin: 3px 0 6px; }
+.header { display: flex; align-items: center; border-radius: 8px; }
+.header.within { background: var(--accent-soft); color: var(--accent); }
+.header.selected { background: var(--accent); color: white; box-shadow: 0 5px 20px #ff3b5720; }
+.parent { display: flex; align-items: center; gap: 16px; flex: 1; min-width: 0; padding: 13px 0 13px 16px; text-decoration: none; color: inherit; font-size: 15px; }
+.parent span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.parent svg, .child svg { flex-shrink: 0; }
+.toggle { display: grid; place-items: center; flex-shrink: 0; padding: 0; width: 36px; min-height: 44px; background: none; border: 0; color: inherit; }
+.toggle span { display: flex; }
+.collapsed { transform: rotate(-90deg); }
+.parent:hover, .toggle:hover { opacity: .8; }
+.children { margin: 5px 0 8px 25px; padding-left: 8px; border-left: 1px solid var(--line); }
+.children[hidden] { display: none; }
+.child { display: flex; align-items: center; gap: 11px; padding: 11px 12px; margin: 3px 0; border-radius: 7px; min-width: 0; color: var(--muted); font-size: 14px; text-decoration: none; }
+.child span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.child:hover { color: var(--text); background: var(--hover); }
+.child.active { color: var(--accent); background: var(--accent-soft); font-weight: 600; }
+.retry { font-size: 12px; width: 100%; padding: 8px 4px; }
+@media (max-width: 850px) {
+  .parent { gap: 10px; }
+  .children { margin-left: 20px; padding-left: 5px; }
+  .child { gap: 8px; padding: 11px 8px; }
+}
+@media (max-width: 580px) {
+  .header { flex-direction: column; }
+  .parent { flex-direction: column; gap: 3px; width: 100%; padding: 10px 0 3px; font-size: 10px; }
+  .toggle { width: 100%; min-height: 24px; }
+  .children { margin: 4px 0; padding: 0; border-left: 0; }
+  .child { flex-direction: column; gap: 4px; padding: 9px 0; font-size: 10px; text-align: center; }
+  .child span { max-width: 100%; }
+  .retry { font-size: 10px; }
+}

@@ -19,6 +19,12 @@ export class LibraryApi {
   private providerRequest = 0;
   private providerApplied = 0;
   constructor(private client: ApiClient) {}
+  async track(sourceTrackId: string, signal?: AbortSignal): Promise<SourceTrack> {
+    const response = await this.client.request<SourceTrack>(`/source-tracks/${encodeURIComponent(sourceTrackId)}`, { signal });
+    if (!isTrack(response) || response.sourceTrackId !== sourceTrackId)
+      throw new ApiError("INVALID_RESPONSE", "Invalid source track response");
+    return response;
+  }
   clearProviderInstances(): void {
     ++this.providerEpoch;
     this.providerInstances.set([]);

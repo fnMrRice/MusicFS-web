@@ -22,7 +22,7 @@ export function AlbumDetail() {
     <section>
       <ErrorNotice error={album.error} retry={album.reload} />
       <ErrorNotice error={catalog.error} retry={catalog.reload} />
-      {album.data && (
+      {album.data && !catalog.loading && !catalog.error && tracks.length > 0 && (
         <div className="detail-heading">
           <Cover large />
           <div>
@@ -30,7 +30,7 @@ export function AlbumDetail() {
             <h2>{album.data.name}</h2>
             <p className="muted">
               {sourceName(album.data.providerInstanceId)} ·{" "}
-              {tr("{0} 首", { 0: album.data.sourceTrackIds.length })}
+              {tr("{0} 首", { 0: tracks.length })}
             </p>
           </div>
         </div>
@@ -43,8 +43,7 @@ export function AlbumDetail() {
           queryKey={id}
           complete={
             !album.error &&
-            !catalog.error &&
-            tracks.length === album.data?.sourceTrackIds.length
+            !catalog.error
           }
         />
       ) : (

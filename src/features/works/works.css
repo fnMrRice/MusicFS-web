@@ -9,8 +9,6 @@
 .work-card:hover { background: var(--hover); }
 .work-card h3 { margin: 12px 0 8px; overflow-wrap: anywhere; }
 .work-type { font-size: 12px; color: var(--accent); }
-.work-type-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 22px; border-bottom: 1px solid var(--line); padding-bottom: 14px; }
-.work-type-tabs button.active { color: var(--accent); background: var(--accent-soft); border-color: currentColor; }
 .work-card-credits p { margin: 3px 0; display: flex; gap: 9px; overflow-wrap: anywhere; }
 .work-card-credits span { flex-shrink: 0; opacity: .7; }
 .work-excerpt { color: var(--muted); font-size: 13px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }

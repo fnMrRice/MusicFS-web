@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { copyFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
-import type { PackagePreview, WorkPackage } from "../../src/api/work-packages";
+import type { PackageKind, PackagePreview, WorkPackage } from "../../src/api/work-packages";
 import { packagePNG, packageText } from "../fixtures/work-packages";
 import { instanceIds } from "../fixtures/plugins";
 import { startDirectoryServer, type DirectoryTestServer } from "./directory-server";
@@ -23,16 +23,19 @@ async function addRoot(page: Page, server: DirectoryTestServer) {
     return value.items.find((item: { id: string }) => item.id === instanceIds.local)?.availability;
   }).toBe("available");
 }
-async function importPackage(page: Page, workId: string) {
-  await page.getByRole("button", { name: "导入本地作品包", exact: true }).click();
-  const dialog = page.getByRole("dialog", { name: "导入本地作品包", exact: true });
-  await dialog.getByRole("button", { name: "进入目录 RJ123456 雨夜", exact: true }).click();
+async function importPackage(page: Page, workId: string, kind: PackageKind = "directory", reimport = false) {
+  await page.getByRole("button", { name: reimport ? "重新导入" : "导入本地副本", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "导入本地副本", exact: true });
+  if (!reimport) await dialog.getByRole("button", { name: "进入目录 RJ123456 雨夜", exact: true }).click();
+  await dialog.getByLabel("副本类型", { exact: true }).selectOption(kind);
   const [response] = await Promise.all([
     page.waitForResponse((item) => item.url().endsWith(`/works/${workId}/package-previews`)),
     dialog.getByRole("button", { name: "预览当前目录", exact: true }).click(),
   ]);
   expect(response.status(), await response.text()).toBe(200);
   const preview = await response.json() as PackagePreview;
+  expect(response.request().postDataJSON().kind).toBe(kind);
+  expect(preview.package.kind).toBe(kind);
   await expect(dialog.getByText("02.wav", { exact: true })).toBeVisible();
   const [confirmed] = await Promise.all([
     page.waitForResponse((item) => item.url().endsWith(`/works/${workId}/packages`) && item.request().method() === "POST"),
@@ -67,10 +70,13 @@ test("real package import preserves nested tracks and attachment bytes through r
   await page.goto(`${server.origin}/#/works/${workId}`);
   const first = await importPackage(page, workId);
   expect(first.preview.counts).toEqual({ directories: 4, audio: 3, attachments: 3 });
-  expect(first.value).toMatchObject({ workId, revision: 1, relativePath: "RJ123456 雨夜" });
+  expect(first.value).toMatchObject({ workId, kind: "directory", revision: 1, relativePath: "RJ123456 雨夜" });
+  const beforeCD = await page.request.get(`${server.origin}/api/v1/works?packageKind=cd_dump`);
+  expect(beforeCD.status()).toBe(200);
+  expect((await beforeCD.json()).items).toEqual([]);
   expect(first.value.nodes).toHaveLength(10);
   expect(first.value.nodes.filter((node) => node.kind === "audio").every((node) => node.track?.availability === "available" && !!node.sourceTrackId && !!node.assetId)).toBe(true);
-  await expect(page.getByLabel("选择作品包", { exact: true })).toHaveValue(first.value.packageId);
+  await expect(page.getByLabel("选择本地副本", { exact: true })).toHaveValue(first.value.packageId);
   await page.getByRole("button", { name: "目录 WAV 加入队列", exact: true }).click();
   await expect(page.getByRole("status").filter({ hasText: "已将 2 条音轨加入队列。" })).toBeVisible();
   const [playback] = await Promise.all([
@@ -104,14 +110,17 @@ test("real package import preserves nested tracks and attachment bytes through r
   await attachment.getByRole("button", { name: "关闭", exact: true }).click();
   await page.screenshot({ path: info.outputPath("work-package-real-imported.png"), fullPage: true });
 
-  // 修改真实文件后重复导入同一位置，应更新原作品包并刷新附件内容。
+  // 修改真实文件后重复导入同一位置并变更副本类型，应更新原副本而非新建记录。
   const revisedText = `${packageText}\n第二次导入的说明。`;
   writeFileSync(join(packageRoot, "说明.txt"), revisedText);
   copyFileSync(wave, join(packageRoot, "WAV", "03.wav"));
-  const second = await importPackage(page, workId);
+  const second = await importPackage(page, workId, "cd_dump", true);
   expect(second.preview.counts.audio).toBe(4);
-  expect(second.value).toMatchObject({ packageId: first.value.packageId, revision: 2 });
-  await expect(page.getByLabel("选择作品包", { exact: true }).locator("option")).toHaveCount(1);
+  expect(second.value).toMatchObject({ packageId: first.value.packageId, kind: "cd_dump", revision: 2 });
+  const afterCD = await page.request.get(`${server.origin}/api/v1/works?packageKind=cd_dump`);
+  expect(afterCD.status()).toBe(200);
+  expect((await afterCD.json()).items.map((work: { workId: string }) => work.workId)).toEqual([workId]);
+  await expect(page.getByLabel("选择本地副本", { exact: true }).locator("option")).toHaveCount(1);
   await expect(page.getByText("03.wav", { exact: true })).toBeVisible();
   await server.restart();
   await page.reload();
@@ -120,7 +129,7 @@ test("real package import preserves nested tracks and attachment bytes through r
   expect(persisted.status(), await persisted.text()).toBe(200);
   const saved = await persisted.json() as { items: WorkPackage[] };
   expect(saved.items).toHaveLength(1);
-  expect(saved.items[0]).toMatchObject({ packageId: first.value.packageId, revision: 2, workId });
+  expect(saved.items[0]).toMatchObject({ packageId: first.value.packageId, kind: "cd_dump", revision: 2, workId });
   expect(saved.items[0].nodes.find((node) => node.path === "WAV/03.wav")?.track?.availability).toBe("available");
   await page.getByRole("button", { name: "查看附件 说明.txt", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "附件：说明.txt", exact: true }).locator("pre")).toHaveText(revisedText);

@@ -26,7 +26,7 @@ export interface Work extends WorkInput {
   updatedAt: string;
 }
 export interface WorkPage { items: Work[]; nextAfter: string | null }
-export interface WorkFilters { contentType?: string; q?: string; tag?: string; credit?: string }
+export interface WorkFilters { contentType?: string; packageKind?: "directory" | "cd_dump"; q?: string; tag?: string; credit?: string }
 
 function object(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
