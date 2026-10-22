@@ -10,6 +10,12 @@
 .track-version-name { flex: 1; min-width: 160px; overflow-wrap: anywhere; }
 .track-version-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .track-expand { display: inline-flex; gap: 4px; align-items: center; padding: 4px 0; }
+.bulk-merge-options { display: grid; gap: 12px; border: 1px solid var(--line); border-radius: 8px; padding: 16px; min-width: 0; }
+.bulk-merge-options p, .bulk-merge-summary p { margin: 0; }
+.bulk-merge-options .check-label { white-space: normal; }
+.bulk-merge-score { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.bulk-merge-score input { width: 100px; }
+.bulk-merge-summary { display: grid; gap: 8px; margin: 12px 0; }
 @media (max-width: 600px) {
   .matching-pair { grid-template-columns: 1fr; }
   .track-version { gap: 8px; }

@@ -13,10 +13,25 @@ export interface MatchCandidate {
 }
 export interface CandidatePage { items: MatchCandidate[]; revision: number; nextAfter: string | null }
 export interface MatchingMutation { revision: number; operationId: string; recordingId: string | null }
+export interface BulkMergeMutation extends MatchingMutation { mergedGroups: number; mergedSources: number; skippedGroups: number }
+export type BulkMergeMode = "score" | "title_artist";
+export interface MatchingRevision { revision: number; bulkMergeAvailable?: boolean }
 export type MatchingRequest =
+  | { kind: "bulk-merge"; expectedRevision: number; mode: BulkMergeMode; minimumScore?: number }
   | { kind: "links"; expectedRevision: number; sourceTrackIds: string[]; targetRecordingId: string | null }
   | { kind: "unlinks"; expectedRevision: number; sourceTrackId: string }
   | { kind: "exclusions"; expectedRevision: number; leftSourceTrackId: string; rightSourceTrackId: string; excluded: boolean };
+
+export function bulkMergeRequest(mode: BulkMergeMode, revision: number, minimumScore = 80): MatchingRequest {
+  if (mode === "score" && (!Number.isInteger(minimumScore) || minimumScore < 0 || minimumScore > 100))
+    throw new ApiError("INVALID_SCORE", "Minimum score must be an integer between 0 and 100");
+  return { kind: "bulk-merge", expectedRevision: revision, mode, ...(mode === "score" ? { minimumScore } : {}) };
+}
+
+export function isBulkMergeMutation(result: MatchingMutation): result is BulkMergeMutation {
+  const bulk = result as BulkMergeMutation;
+  return [bulk.mergedGroups, bulk.mergedSources, bulk.skippedGroups].every((value) => Number.isSafeInteger(value) && value >= 0);
+}
 
 export function selectedVersions(tracks: SourceTrack[]): SourceTrack[] {
   return [...new Map(tracks.flatMap((track) => track.versions?.length ? track.versions : [track])
@@ -35,7 +50,13 @@ export function mergeRequest(tracks: SourceTrack[], revision: number): MatchingR
 
 export class MatchingApi {
   constructor(private client: ApiClient) {}
-  revision(signal?: AbortSignal) { return this.client.request<{ revision: number }>("/matching/revision", { signal }); }
+  async revision(signal?: AbortSignal): Promise<MatchingRevision> {
+    const result = await this.client.request<MatchingRevision>("/matching/revision", { signal });
+    if (!result || !Number.isSafeInteger(result.revision) || result.revision < 0 ||
+      (result.bulkMergeAvailable !== undefined && typeof result.bulkMergeAvailable !== "boolean"))
+      throw new ApiError("INVALID_RESPONSE", "Invalid matching revision");
+    return result;
+  }
   async candidates(after: string | null, signal?: AbortSignal): Promise<CandidatePage> {
     const query = new URLSearchParams({ limit: "20" });
     if (after) query.set("after", after);
@@ -48,8 +69,12 @@ export class MatchingApi {
       throw new ApiError("INVALID_RESPONSE", "Invalid matching candidates");
     return page;
   }
-  mutate(request: MatchingRequest, key: string, signal?: AbortSignal): Promise<MatchingMutation> {
+  async mutate(request: MatchingRequest, key: string, signal?: AbortSignal): Promise<MatchingMutation> {
     const { kind, ...body } = request;
-    return this.client.request(`/matching/${kind}`, { method: "POST", body, idempotencyKey: key, signal });
+    const result = await this.client.request<MatchingMutation>(`/matching/${kind}`, { method: "POST", body, idempotencyKey: key, signal });
+    if (kind === "bulk-merge" && (!result || !isBulkMergeMutation(result) || !Number.isSafeInteger(result.revision) ||
+      result.revision < 0 || typeof result.operationId !== "string" || !result.operationId || result.recordingId !== null))
+      throw new ApiError("INVALID_RESPONSE", "Invalid bulk merge result");
+    return result;
   }
 }

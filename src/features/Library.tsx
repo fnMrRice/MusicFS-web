@@ -15,6 +15,7 @@ import { scanStatusMessage } from "../library/scan-state";
 import { useSourceName } from "../components/use-source-name";
 import { Candidates } from "./matching/Candidates";
 import { MatchingRecovery } from "./matching/MatchingRecovery";
+import { BulkMergeButton } from "./matching/BulkMerge";
 
 export function Library() {
   useLocale();
@@ -123,6 +124,7 @@ export function Library() {
               {tr("更多筛选")}
             </button>
             <div className="filter-end">
+              {snapshot.matchingRevision !== undefined && <BulkMergeButton />}
               {snapshot.matchingRevision !== undefined && <button onClick={() => setCandidates(true)}>{tr("重复识别")}</button>}
               <input
                 placeholder={tr("搜索当前列表")}

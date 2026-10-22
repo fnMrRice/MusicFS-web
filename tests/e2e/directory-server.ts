@@ -32,7 +32,8 @@ async function freePort(): Promise<number> {
 
 export async function startDirectoryServer(): Promise<DirectoryTestServer> {
   const web = resolve(import.meta.dirname, '../..');
-  const source = resolve(web, '../server');
+  const source = process.env.MUSICFS_E2E_SERVER_SOURCE
+    ? resolve(process.env.MUSICFS_E2E_SERVER_SOURCE) : resolve(web, '../server');
   const runtime = join(web, '.e2e-runtime');
   mkdirSync(runtime, { recursive: true });
   const directory = mkdtempSync(join(runtime, 'directories-'));

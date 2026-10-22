@@ -115,6 +115,8 @@ export function errorMessage(error: unknown): string {
     AUTH_REQUIRED: "登录已失效，请重新登录。",
     PLATFORM_AUTH_REQUIRED: "请先在设置中登录此音乐平台；已保存的账号需要校验登录状态。",
     REVISION_CONFLICT: "内容已发生变化，请刷新后重新编辑。",
+    MATCHING_PENDING: "请先确认上次歌曲关联操作的结果。",
+    IDEMPOTENCY_EXPIRED: "上次操作的确认记录已过期，请刷新曲库检查结果后重新选择。",
     RECOVERY_EXHAUSTED: "自动恢复已用尽，请重新播放。",
     ATTEMPT_CONFLICT: "播放状态已改变，请重新播放。",
     OUTCOME_UNKNOWN: "无法确认上次操作结果，请重新播放。",
