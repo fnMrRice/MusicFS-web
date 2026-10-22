@@ -26,6 +26,7 @@ export function LibraryNavigation() {
   const rank = (id: string) => id === "music" ? 0 : id === "asmr" ? 1 : 2;
   const categories = [...(types.data ?? [])].sort((left, right) => rank(left.id) - rank(right.id));
   const entries = [
+    { href: "/works", icon: "album", label: tr("全部作品"), active: overview },
     { href: "/library", icon: "music", label: tr("曲目列表"), active: isTracks },
     ...categories.map((type) => ({
       href: `/works?contentType=${encodeURIComponent(type.id)}`,
@@ -36,18 +37,18 @@ export function LibraryNavigation() {
     { href: "/works?packageKind=cd_dump", icon: "disc", label: tr("CD 抓轨"), active: cdDump },
   ];
   return <div className={styles.libraryGroup}>
-    <div className={`${styles.header} ${current ? styles.within : ""} ${overview || (current && !expanded) ? styles.selected : ""}`}>
-      <Link to="/works" className={styles.parent} aria-label={tr("作品库")} title={tr("全部作品")}
-        aria-current={overview ? "page" : undefined} onClick={() => setExpanded(true)}>
+    <button type="button" className={`${styles.header} ${current ? styles.within : ""} ${overview || (current && !expanded) ? styles.selected : ""}`}
+      aria-expanded={expanded} aria-controls="work-library-navigation"
+      aria-label={tr(expanded ? "收起作品库" : "展开作品库")}
+      title={tr(expanded ? "收起作品库" : "展开作品库")}
+      onClick={() => setExpanded(!expanded)}>
+      <span className={styles.parent}>
         <Icon name="album" /><span>{tr("作品库")}</span>
-      </Link>
-      <button type="button" className={styles.toggle} aria-expanded={expanded} aria-controls="work-library-navigation"
-        aria-label={tr(expanded ? "收起作品库" : "展开作品库")}
-        title={tr(expanded ? "收起作品库" : "展开作品库")}
-        onClick={() => setExpanded(!expanded)}>
+      </span>
+      <span className={styles.toggle} aria-hidden="true">
         <span className={expanded ? "" : styles.collapsed}><Icon name="chevron" size={16} /></span>
-      </button>
-    </div>
+      </span>
+    </button>
     <div id="work-library-navigation" className={styles.children} hidden={!expanded}>
       {entries.map((entry) => <Link key={entry.href} to={entry.href} className={`${styles.child} ${entry.active ? styles.active : ""}`}
         aria-label={entry.label} aria-current={entry.active ? "page" : undefined} title={entry.label}>

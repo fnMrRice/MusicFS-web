@@ -69,16 +69,27 @@ async function selected(page: Page, name: string | RegExp) {
   await expect(navigation(page).locator('a[aria-current="page"]')).toHaveCount(1);
 }
 
-test("work navigation starts collapsed and restores the last toggle after refresh", async ({ page }, info) => {
+test("the whole library row toggles without navigating and restores its state after refresh", async ({ page }, info) => {
   await mockNavigation(page);
   await page.goto(`${origin}/#/library`);
   await expect(child(page, "ASMR")).toBeHidden();
   await expect(navigation(page).getByRole("button", { name: "展开作品库", exact: true })).toHaveAttribute("aria-expanded", "false");
+  await expect(navigation(page).getByRole("button", { name: "展开作品库", exact: true })).toHaveJSProperty("tagName", "BUTTON");
+  await expect(child(page, "作品库")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "播放 导航测试.wav", exact: true })).toBeVisible();
   await page.screenshot({ path: info.outputPath("default-collapsed.png") });
-  await expand(page);
+  await navigation(page).getByRole("button", { name: "展开作品库", exact: true }).getByText("作品库", { exact: true }).click();
   await expect(child(page, "ASMR")).toBeVisible();
   await expect(child(page, "演播作品")).toBeVisible();
+  await expect(child(page, "全部作品")).toHaveAttribute("href", "#/works");
+  expect(await navigation(page).locator('#work-library-navigation a').evaluateAll((links) =>
+    links.slice(0, 2).map((link) => link.getAttribute("aria-label")))).toEqual(["全部作品", "曲目列表"]);
+  await navigation(page).getByRole("button", { name: "收起作品库", exact: true }).getByText("作品库", { exact: true }).click();
+  await expect(child(page, "ASMR")).toBeHidden();
+  await expect(page).toHaveURL(/#\/library$/);
+  await navigation(page).getByRole("button", { name: "展开作品库", exact: true }).locator("svg").last().click();
+  await expect(child(page, "ASMR")).toBeVisible();
+  await expect(page).toHaveURL(/#\/library$/);
   const collapse = navigation(page).getByRole("button", { name: /收起作品库/ });
   await expect(collapse).toHaveAttribute("aria-expanded", "true");
   await collapse.focus();
@@ -94,15 +105,22 @@ test("work navigation starts collapsed and restores the last toggle after refres
   await page.reload();
   await expect(navigation(page).getByRole("button", { name: /展开作品库/ })).toHaveAttribute("aria-expanded", "false");
   await expect(child(page, "ASMR")).toBeHidden();
-  await child(page, "作品库").click();
+  const collapsedRow = navigation(page).getByRole("button", { name: "展开作品库", exact: true });
+  const rowBounds = await collapsedRow.boundingBox();
+  expect(rowBounds).not.toBeNull();
+  await collapsedRow.click({ position: { x: rowBounds!.width * 0.65, y: rowBounds!.height / 2 } });
+  await expect(child(page, "全部作品")).toBeVisible();
+  await expect(page).toHaveURL(/#\/library$/);
+  await child(page, "全部作品").click();
   await expect(page).toHaveURL(/#\/works$/);
+  await selected(page, "全部作品");
   await expect(page.getByRole("group", { name: "作品分类", exact: true })).toHaveCount(0);
   await navigation(page).getByRole("button", { name: /收起作品库/ }).click();
   const expandButton = navigation(page).getByRole("button", { name: /展开作品库/ });
   await expandButton.focus();
   await page.keyboard.press("Space");
   await expect(child(page, "ASMR")).toBeVisible();
-  await selected(page, "作品库");
+  await selected(page, "全部作品");
 });
 
 test("sidebar categories match query filters and retain future registered content types", async ({ page }, info) => {
@@ -172,7 +190,10 @@ test("work navigation remains reachable at 390 pixels without horizontal overflo
   await page.goto(`${origin}/#/works?contentType=asmr`);
   await expand(page);
   await selected(page, "ASMR");
-  for (const name of ["作品库", "曲目列表", "专辑", "ASMR", /^CD\s?抓轨$/, "演播作品"]) {
+  const toggle = navigation(page).getByRole("button", { name: "收起作品库", exact: true });
+  await toggle.scrollIntoViewIfNeeded();
+  await expect(toggle).toBeInViewport();
+  for (const name of ["全部作品", "曲目列表", "专辑", "ASMR", /^CD\s?抓轨$/, "演播作品"]) {
     const link = child(page, name);
     await link.scrollIntoViewIfNeeded();
     await expect(link).toBeInViewport();

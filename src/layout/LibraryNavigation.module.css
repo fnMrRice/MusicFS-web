@@ -1,5 +1,6 @@
 .libraryGroup { margin: 3px 0 6px; }
-.header { display: flex; align-items: center; border-radius: 8px; }
+.header { display: flex; align-items: center; justify-content: flex-start; gap: 0; width: 100%; padding: 0; border: 0; border-radius: 8px; background: transparent; color: var(--text); text-align: left; }
+.header:hover { background: var(--hover); }
 .header.within { background: var(--accent-soft); color: var(--accent); }
 .header.selected { background: var(--accent); color: white; box-shadow: 0 5px 20px #ff3b5720; }
 .parent { display: flex; align-items: center; gap: 16px; flex: 1; min-width: 0; padding: 13px 0 13px 16px; text-decoration: none; color: inherit; font-size: 15px; }
@@ -8,7 +9,6 @@
 .toggle { display: grid; place-items: center; flex-shrink: 0; padding: 0; width: 36px; min-height: 44px; background: none; border: 0; color: inherit; }
 .toggle span { display: flex; }
 .collapsed { transform: rotate(-90deg); }
-.parent:hover, .toggle:hover { opacity: .8; }
 .children { margin: 5px 0 8px 25px; padding-left: 8px; border-left: 1px solid var(--line); }
 .children[hidden] { display: none; }
 .child { display: flex; align-items: center; gap: 11px; padding: 11px 12px; margin: 3px 0; border-radius: 7px; min-width: 0; color: var(--muted); font-size: 14px; text-decoration: none; }

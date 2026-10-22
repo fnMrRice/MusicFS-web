@@ -29,9 +29,12 @@ test("real work lifecycle persists ASMR metadata and rejects a stale browser edi
   test.setTimeout(180_000);
   server = await startDirectoryServer();
   await login(page, server);
+  const library = page.getByRole("button", { name: /^(展开|收起)作品库$/ });
+  await expect(library).toBeVisible();
+  if (await library.getAttribute("aria-expanded") === "false") await library.click();
   const [typesResponse] = await Promise.all([
     page.waitForResponse((item) => new URL(item.url()).pathname === "/api/v1/content-types"),
-    page.getByRole("link", { name: "作品库", exact: true }).click(),
+    page.getByRole("navigation", { name: "主导航", exact: true }).getByRole("link", { name: "全部作品", exact: true }).click(),
   ]);
   expect(typesResponse.status(), await typesResponse.text()).toBe(200);
   const { items: contentTypes } = await typesResponse.json() as { items: ContentType[] };
@@ -39,7 +42,7 @@ test("real work lifecycle persists ASMR metadata and rejects a stale browser edi
   expect(asmr).toMatchObject({ pluginId: "musicfs.plugin.content.asmr", name: "音声作品" });
   expect(asmr?.creditRoles).toContainEqual({ id: "voice_actor", name: "声优" });
   expect(asmr?.externalIdNamespaces.some((item) => item.id === "dlsite")).toBe(true);
-  await page.getByRole("group", { name: "作品分类" }).getByRole("button", { name: asmr!.name, exact: true }).click();
+  await page.getByRole("navigation", { name: "主导航", exact: true }).getByRole("link", { name: "ASMR", exact: true }).click();
   await page.getByRole("button", { name: "新建作品", exact: true }).click();
   const create = page.getByRole("dialog", { name: "新建作品", exact: true });
   await expect(create.getByLabel("内容类型", { exact: true })).toHaveValue("asmr");

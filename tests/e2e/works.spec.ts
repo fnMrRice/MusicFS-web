@@ -182,7 +182,10 @@ test("finishing a submitted work after leaving does not return to the old editor
   let finishWrite!: () => void;
   state.writeGate = new Promise<void>((resolve) => { finishWrite = resolve; });
   await page.goto(`${origin}/#/library`);
-  await page.getByRole("link", { name: "作品库", exact: true }).click();
+  const library = page.getByRole("button", { name: /^(展开|收起)作品库$/ });
+  await expect(library).toBeVisible();
+  if (await library.getAttribute("aria-expanded") === "false") await library.click();
+  await page.getByRole("navigation", { name: "主导航", exact: true }).getByRole("link", { name: "全部作品", exact: true }).click();
   await page.getByRole("button", { name: "新建作品", exact: true }).click();
   const editor = page.getByRole("dialog", { name: "新建作品", exact: true });
   await editor.getByLabel("作品标题", { exact: true }).fill("后台完成的作品");
