@@ -16,10 +16,10 @@ const plugins = [
   { id: "musicfs.plugin.decoder.channelmix", name: "Audio Channel Conversion", localizedNames: {
     "zh-CN": "音频声道转换",
   }, features: ["audio-dsp"] },
-  { ...scraperPlugin, features: ["lyrics", "artwork"] },
+  scraperPlugin,
   { id: "example.hybrid.radio", name: "Hybrid Radio", localizedNames: {
     "zh-CN": "组合电台", "zh-TW": "複合電臺", ja: "複合ラジオ",
-  }, features: ["music-source", "lyrics"] },
+  }, features: ["music-source", "metadata"] },
   { id: "example.processing", name: "Audio Processing", localizedNames: {}, features: ["audio-processing"] },
   { id: "example.custom", name: "Custom Function", localizedNames: {}, features: ["custom-feature", "constructor", longFeature] },
   { id: "example.unclassified", name: "Unclassified Plugin", localizedNames: {}, features: [] },
@@ -61,7 +61,7 @@ test("plugin list shows purposes and versions with empty type selection displayi
   const card = await openPlugins(page);
   await expect(card.getByRole("heading", { name: "插件列表", exact: true })).toBeVisible();
   const types = card.getByRole("group", { name: "插件类型", exact: true });
-  for (const label of ["音乐源", "音频编解码", "DSP", "歌词", "封面", "音频处理", "custom-feature", "constructor", longFeature, "未分类"]) {
+  for (const label of ["音乐源", "音频编解码", "DSP", "元数据", "音频处理", "custom-feature", "constructor", longFeature, "未分类"]) {
     await expect(types.getByRole("checkbox", { name: label, exact: true })).not.toBeChecked();
   }
   await expect(card.getByRole("searchbox", { name: "按 ID 或名称筛选插件", exact: true })).toHaveValue("");
@@ -69,7 +69,7 @@ test("plugin list shows purposes and versions with empty type selection displayi
   const purposes = [
     [localPlugin.id, ["音乐源"]], [ncmPlugin.id, ["音频编解码"]],
     ["musicfs.plugin.decoder.ffmpeg", ["音频编解码"]], ["musicfs.plugin.decoder.channelmix", ["DSP"]],
-    [scraperPlugin.id, ["歌词", "封面"]], ["example.hybrid.radio", ["音乐源", "歌词"]],
+    [scraperPlugin.id, ["元数据"]], ["example.hybrid.radio", ["音乐源", "元数据"]],
     ["example.processing", ["音频处理"]], ["example.custom", ["custom-feature", "constructor", longFeature]],
     ["example.unclassified", ["未分类"]],
   ] as const;
@@ -84,14 +84,14 @@ test("type filters accept multiple types as alternatives and return to all plugi
   const card = await openPlugins(page);
   const types = card.getByRole("group", { name: "插件类型", exact: true });
   const music = types.getByRole("checkbox", { name: "音乐源", exact: true });
-  const lyrics = types.getByRole("checkbox", { name: "歌词", exact: true });
+  const metadata = types.getByRole("checkbox", { name: "元数据", exact: true });
   await music.check();
   await expectVisiblePlugins(card, [localPlugin.id, "example.hybrid.radio"]);
-  await lyrics.check();
+  await metadata.check();
   await expectVisiblePlugins(card, [localPlugin.id, scraperPlugin.id, "example.hybrid.radio"]);
   await music.uncheck();
   await expectVisiblePlugins(card, [scraperPlugin.id, "example.hybrid.radio"]);
-  await lyrics.uncheck();
+  await metadata.uncheck();
   await expectVisiblePlugins(card, plugins.map(plugin => plugin.id));
 
   const codec = types.getByRole("checkbox", { name: "音频编解码", exact: true });
@@ -162,22 +162,20 @@ test("refresh keeps active filters while updating matching plugin data", async (
   await expect(search).toHaveValue("local");
 });
 
-for (const [locale, group, all, lyrics, artwork, codec, searchLabel, empty] of [
-  ["en", "Plugin types", "All", "Lyrics", "Artwork", "Audio codecs", "Filter plugins by ID or name", "No plugins match these filters."],
-  ["zh-TW", "外掛程式類型", "全部", "歌詞", "封面", "音訊編解碼", "依 ID 或名稱篩選外掛程式", "沒有符合篩選條件的外掛程式。"],
-  ["ja", "プラグインの種類", "すべて", "歌詞", "カバーアート", "音声コーデック", "ID または名前でプラグインを絞り込み", "条件に一致するプラグインはありません。"],
+for (const [locale, group, all, metadata, codec, searchLabel, empty] of [
+  ["en", "Plugin types", "All", "Metadata", "Audio codecs", "Filter plugins by ID or name", "No plugins match these filters."],
+  ["zh-TW", "外掛程式類型", "全部", "中繼資料", "音訊編解碼", "依 ID 或名稱篩選外掛程式", "沒有符合篩選條件的外掛程式。"],
+  ["ja", "プラグインの種類", "すべて", "メタデータ", "音声コーデック", "ID または名前でプラグインを絞り込み", "条件に一致するプラグインはありません。"],
 ] as const) {
   test(`plugin filter controls and purposes follow the ${locale} language preference`, async ({ page }) => {
     await page.addInitScript(language => localStorage.setItem("musicfs:language", language), locale);
     const card = await openPlugins(page);
     const types = card.getByRole("group", { name: group, exact: true });
     await expect(types.getByRole("button", { name: all, exact: true })).toBeVisible();
-    await expect(types.getByRole("checkbox", { name: lyrics, exact: true })).toBeVisible();
-    await expect(types.getByRole("checkbox", { name: artwork, exact: true })).toBeVisible();
+    await expect(types.getByRole("checkbox", { name: metadata, exact: true })).toBeVisible();
     await expect(types.getByRole("checkbox", { name: codec, exact: true })).toBeVisible();
     const purposes = entry(card, scraperPlugin.id).locator(".plugin-purposes");
-    await expect(purposes.getByText(lyrics, { exact: true })).toBeVisible();
-    await expect(purposes.getByText(artwork, { exact: true })).toBeVisible();
+    await expect(purposes.getByText(metadata, { exact: true })).toBeVisible();
     await card.getByRole("searchbox", { name: searchLabel, exact: true }).fill("no-match");
     await expect(card.getByText(empty, { exact: true })).toBeVisible();
   });
@@ -189,7 +187,7 @@ test("plugin filters remain usable without horizontal overflow on narrow screens
   const types = card.getByRole("group", { name: "插件类型", exact: true });
   const search = card.getByRole("searchbox", { name: "按 ID 或名称筛选插件", exact: true });
   await types.getByRole("checkbox", { name: "音乐源", exact: true }).check();
-  await types.getByRole("checkbox", { name: "歌词", exact: true }).check();
+  await types.getByRole("checkbox", { name: "元数据", exact: true }).check();
   await search.fill("hybrid");
   await expectVisiblePlugins(card, ["example.hybrid.radio"]);
   expect(await card.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);

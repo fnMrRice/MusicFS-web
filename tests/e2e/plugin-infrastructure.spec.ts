@@ -45,14 +45,14 @@ function entry(card: Locator, id: string) {
 
 test("builtin algorithms show configuration and purpose without fake instances", async ({ page }) => {
   const items: ManagedPlugin[] = [
-    ["analysis.chromaprint", "音频分析", "audio-analysis", false],
-    ["tags.flac", "标签格式", "tag-format", false],
-    ["matching.standard", "录音匹配", "matching", true],
-    ["transform.thumbnail", "内容变换", "content-transform", true],
-  ].map(([suffix, label, purpose, configured]) => {
+    ["analysis.chromaprint", "音频分析", "audio-analysis", "audio-analysis", false],
+    ["tags.flac", "FLAC 标签", "metadata", "tag-format", false],
+    ["matching.standard", "录音匹配", "matching", "matching", true],
+    ["transform.thumbnail", "封面缩略图", "metadata", "content-transform", true],
+  ].map(([suffix, label, purpose, capability, configured]) => {
     const id = `musicfs.plugin.${suffix}`;
     return { pluginId: id, plugin: { id, name: String(label), localizedNames: {}, features: [String(purpose)] }, version: "0.1.0", supportsMultipleInstances: false,
-      instances: [], stateMutable: false, execution: "builtin", builtin: { configured: Boolean(configured), capabilities: [String(purpose)] } };
+      instances: [], stateMutable: false, execution: "builtin", builtin: { configured: Boolean(configured), capabilities: [String(capability)] } };
   });
   const card = await openPlugins(page, items);
   for (const plugin of items) {
@@ -64,8 +64,9 @@ test("builtin algorithms show configuration and purpose without fake instances",
     await expect(item.getByText("暂无插件实例。", { exact: true })).toHaveCount(0);
     await expect(item.getByRole("button")).toHaveCount(0);
   }
-  await card.getByRole("group", { name: "插件类型", exact: true }).getByRole("checkbox", { name: "内容变换", exact: true }).check();
-  await expect(card.locator(".plugin-entry")).toHaveCount(1);
+  await card.getByRole("group", { name: "插件类型", exact: true }).getByRole("checkbox", { name: "元数据", exact: true }).check();
+  await expect(card.locator(".plugin-entry")).toHaveCount(2);
+  await expect(entry(card, "musicfs.plugin.tags.flac")).toBeVisible();
   await expect(entry(card, "musicfs.plugin.transform.thumbnail")).toBeVisible();
 });
 

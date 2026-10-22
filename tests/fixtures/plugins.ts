@@ -28,5 +28,5 @@ export const ncmPlugin: PluginIdentity = {
 };
 export const scraperPlugin: PluginIdentity = {
   id: "musicfs.scraper.local", name: "Local Metadata",
-  localizedNames: { "zh-CN": "本地元数据提取", "zh-TW": "本地中繼資料擷取" }, features: ["scraper"],
+  localizedNames: { "zh-CN": "本地元数据提取", "zh-TW": "本地中繼資料擷取" }, features: ["metadata"],
 };

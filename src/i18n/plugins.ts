@@ -1,8 +1,7 @@
 export default {
+  "元数据": ["Metadata", "中繼資料", "メタデータ"],
   "音频分析": ["Audio analysis", "音訊分析", "音声分析"],
-  "标签格式": ["Tag formats", "標籤格式", "タグ形式"],
   "录音匹配": ["Recording matching", "錄音匹配", "録音の照合"],
-  "内容变换": ["Content transforms", "內容轉換", "コンテンツ変換"],
   "业务配置": ["Feature configuration", "功能設定", "機能設定"],
   "已配置": ["Configured", "已設定", "設定済み"],
   "内置能力已装配到服务端主进程，按对应业务配置使用；这里不表示依赖工具已就绪或任务正在运行。": [
@@ -14,8 +13,6 @@ export default {
   "用途": ["Purpose", "用途", "用途"],
   "插件类型": ["Plugin types", "外掛程式類型", "プラグインの種類"],
   "全部": ["All", "全部", "すべて"],
-  "歌词": ["Lyrics", "歌詞", "歌詞"],
-  "封面": ["Artwork", "封面", "カバーアート"],
   "音频处理": ["Audio processing", "音訊處理", "音声処理"],
   "音频编解码": ["Audio codecs", "音訊編解碼", "音声コーデック"],
   "DSP": ["DSP", "DSP", "DSP"],
@@ -49,7 +46,6 @@ export default {
   "此 DSP 尚未加入处理链。": ["This DSP is not in the processing chain.", "此 DSP 尚未加入處理鏈。", "この DSP は処理チェーンに追加されていません。"],
   "音频解密": ["Audio decryption", "音訊解密", "音声復号"],
   "音频解码": ["Audio decoding", "音訊解碼", "音声デコード"],
-  "元数据刮削": ["Metadata scraping", "中繼資料擷取", "メタデータ取得"],
   "未分类": ["Uncategorized", "未分類", "未分類"],
   "按 ID 或名称筛选插件": ["Filter plugins by ID or name", "依 ID 或名稱篩選外掛程式", "ID または名前でプラグインを絞り込み"],
   "类型可多选，未选择时显示全部。": ["Select multiple types, or leave all unselected to show every type.", "類型可複選，未選擇時顯示全部。", "種類は複数選択できます。未選択の場合はすべて表示します。"],

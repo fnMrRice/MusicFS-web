@@ -9,15 +9,11 @@ const purposeLabels: Record<string, string> = {
   "audio-processing": "音频处理",
   "audio-dsp": "DSP",
   "audio-analysis": "音频分析",
-  "tag-format": "标签格式",
+  metadata: "元数据",
   matching: "录音匹配",
-  "content-transform": "内容变换",
   database: "数据库",
   "audio-decryption": "音频解密",
-  lyrics: "歌词",
-  artwork: "封面",
   decode: "音频解码",
-  scraper: "元数据刮削",
 };
 
 export function pluginPurposes(plugin: Plugin): string[] {
