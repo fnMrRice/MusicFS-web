@@ -65,7 +65,7 @@ test('NCM FLAC uses browser capabilities to deliver exact FLAC bytes and native 
   expect(descriptor).toMatchObject({ deliveryMode: 'proxy', seekMode: 'byteRange',
     outputProfile: { mime: 'audio/flac', codec: 'flac', bitrateBps: 116162, channels: 2, sampleRate: 48000 } });
   expect(descriptor.effectiveProcessing).toEqual([{ type: 'ncmDecrypt', gainDb: 0, version: '1', execution: 'server' }]);
-  await expect(page.locator('.player-status')).toHaveText('NCM → FLAC · 116.2 kbps · 2 声道');
+  await expect(page.locator('.player-status')).toHaveText('NCM → FLAC · 48 kHz · 116.2 kbps · 2 声道');
   await expect(page.locator('.player-status')).toHaveAttribute('title', /来源码率：116.2 kbps\n发送码率：116.2 kbps/);
   await waitPlaying(page);
   const original = readFileSync(resolve(import.meta.dirname, '../../../server/tests/testdata/audio/lossless.flac'));
@@ -104,7 +104,7 @@ test('unsupported FLAC converts at the nearest MP3 bitrate and timeRestart reach
   expect(descriptor).toMatchObject({ deliveryMode: 'processed', seekMode: 'timeRestart', outputProfile: { mime: 'audio/mpeg', codec: 'mp3' } });
   expect(descriptor.effectiveProcessing).toContainEqual({ type: 'ncmDecrypt', gainDb: 0, version: '1', execution: 'server' });
   expect(descriptor.outputProfile.bitrateBps).toBe(112000);
-  await expect(page.locator('.player-status')).toHaveText('NCM → FLAC → MP3 · 112 kbps · 2 声道');
+  await expect(page.locator('.player-status')).toHaveText('NCM → FLAC → MP3 · 48 kHz · 112 kbps · 2 声道');
   await expect(page.locator('.player-status')).toHaveAttribute('title', /来源码率：116.2 kbps\n发送码率：112 kbps/);
   await waitPlaying(page);
   const [response] = await Promise.all([

@@ -54,7 +54,7 @@ async function setup(page: Page, antiphase = false) {
 
 test('real browser output changes live without replacing the stream or requesting server effects', async ({ page }, info) => {
   const { creates, controls, errors } = await setup(page);
-  await expect(page.locator('.player-status')).toHaveText('WAV → PCM · 码率未知 · 1 声道');
+  await expect(page.locator('.player-status')).toHaveText('WAV → PCM · 采样率未知 · 码率未知 · 1 声道');
   const audio = page.locator('audio');
   const original = await audio.elementHandle();
   const url = await audio.getAttribute('src');
@@ -77,7 +77,7 @@ test('real browser output changes live without replacing the stream or requestin
   await page.getByLabel('选择效果', { exact: true }).selectOption('reverb');
   await page.getByRole('button', { name: '添加效果', exact: true }).click();
   await page.getByRole('button', { name: '暂停', exact: true }).click();
-  await expect(page.locator('.player-status')).toHaveText('WAV → PCM · 码率未知 · 1 声道 · 本地音效');
+  await expect(page.locator('.player-status')).toHaveText('WAV → PCM · 采样率未知 · 码率未知 · 1 声道 · 本地音效');
   await expect.poll(async () => (await outputSignal(page)).rms).toBeLessThan(0.00001);
   await page.getByRole('button', { name: '播放', exact: true }).click();
   await waitPlaying(page);

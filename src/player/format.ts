@@ -23,6 +23,12 @@ function bitrateLabel(value: number | null | undefined): string {
     : tr('码率未知');
 }
 
+function sampleRateLabel(value: number | null | undefined): string {
+  return typeof value === 'number' && Number.isInteger(value) && value > 0
+    ? `${value / 1000} kHz`
+    : tr('采样率未知');
+}
+
 function formatChain(track: SourceTrack, playback: Playback | null): string {
   const stages: string[] = [];
   const container = track.container?.trim().toUpperCase();
@@ -37,14 +43,14 @@ function formatChain(track: SourceTrack, playback: Playback | null): string {
   return stages.join(' → ');
 }
 
-/** 展示源封装、内层编码与服务端交付编码；码率只使用对应阶段的数据。 */
+/** 展示源封装、内层编码与服务端交付编码；采样率和码率使用实际交付数据。 */
 export function playbackFormat(track: SourceTrack, playback: Playback | null): string {
   const chain = formatChain(track, playback);
   if (!playback) return chain;
   const output = playback.outputProfile;
   const channels = channelCount(output);
   const channelLabel = channels === undefined ? tr('声道未知') : tr('{0} 声道', { 0: channels });
-  return `${chain} · ${bitrateLabel(output.bitrateBps)} · ${channelLabel}`;
+  return `${chain} · ${sampleRateLabel(output.sampleRate)} · ${bitrateLabel(output.bitrateBps)} · ${channelLabel}`;
 }
 
 export function playbackFormatTitle(track: SourceTrack, playback: Playback | null): string {
