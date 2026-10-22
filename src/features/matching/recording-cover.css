@@ -1,0 +1,10 @@
+.recording-cover-options { margin: 18px 0; padding: 0; border: 0; min-width: 0; }
+.recording-cover-automatic { display: flex; align-items: center; gap: 9px; margin-bottom: 18px; }
+.recording-cover-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(155px, 1fr)); gap: 14px; }
+.recording-cover-choice { position: relative; display: flex; flex-direction: column; gap: 6px; padding: 10px; border: 1px solid var(--line); border-radius: 12px; cursor: pointer; min-width: 0; }
+.recording-cover-choice.selected { border-color: var(--accent); }
+.recording-cover-choice > input { position: absolute; top: 17px; left: 17px; z-index: 1; }
+.recording-cover-choice strong, .recording-cover-choice span { overflow-wrap: anywhere; }
+.recording-cover-choice small, .recording-cover-choice > span:not(.cover) { color: var(--muted); }
+.recording-cover-choice small.recording-cover-current { color: var(--accent); }
+.recording-cover-choice > .cover { max-width: 240px; }

@@ -241,3 +241,31 @@ test('mock uncertain deletion retries the identical request and only removes the
   expect(requests[0].key).toBeTruthy();
   expect(requests[1]).toEqual(requests[0]);
 });
+
+for (const initial of [true, false, undefined]) {
+  test(`artwork import follows effective settings and stays disabled when saving other options (${initial})`, async ({ page }) => {
+    let saved: { importDefaults: { importArtwork: boolean }; musicRoots: { importDefaults: { importArtwork: boolean } }[] } | null = null;
+    const options = { recursive: true, maxDepth: 0, importLyrics: false, skipHidden: true, respectNoMedia: true, excludePatterns: [],
+      ...(initial === undefined ? {} : { importArtwork: initial }) };
+    await mockApi(page, async route => route.fulfill({ json: directoryPage(null, [rootItem]) }), 'admin', async route => {
+      if (route.request().method() === 'PUT') {
+        saved = route.request().postDataJSON();
+        return route.fulfill({ status: 412, json: { error: { code: 'REVISION_CONFLICT' } } });
+      }
+      return route.fulfill({ json: { revision: 'artwork-revision', roots: [], rootImportDefaultsSupported: true,
+        importOptions: { importDefaults: options, schemaRevision: 'local-import-v6' } } });
+    });
+    const dialog = await openDirectories(page);
+    await dialog.getByText('高级选项', { exact: true }).click();
+    const artwork = dialog.getByRole('checkbox', { name: '导入曲目封面', exact: true });
+    if (initial) await expect(artwork).toBeChecked(); else await expect(artwork).not.toBeChecked();
+    await artwork.uncheck();
+    await dialog.getByRole('checkbox', { name: '递归查找子目录', exact: true }).uncheck();
+    await dialog.getByRole('checkbox', { name: '选择目录 Fixture Music', exact: true }).check();
+    await dialog.getByRole('button', { name: '添加所选目录', exact: true }).click();
+    await expect(dialog.getByRole('alert')).toBeVisible();
+    expect(saved).not.toBeNull();
+    expect(saved!.importDefaults.importArtwork).toBe(initial === true);
+    expect(saved!.musicRoots[0].importDefaults.importArtwork).toBe(false);
+  });
+}

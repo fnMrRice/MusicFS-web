@@ -1,0 +1,12 @@
+.category-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(245px, 1fr)); gap: 12px; margin: 20px 0; }
+.category-card { display: flex; align-items: center; gap: 12px; min-width: 0; padding: 16px; text-align: start; }
+.category-icon { display: flex; flex: 0 0 42px; align-items: center; justify-content: center; color: var(--accent); }
+.category-card-text { display: flex; flex: 1; flex-direction: column; gap: 6px; min-width: 0; }
+.category-card-text strong { overflow-wrap: anywhere; }
+.category-card-text small { color: var(--muted); overflow-wrap: anywhere; }
+.category-breadcrumbs, .category-breadcrumbs > span { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
+.category-breadcrumbs { margin: 20px 0 12px; }
+.category-breadcrumbs button { border: 0; background: transparent; padding: 5px 8px; overflow-wrap: anywhere; }
+.category-breadcrumbs [aria-current] { color: var(--accent); }
+.category-heading { display: flex; flex-wrap: wrap; align-items: baseline; gap: 16px; }
+.category-heading h2 { overflow-wrap: anywhere; }

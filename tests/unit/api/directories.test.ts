@@ -22,7 +22,7 @@ describe("Administrator directory API", () => {
     const client = new ApiClient(fetcher);
     client.csrfToken = "csrf-test";
     const api = new DirectoriesApi(client, instanceIds.local);
-    const importDefaults = { recursive: true, maxDepth: 0, importLyrics: true, excludePatterns: ["private/**"], skipHidden: true, respectNoMedia: true };
+    const importDefaults = { recursive: true, maxDepth: 0, importLyrics: true, importArtwork: true, excludePatterns: ["private/**"], skipHidden: true, respectNoMedia: true };
     const rootOptions = { ...importDefaults, recursive: false, skipHidden: false };
     await api.save([{ id: "old", name: "Existing", importDefaults: rootOptions }, { id: "new", name: "New", path: "/music/new" }], importDefaults, "opaque-revision", "retry-key");
     const [path, options] = (fetcher.mock.calls as unknown as [string, RequestInit][])[0];
@@ -36,5 +36,18 @@ describe("Administrator directory API", () => {
       { id: "old", name: "Existing", importDefaults: rootOptions }, { id: "new", name: "New", path: "/music/new" },
     ], importDefaults });
     expect(fetcher).toHaveBeenCalledOnce();
+  });
+
+  it.each([undefined, false])("keeps omitted or disabled artwork import off while saving other settings (%s)", async (importArtwork) => {
+    const fetcher = vi.fn<typeof fetch>(async () => new Response("{}", { status: 202 }));
+    const api = new DirectoriesApi(new ApiClient(fetcher), instanceIds.local);
+    const options = { recursive: false, maxDepth: 0, importLyrics: false, excludePatterns: [], skipHidden: true, respectNoMedia: true,
+      ...(importArtwork === undefined ? {} : { importArtwork }) };
+    await api.save([{ id: "changed", name: "Edited", importDefaults: options }, { id: "unchanged", name: "Existing" }], options, "revision", "stable-key");
+    const body = JSON.parse(String(fetcher.mock.calls[0][1]?.body));
+    expect(body.importDefaults.importArtwork).toBe(false);
+    expect(body.musicRoots[0].importDefaults.importArtwork).toBe(false);
+    expect(body.musicRoots[1]).toEqual({ id: "unchanged", name: "Existing" });
+    expect(options).not.toHaveProperty("importArtwork", true);
   });
 });

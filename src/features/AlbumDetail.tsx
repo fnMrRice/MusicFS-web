@@ -24,7 +24,7 @@ export function AlbumDetail() {
       <ErrorNotice error={catalog.error} retry={catalog.reload} />
       {album.data && !catalog.loading && !catalog.error && tracks.length > 0 && (
         <div className="detail-heading">
-          <Cover large />
+          <Cover large objectId={album.data.coverObjectId} />
           <div>
             <p className="eyebrow">{tr("来源专辑")}</p>
             <h2>{album.data.name}</h2>

@@ -27,6 +27,7 @@ export default {
   "递归深度": ["Recursion depth", "遞迴深度", "再帰の深さ"],
   "0 表示全部递归": ["0 searches all subfolder levels", "0 表示全部遞迴", "0 はすべての階層を検索"],
   "高级选项": ["Advanced options", "進階選項", "詳細オプション"],
+  "导入曲目封面": ["Import track artwork", "匯入曲目封面", "曲のカバーを取り込む"],
   "包含隐藏文件和目录": ["Include hidden files and folders", "包含隱藏檔案與目錄", "隠しファイルとフォルダーを含める"],
   "遵循 .nomedia 标记": ["Respect .nomedia markers", "遵循 .nomedia 標記", ".nomedia マーカーに従う"],
   "包括以 . 开头的文件、目录和 Windows 隐藏项。": ["Includes files and folders starting with . and Windows hidden items.", "包括以 . 開頭的檔案、目錄和 Windows 隱藏項目。", ". で始まるファイル・フォルダーと Windows の隠し項目を含みます。"],

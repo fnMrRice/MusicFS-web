@@ -6,6 +6,7 @@ import { MediaPanel } from "./MediaPanel";
 import { playbackFormat, playbackFormatTitle } from "./format";
 import type { PlaybackMode } from "./playback-queue";
 import { VolumeControl } from "./VolumeControl";
+import { useTrackCover } from "../components/use-track-cover";
 import { PlayerTime } from "./PlayerTime";
 
 const playbackModes: { mode: PlaybackMode; icon: string; label: string }[] = [
@@ -19,6 +20,7 @@ export function PlayerBar() {
   useLocale();
   const s = useServices();
   const state = useStore(s.playerState);
+  const coverObjectId = useTrackCover(state.track);
   const q = useStore(s.queue);
   const modeIndex = playbackModes.findIndex((option) => option.mode === q.mode);
   const mode = playbackModes[modeIndex];
@@ -108,7 +110,7 @@ export function PlayerBar() {
         }}
       />
       <div className="now-playing">
-        <Cover />
+        <Cover objectId={coverObjectId} />
         <div>
           <strong>
             {state.track?.title || state.track?.displayName || tr("暂无音频")}

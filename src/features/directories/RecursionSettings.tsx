@@ -6,7 +6,7 @@ export function RecursionSettings({ value, disabled, change, advanced }: {
   value: ImportDefaults;
   disabled: boolean;
   change: (recursive: boolean, maxDepth: number) => void;
-  advanced: (options: Pick<ImportDefaults, "skipHidden" | "respectNoMedia">) => void;
+  advanced: (options: Pick<ImportDefaults, "skipHidden" | "respectNoMedia" | "importArtwork">) => void;
 }) {
   const hint = useId();
   const [limited, setLimited] = useState(value.maxDepth > 0);
@@ -43,6 +43,9 @@ export function RecursionSettings({ value, disabled, change, advanced }: {
         onChange={(event) => advanced({ skipHidden: value.skipHidden, respectNoMedia: event.target.checked })} />
         {tr("遵循 .nomedia 标记")}</label>
       <p className="muted">{tr("跳过包含 .nomedia 的目录及其子目录。")}</p>
+      <label className="check-label"><input type="checkbox" checked={value.importArtwork === true}
+        onChange={(event) => advanced({ skipHidden: value.skipHidden, respectNoMedia: value.respectNoMedia, importArtwork: event.target.checked })} />
+        {tr("导入曲目封面")}</label>
     </details>
   </fieldset>;
 }

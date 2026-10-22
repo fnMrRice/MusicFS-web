@@ -12,6 +12,7 @@ export interface Provider {
 export interface SourceTrack {
   sourceTrackId: string; providerInstanceId: string; displayName: string;
   title: string | null; artists: string[] | null; durationMs: number | null;
+  album?: string | null; genre?: string | null; coverObjectId?: string | null;
   codec: string | null; container: string | null; bitrateBps: number | null;
   availability: string; assetId: string | null; recordingId?: string | null;
   asset?: { fileSizeBytes?: number | null } | null;

@@ -112,6 +112,7 @@ export interface Album {
   name: string;
   sourceTrackIds: string[];
   revision: number;
+  coverObjectId?: string | null;
 }
 export interface AfterPage<T> {
   items: T[];

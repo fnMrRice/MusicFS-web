@@ -1,4 +1,5 @@
 import { tr, useLocale, statusText } from "../i18n";
+import { useServices } from "../app/services";
 import {
   useEffect,
   useRef,
@@ -251,11 +252,13 @@ export function Sentinel({
   }, [active]);
   return <div ref={ref} className="sentinel" aria-hidden="true" />;
 }
-export function Cover({ large = false }: { large?: boolean }) {
-  useLocale();
+export function Cover({ large = false, objectId, alt = "" }: { large?: boolean; objectId?: string | null; alt?: string }) {
+  const s = useServices();
+  const [failed, setFailed] = useState<string | null>(null);
   return (
     <span className={`cover ${large ? "large" : ""}`}>
-      <Icon name="music" size={large ? 46 : 22} />
+      {objectId && objectId !== failed ? <img key={objectId} src={s.client.url(`/media/${encodeURIComponent(objectId)}`)} alt={alt}
+        loading="lazy" decoding="async" onError={() => setFailed(objectId)} /> : <Icon name="music" size={large ? 46 : 22} />}
     </span>
   );
 }

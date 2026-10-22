@@ -6,6 +6,7 @@ export interface ImportDefaults {
   recursive: boolean;
   maxDepth: number;
   importLyrics: boolean;
+  importArtwork?: boolean;
   excludePatterns: string[];
   skipHidden: boolean;
   respectNoMedia: boolean;
@@ -94,8 +95,13 @@ export class DirectoriesApi {
     return this.client.request<DirectoryPage>(`${this.path}/directories?${query}`, { signal });
   }
   save(musicRoots: MusicRoot[], importDefaults: ImportDefaults, revision: string, key: string, signal?: AbortSignal) {
+    // 有效配置省略布尔字段表示关闭，完整保存时显式传 false，避免再次套用导入默认值。
+    const options = (value: ImportDefaults) => ({ ...value, importArtwork: value.importArtwork === true });
     return this.client.request<PluginOperation>(`${this.path}/configuration`, {
-      method: "PUT", body: { musicRoots, importDefaults }, ifMatch: revision, idempotencyKey: key, signal,
+      method: "PUT", body: {
+        musicRoots: musicRoots.map((root) => root.importDefaults ? { ...root, importDefaults: options(root.importDefaults) } : root),
+        importDefaults: options(importDefaults),
+      }, ifMatch: revision, idempotencyKey: key, signal,
     });
   }
   operation(id: string, signal?: AbortSignal) {

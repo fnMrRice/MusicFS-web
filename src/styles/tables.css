@@ -184,6 +184,8 @@
   background: radial-gradient(circle at 25% 20%, #465164, #1c2531 75%);
   color: #b3bdcc;
 }
+.cover { overflow: hidden; }
+.cover > img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .format {
   font-size: 11px;
   letter-spacing: 0.6px;

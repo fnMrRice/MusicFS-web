@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import { detectLocale, setLanguage, statusText, tr } from "../../src/i18n";
 import common from "../../src/i18n/common";
 import music from "../../src/i18n/music";
+import categories from "../../src/i18n/categories";
+import recordingCover from "../../src/i18n/recording-cover";
 import notices from "../../src/i18n/notices";
 import { sourceName } from "../../src/components/source-name";
 
@@ -48,7 +50,7 @@ describe("Language selection and messages", () => {
   });
 
   it("has complete translations with matching interpolation parameters", () => {
-    const groups = [common, music, notices];
+    const groups = [common, music, notices, categories, recordingCover];
     const all = groups.flatMap((group) => Object.entries(group));
     expect(new Set(all.map(([key]) => key)).size).toBe(all.length);
     const parameters = (value: string) =>

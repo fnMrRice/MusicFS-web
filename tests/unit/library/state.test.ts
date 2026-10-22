@@ -8,10 +8,13 @@ import { deferred, page } from '../../fixtures/dto';
 describe('Library revision state (Mock pages)', () => {
   it('discards an old page after a new refresh', async () => {
     const old = deferred<TrackPage>(); const fresh = deferred<TrackPage>();
-    const state = new LibraryState(vi.fn().mockReturnValueOnce(old.promise).mockReturnValueOnce(fresh.promise));
+    const received = vi.fn();
+    const state = new LibraryState(vi.fn().mockReturnValueOnce(old.promise).mockReturnValueOnce(fresh.promise), received);
     const first = state.select(instanceIds.local); const second = state.refresh();
     fresh.resolve(page('fresh')); await second; old.resolve(page('old')); await first;
     expect(state.snapshot.items[0].sourceTrackId).toBe('fresh');
+    expect(received).toHaveBeenCalledOnce();
+    expect(received.mock.calls[0][0][0].sourceTrackId).toBe('fresh');
   });
   it('refresh wins against a late load-more and preserves nullable metadata', async () => {
     const more = deferred<TrackPage>();

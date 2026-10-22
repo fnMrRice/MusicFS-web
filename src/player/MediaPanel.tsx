@@ -4,6 +4,7 @@ import { useServices } from "../app/services";
 import type { SourceTrack } from "../api/types";
 import { ErrorNotice } from "../components/ui";
 import { errorMessage } from "../api/client";
+import { useTrackCover } from "../components/use-track-cover";
 interface Binding {
   objectId: string;
   field: string;
@@ -13,6 +14,7 @@ interface Binding {
 export function MediaPanel({ track }: { track: SourceTrack | null }) {
   useLocale();
   const s = useServices();
+  const coverObjectId = useTrackCover(track);
   const [state, setState] = useState({
     lyrics: "",
     artwork: "",
@@ -38,7 +40,7 @@ export function MediaPanel({ track }: { track: SourceTrack | null }) {
         let text = "";
         if (lyrics) {
           const response = await fetch(
-            `/api/v1/media/${encodeURIComponent(lyrics.objectId)}`,
+            s.client.url(`/media/${encodeURIComponent(lyrics.objectId)}`),
             { signal: controller.signal, credentials: "same-origin" },
           );
           if (response.status === 401) s.clear();
@@ -46,7 +48,7 @@ export function MediaPanel({ track }: { track: SourceTrack | null }) {
           text = await response.text();
         }
         if (artwork)
-          url = `/api/v1/media/${encodeURIComponent(artwork.objectId)}`;
+          url = s.client.url(`/media/${encodeURIComponent(artwork.objectId)}`);
         if (!controller.signal.aborted)
           setState({ lyrics: text, artwork: url, loading: false, error: "" });
       } catch (error) {
@@ -61,6 +63,7 @@ export function MediaPanel({ track }: { track: SourceTrack | null }) {
     })();
     return () => controller.abort();
   }, [track?.sourceTrackId, track?.assetId, s]);
+  const artwork = coverObjectId === undefined ? state.artwork : coverObjectId ? s.client.url(`/media/${encodeURIComponent(coverObjectId)}`) : "";
   return (
     <>
       <ErrorNotice error={state.error} />
@@ -68,10 +71,11 @@ export function MediaPanel({ track }: { track: SourceTrack | null }) {
         <p>{tr("正在读取内容…")}</p>
       ) : (
         <>
-          {state.artwork && (
+          {artwork && (
             <img
               className="media-artwork"
-              src={state.artwork}
+              src={artwork}
+              loading="lazy"
               alt={tr("当前曲目封面")}
             />
           )}

@@ -9,6 +9,7 @@ import { AddToPlaylist } from "./playlists/AddToPlaylist";
 import { useSourceName } from "../components/use-source-name";
 import { MergeSongs } from "./matching/MergeSongs";
 import { TrackVersions } from "./matching/TrackVersions";
+import { useTrackCover } from "../components/use-track-cover";
 import "./matching/matching.css";
 
 export function TrackTable({
@@ -253,6 +254,7 @@ function TrackRow({
   useLocale();
   const s = useServices();
   const currentTrack = useStore(s.currentTrack);
+  const coverObjectId = useTrackCover(t);
   const [expanded, setExpanded] = useState(false);
   const versions = t.versions ?? [t];
   const playing = versions.some((version) => version.sourceTrackId === currentTrack);
@@ -284,7 +286,7 @@ function TrackRow({
       </td>
       <td>
         <div className="track-title">
-          <Cover />
+          <Cover objectId={coverObjectId} />
           <div>
             <button
               className="track-play"
@@ -314,7 +316,7 @@ function TrackRow({
         </div>
       </td>
       <td>{t.artists?.join(" / ") || "—"}</td>
-      <td className="muted">—</td>
+      <td>{t.album || "—"}</td>
       <td>{provider}</td>
       <td>
         <span className="format">

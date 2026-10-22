@@ -1,6 +1,8 @@
 import { useSyncExternalStore } from "react";
 import common from "./common";
 import music from "./music";
+import categories from "./categories";
+import recordingCover from "./recording-cover";
 import favorites from "./favorites";
 import notices from "./notices";
 import plugins from "./plugins";
@@ -20,6 +22,8 @@ const storageKey = "musicfs:language";
 const messages: Record<string, readonly string[]> = {
   ...common,
   ...music,
+  ...categories,
+  ...recordingCover,
   ...favorites,
   ...notices,
   ...plugins,

@@ -30,7 +30,7 @@ export class LibraryState {
   private provider = "";
   private emptyPages = 0;
   private consumed = new Set<string>();
-  constructor(private load: PageLoader) {}
+  constructor(private load: PageLoader, private received?: (items: SourceTrack[]) => void) {}
   select(provider: string): Promise<void> {
     if (provider !== this.provider) {
       this.provider = provider;
@@ -123,6 +123,7 @@ export class LibraryState {
         stale: false,
         error: null,
       };
+      this.received?.(page.items);
     } catch (error) {
       if (generation !== this.generation) return;
       const expired =

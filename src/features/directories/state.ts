@@ -66,7 +66,7 @@ export class DirectorySettingsState extends Store<State> {
     if (this.locked || !Number.isInteger(maxDepth) || maxDepth < 0 || maxDepth > 64) return;
     this.patch({ importDefaults: { ...this.value.importDefaults, recursive, maxDepth: recursive ? maxDepth : 0 }, saved: false, error: null });
   }
-  editAdvanced(options: Pick<ImportDefaults, "skipHidden" | "respectNoMedia">) {
+  editAdvanced(options: Pick<ImportDefaults, "skipHidden" | "respectNoMedia" | "importArtwork">) {
     if (!this.locked) this.patch({ importDefaults: { ...this.value.importDefaults, ...options }, saved: false, error: null });
   }
   editRoot(id: string, changes: Partial<Pick<MusicRoot, "name" | "importDefaults">>) {

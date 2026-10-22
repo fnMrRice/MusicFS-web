@@ -1,0 +1,16 @@
+export default {
+  "选择封面": ["Choose artwork", "選擇封面", "カバーを選択"],
+  "从合并歌曲的来源封面中选择；自动模式使用分辨率最高的可用封面。": ["Choose artwork from the merged song’s sources. Automatic mode uses the highest-resolution available image.", "從合併歌曲的來源封面中選擇；自動模式使用解析度最高的可用封面。", "まとめた曲のソースからカバーを選択します。自動モードでは利用可能な画像のうち解像度が最も高いものを使用します。"],
+  "正在读取封面…": ["Loading artwork…", "正在讀取封面…", "カバーを読み込み中…"],
+  "封面选项": ["Artwork options", "封面選項", "カバーの選択肢"],
+  "自动选择最高分辨率": ["Automatically choose the highest resolution", "自動選擇最高解析度", "最高解像度を自動選択"],
+  "原手动封面已不可用，当前使用自动封面。": ["The previous manual artwork is unavailable. Automatic artwork is currently used.", "原手動封面已不可用，目前使用自動封面。", "以前選択したカバーは利用できないため、現在は自動選択のカバーを使用しています。"],
+  "选择 {0} 的封面": ["Choose artwork from {0}", "選擇 {0} 的封面", "{0} のカバーを選択"],
+  "尺寸未知": ["Unknown dimensions", "尺寸未知", "サイズ不明"],
+  "当前封面": ["Current artwork", "目前封面", "現在のカバー"],
+  "暂无可选封面": ["No artwork available", "暫無可選封面", "選択できるカバーがありません"],
+  "封面或来源版本已发生变化，请刷新封面后重新选择。": ["Artwork or source versions have changed. Refresh the artwork and choose again.", "封面或來源版本已發生變化，請重新整理封面後重新選擇。", "カバーまたはソースのバージョンが変更されました。カバーを更新して選び直してください。"],
+  "刷新封面后重新选择": ["Refresh artwork and choose again", "重新整理封面後重新選擇", "カバーを更新して再選択"],
+  "继续确认封面选择": ["Retry artwork selection", "繼續確認封面選擇", "カバーの選択を再確認"],
+  "保存封面": ["Save artwork", "儲存封面", "カバーを保存"],
+} as const;

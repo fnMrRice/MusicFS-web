@@ -1,10 +1,9 @@
 import { tr, useLocale, statusText } from "../i18n";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { useServices } from "../app/services";
-import { useResource, usePages } from "../components/query";
+import { useResource } from "../components/query";
 import {
-  Cover,
   Empty,
   ErrorNotice,
   IconButton,
@@ -16,6 +15,7 @@ import { useSourceName } from "../components/use-source-name";
 import { Candidates } from "./matching/Candidates";
 import { MatchingRecovery } from "./matching/MatchingRecovery";
 import { BulkMergeButton } from "./matching/BulkMerge";
+import { CategoryBrowser, categoryKinds } from "./library/CategoryBrowser";
 
 export function Library() {
   useLocale();
@@ -23,7 +23,8 @@ export function Library() {
   const sourceName = useSourceName();
   const [params, setParams] = useSearchParams();
   const provider = params.get("source") || "all";
-  const category = params.get("category") || "全部曲目";
+  const requestedCategory = params.get("category") || "全部曲目";
+  const category = Object.hasOwn(categoryKinds, requestedCategory) ? requestedCategory : "全部曲目";
   const providers = useResource("providers", (signal) =>
     s.libraryApi.providers(signal),
   );
@@ -41,10 +42,11 @@ export function Library() {
   const [revision, setRevision] = useState(0);
   const [candidates, setCandidates] = useState(false);
   useEffect(() => {
+    if (category !== "全部曲目") return;
     if (!state.snapshot.revision) void state.select(provider);
     else void state.refresh();
     return () => state.cancel();
-  }, [provider, state]);
+  }, [provider, state, category]);
   const refresh = () => {
     setRevision((v) => v + 1);
     providers.reload();
@@ -65,6 +67,8 @@ export function Library() {
             onClick={() => {
               const next = new URLSearchParams(params);
               next.set("category", c);
+              next.delete("categoryId");
+              next.delete("categoryQuery");
               setParams(next);
             }}
           >
@@ -72,17 +76,9 @@ export function Library() {
           </button>
         ))}
       </div>
-      {category === "专辑" ? (
-        <Albums />
-      ) : category !== "全部曲目" ? (
-        <Empty
-          title={tr("{0}分类待支持", { "0": tr(category) })}
-          icon={category === "歌手" ? "user" : "folder"}
-        >
-          {tr("服务端尚未提供完整的{0}分类接口。你仍可浏览全部曲目。", {
-            0: tr(category),
-          })}
-        </Empty>
+      {category !== "全部曲目" ? (
+        <CategoryBrowser kind={categoryKinds[category]} provider={provider} providers={providers.data ?? []}
+          providerError={providers.error} reloadProviders={providers.reload} />
       ) : (
         <>
           <div className="filters">
@@ -188,51 +184,5 @@ export function Library() {
       )}
       {candidates && <Candidates close={() => setCandidates(false)} refresh={refresh} />}
     </section>
-  );
-}
-function Albums() {
-  useLocale();
-  const s = useServices();
-  const sourceName = useSourceName();
-  const pages = usePages(
-    "albums",
-    async (after, signal) => {
-      const p = await s.content.albums(after, signal);
-      return { items: p.items, cursor: p.nextAfter };
-    },
-    (a) => a.sourceAlbumId,
-  );
-  return (
-    <>
-      <div className="cards">
-        {pages.items.map((a) => (
-          <Link
-            className="music-card"
-            key={a.sourceAlbumId}
-            to={`/albums/${encodeURIComponent(a.sourceAlbumId)}`}
-          >
-            <Cover large />
-            <strong>{a.name}</strong>
-            <small>
-              {tr("{0} 首 · {1}", {
-                0: a.sourceTrackIds.length,
-                1: sourceName(a.providerInstanceId),
-              })}
-            </small>
-          </Link>
-        ))}
-      </div>
-      <ErrorNotice error={pages.error} retry={pages.retry} />
-      {pages.loading && <p className="loading">{tr("正在加载…")}</p>}
-      {!pages.loading && !pages.error && !pages.items.length && (
-        <Empty title={tr("暂无专辑")}>
-          {tr("服务端尚未整理可浏览的专辑。")}
-        </Empty>
-      )}
-      <Sentinel
-        active={!!pages.cursor && !pages.loading && !pages.error}
-        load={pages.more}
-      />
-    </>
   );
 }

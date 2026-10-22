@@ -1,0 +1,172 @@
+import { expect, test, type Page, type Route } from "@playwright/test";
+import { preview, type PreviewServer } from "vite";
+import type { RecordingCover } from "../../src/api/recording-cover";
+import type { SourceTrack } from "../../src/api/types";
+import { playback } from "../fixtures/dto";
+import { waitPlaying } from "./helpers";
+
+let server: PreviewServer;
+let origin: string;
+test.beforeAll(async () => {
+  server = await preview({ preview: { host: "127.0.0.1", port: 0 } });
+  const address = server.httpServer.address();
+  if (!address || typeof address === "string") throw new Error("Preview address unavailable");
+  origin = `http://127.0.0.1:${address.port}`;
+});
+test.afterAll(async () => { await new Promise<void>((resolve) => server?.httpServer.close(() => resolve())); });
+
+const tracks: SourceTrack[] = ["Small", "Large", "Legacy"].map((name, index) => ({ sourceTrackId: name, providerInstanceId: index ? "archive" : "local",
+  displayName: `${name}.wav`, title: "Song", artists: ["Artist"], album: "Album", coverObjectId: name.toLowerCase(), recordingId: "recording",
+  durationMs: 30000, codec: "pcm_s16le", container: "wav", bitrateBps: 128000, availability: "available", assetId: name }));
+const initial = (): RecordingCover => ({ recordingId: "recording", revision: 3, coverObjectId: "large", manualObjectId: null,
+  candidates: tracks.map((track, index) => ({ objectId: track.coverObjectId!, sourceTrackId: track.sourceTrackId,
+    providerInstanceId: track.providerInstanceId, width: [600, 1200, 0][index], height: [600, 1200, 0][index] })) });
+function silence(): Buffer {
+  const bytes = 8000 * 30 * 2, data = Buffer.alloc(44 + bytes);
+  data.write("RIFF", 0); data.writeUInt32LE(36 + bytes, 4); data.write("WAVEfmt ", 8);
+  data.writeUInt32LE(16, 16); data.writeUInt16LE(1, 20); data.writeUInt16LE(1, 22);
+  data.writeUInt32LE(8000, 24); data.writeUInt32LE(16000, 28); data.writeUInt16LE(2, 32); data.writeUInt16LE(16, 34);
+  data.write("data", 36); data.writeUInt32LE(bytes, 40); return data;
+}
+async function mockApi(page: Page, special?: (route: Route, state: ReturnType<typeof initial>) => Promise<boolean>, recording = true) {
+  const state = initial();
+  const writes: { body: { expectedRevision: number; objectId: string | null }; key: string | undefined }[] = [];
+  const plays: string[] = [], errors: string[] = [];
+  let reads = 0, pages = 0;
+  const sound = silence();
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.route("**/api/v1/**", async (route) => {
+    const request = route.request(), path = new URL(request.url()).pathname;
+    if (path.endsWith("/recordings/recording/cover")) {
+      if (request.method() === "PUT") {
+        writes.push({ body: request.postDataJSON(), key: request.headers()["idempotency-key"] });
+        expect(request.headers()["x-csrf-token"]).toBe("fixture");
+        if (special && await special(route, state)) return;
+        const body = writes.at(-1)!.body;
+        expect(body.expectedRevision).toBe(state.revision);
+        state.manualObjectId = body.objectId; state.coverObjectId = body.objectId || "large"; state.revision++;
+      } else reads++;
+      await route.fulfill({ json: state }); return;
+    }
+    if (path.includes("/media/")) {
+      await route.fulfill({ contentType: "image/png", body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/lVQAAAAASUVORK5CYII=", "base64") }); return;
+    }
+    if (path.endsWith("/stream")) { await route.fulfill({ contentType: "audio/wav", body: sound }); return; }
+    if (request.method() === "DELETE") { await route.fulfill({ status: 204 }); return; }
+    let json: unknown = { items: [], nextCursor: null, nextAfter: null };
+    if (path.endsWith("/health/ready")) json = { product: "MusicFS", apiVersion: "1", ready: true, instanceId: "recording-covers" };
+    if (path.endsWith("/auth/session")) json = { csrfToken: "fixture", user: { id: "user", role: "admin" } };
+    if (path.endsWith("/provider-instances")) json = { items: [
+      { id: "local", name: "音乐目录", plugin: { id: "local", name: "音乐目录", features: [] }, capabilities: [], availability: "available", roots: [] },
+      { id: "archive", name: "备份来源", plugin: { id: "archive", name: "备份来源", features: [] }, capabilities: [], availability: "available", roots: [] },
+    ] };
+    if (path.endsWith("/source-tracks")) {
+      pages++;
+      json = { items: [{ ...tracks[0], recordingId: recording ? "recording" : null, coverObjectId: state.coverObjectId,
+        versions: tracks }], libraryRevision: `revision-${state.revision}`, matchingRevision: 0, nextCursor: null };
+    }
+    if (path.endsWith("/media-selection")) json = { bindings: [{ objectId: "small", field: "artwork", current: true, state: "available" }] };
+    if (path.endsWith("/playback/sessions") && request.method() === "POST") { plays.push(request.postDataJSON().sourceTrackId); json = playback(); }
+    await route.fulfill({ json });
+  });
+  await page.goto(`${origin}/#/library`);
+  await page.getByRole("button", { name: "展开 Song 的来源版本", exact: true }).click();
+  return { state, writes, plays, errors, reads: () => reads, pages: () => pages };
+}
+async function open(page: Page) {
+  await page.getByRole("button", { name: "选择封面", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "选择封面", exact: true });
+  await expect(dialog.getByRole("radio", { name: "自动选择最高分辨率", exact: true })).toBeVisible();
+  return dialog;
+}
+
+test("manual and automatic artwork stay consistent in library and player without restarting playback", async ({ page }) => {
+  const mock = await mockApi(page);
+  const row = page.locator(".tracks tbody tr").first();
+  await expect(row.locator(".cover img")).toHaveAttribute("src", "/api/v1/media/large");
+  await page.getByRole("button", { name: "播放 Small.wav", exact: true }).click();
+  await waitPlaying(page);
+  await page.getByRole("button", { name: "暂停", exact: true }).click();
+  const stream = await page.locator("audio").getAttribute("src");
+  const player = page.getByRole("region", { name: "播放器", exact: true });
+  const dialog = await open(page);
+  await expect(dialog.getByRole("radio", { name: "自动选择最高分辨率", exact: true })).toBeChecked();
+  await expect(dialog).toContainText("600 × 600"); await expect(dialog).toContainText("1200 × 1200");
+  await expect(dialog).toContainText("尺寸未知"); await expect(dialog).toContainText("备份来源");
+  await dialog.getByRole("radio", { name: "选择 Small.wav 的封面", exact: true }).check();
+  await dialog.getByRole("button", { name: "保存封面", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(row.locator(".cover img")).toHaveAttribute("src", "/api/v1/media/small");
+  await expect(player.locator(".now-playing .cover img")).toHaveAttribute("src", "/api/v1/media/small");
+  await expect.poll(mock.pages).toBeGreaterThan(1);
+  const again = await open(page);
+  await expect(again.getByRole("radio", { name: "选择 Small.wav 的封面", exact: true })).toBeChecked();
+  await expect(again.locator(".recording-cover-choice img")).toHaveCount(3);
+  expect(await again.locator(".recording-cover-choice img").evaluateAll((images) => images.map((image) => image.getAttribute("src")))).toEqual([
+    "/api/v1/media/small", "/api/v1/media/large", "/api/v1/media/legacy",
+  ]);
+  await again.getByRole("radio", { name: "自动选择最高分辨率", exact: true }).check();
+  await again.getByRole("button", { name: "保存封面", exact: true }).click();
+  await expect(player.locator(".now-playing .cover img")).toHaveAttribute("src", "/api/v1/media/large");
+  await player.getByRole("button", { name: "歌词", exact: true }).click();
+  await expect(player.locator(".media-artwork")).toHaveAttribute("src", "/api/v1/media/large");
+  mock.state.coverObjectId = "legacy"; mock.state.revision++;
+  await page.getByRole("button", { name: "刷新列表", exact: true }).click();
+  await expect(row.locator(".cover img")).toHaveAttribute("src", "/api/v1/media/legacy");
+  await expect(player.locator(".now-playing .cover img")).toHaveAttribute("src", "/api/v1/media/legacy");
+  await player.getByRole("button", { name: "歌词", exact: true }).click();
+  await expect(player.locator(".media-artwork")).toHaveAttribute("src", "/api/v1/media/legacy");
+  expect(mock.writes.map((write) => write.body)).toEqual([{ expectedRevision: 3, objectId: "small" }, { expectedRevision: 4, objectId: null }]);
+  expect(mock.plays).toEqual(["Small"]);
+  await expect(page.locator("audio")).toHaveAttribute("src", stream!);
+  expect(mock.errors).toEqual([]);
+});
+
+test("changed candidates require refreshing before another write", async ({ page }) => {
+  let conflict = true;
+  const mock = await mockApi(page, async (route, state) => {
+    if (!conflict) return false;
+    conflict = false; state.revision = 7; state.manualObjectId = "small";
+    state.candidates = state.candidates.filter((candidate) => candidate.objectId !== "small");
+    await route.fulfill({ status: 409, json: { error: { code: "RESOURCE_CHANGED" } } }); return true;
+  });
+  const dialog = await open(page);
+  await dialog.getByRole("radio", { name: "选择 Small.wav 的封面", exact: true }).check();
+  await dialog.getByRole("button", { name: "保存封面", exact: true }).click();
+  await expect(dialog.getByRole("alert")).toContainText("已发生变化");
+  await expect(dialog.getByRole("radio", { name: "自动选择最高分辨率", exact: true })).toBeDisabled();
+  expect(mock.writes).toHaveLength(1);
+  await dialog.getByRole("button", { name: "刷新封面后重新选择", exact: true }).click();
+  await expect(dialog.getByRole("radio", { name: "选择 Small.wav 的封面", exact: true })).toHaveCount(0);
+  await expect(dialog).toContainText("原手动封面已不可用");
+  await dialog.getByRole("radio", { name: "自动选择最高分辨率", exact: true }).check();
+  await dialog.getByRole("button", { name: "保存封面", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  expect(mock.writes[1].body).toEqual({ expectedRevision: 7, objectId: null });
+  expect(mock.writes[1].key).not.toBe(mock.writes[0].key);
+});
+
+test("uncertain saves retain the same idempotency key and choice on mobile", async ({ page }, info) => {
+  let failed = false;
+  const mock = await mockApi(page, async (route) => {
+    if (failed) return false;
+    failed = true; await route.abort("failed"); return true;
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  const dialog = await open(page);
+  await dialog.getByRole("radio", { name: "选择 Small.wav 的封面", exact: true }).check();
+  await dialog.getByRole("button", { name: "保存封面", exact: true }).click();
+  await expect(dialog.getByRole("radio", { name: "自动选择最高分辨率", exact: true })).toBeDisabled();
+  await expect(dialog.getByRole("button", { name: "继续确认封面选择", exact: true })).toBeEnabled();
+  expect(await dialog.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+  await dialog.screenshot({ path: info.outputPath("recording-cover-mobile.png") });
+  await dialog.getByRole("button", { name: "继续确认封面选择", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  expect(mock.writes).toHaveLength(2); expect(mock.writes[0].key).toBeTruthy(); expect(mock.writes[1]).toEqual(mock.writes[0]);
+});
+
+test("source rows without a recording cannot select recording artwork", async ({ page }) => {
+  const mock = await mockApi(page, undefined, false);
+  await expect(page.getByRole("button", { name: "选择封面", exact: true })).toHaveCount(0);
+  expect(mock.reads()).toBe(0); expect(mock.writes).toHaveLength(0);
+});

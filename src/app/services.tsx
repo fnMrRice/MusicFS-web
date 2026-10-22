@@ -32,6 +32,7 @@ import { LocalDSPEngine } from "../player/dsp/engine";
 import { MatchingApi } from "../api/matching";
 import { MatchingDecisions } from "../library/matching-decisions";
 import { volumePreferences } from "./volume-preferences";
+import { RecordingCovers } from "./recording-covers";
 import { FavoritesApi } from "../api/favorites";
 import { FavoritesState } from "../library/favorites";
 
@@ -96,6 +97,7 @@ export class Services {
     (status) => this.audioOutput.reportStatus(status));
   playlists = new Store<Playlist[]>([]);
   queue = new PlaybackQueue();
+  recordingCovers = new RecordingCovers();
   player: PlayerController;
   playerState: Store<PlayerController["state"]>;
   currentTrack = new Store<string | null>(null);
@@ -115,6 +117,13 @@ export class Services {
     this.libraries.forEach((library) => { void library.refresh(); });
     capabilityResources.invalidate();
   }
+  recordingCoverChanged(recordingId: string, objectId: string | null, sourceTrackIds: string[] = []): void {
+    this.recordingCovers.update(recordingId, objectId, this.coverTracks(), sourceTrackIds);
+    this.libraries.forEach((library) => { void library.refresh(); });
+  }
+  private coverTracks(): SourceTrack[] {
+    return this.player.state.track ? [...this.queue.value.items, this.player.state.track] : this.queue.value.items;
+  }
   invalidateLibraries(): void {
     this.libraries.forEach((library, provider) => {
       library.clear();
@@ -127,6 +136,7 @@ export class Services {
         provider,
         new LibraryState((p, cursor, signal) =>
           this.libraryApi.page(p, cursor, signal, true),
+          (items) => this.recordingCovers.reconcile(items, this.coverTracks()),
         ),
       );
     return this.libraries.get(provider)!;
@@ -179,6 +189,7 @@ export class Services {
   }
   inspectAudioOutput(): void { this.dsp.inspectOutput(); }
   private accept(session: AuthSession): void {
+    this.recordingCovers.clear();
     this.player.stop();
     this.queue.forgetSelection();
     this.dsp.dispose();
@@ -293,6 +304,7 @@ export class Services {
   }
   clear(): void {
     this.favorites.clear();
+    this.recordingCovers.clear();
     this.matchingDecisions.clear();
     this.configurationScans.clear();
     this.scans.clear();

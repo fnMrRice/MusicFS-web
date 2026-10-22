@@ -9,6 +9,7 @@ import { useResource } from "../../components/query";
 import { tr, useLocale } from "../../i18n";
 import { useDecision } from "./useDecision";
 import { TrackDetails } from "./TrackDetails";
+import { RecordingCover } from "./RecordingCover";
 
 export function TrackVersions({ tracks, revision, refresh, recordingId, defaultSourceTrackId, manualSourceTrackId, openActions }: {
   tracks: SourceTrack[]; revision?: number; refresh?: () => void;
@@ -21,6 +22,7 @@ export function TrackVersions({ tracks, revision, refresh, recordingId, defaultS
   const sourceName = useSourceName();
   const [unlink, setUnlink] = useState<{ track: SourceTrack; revision?: number } | null>(null);
   const [details, setDetails] = useState<SourceTrack | null>(null);
+  const [cover, setCover] = useState(false);
   const canChooseDefault = !!recordingId && !!refresh;
   const current = useResource(`default-source-revision-${recordingId}-${revision}`, (signal) =>
     revision === undefined && canChooseDefault ? new MatchingApi(services.client).revision(signal) : Promise.resolve({ revision }));
@@ -37,6 +39,7 @@ export function TrackVersions({ tracks, revision, refresh, recordingId, defaultS
   }
   return <div className="track-versions-list" aria-label={tr("来源版本")} aria-busy={decision.busy}>
     <p className="muted track-version-policy">{tr("自动选择可用版本中码率最高的；码率相同时选择较大的文件。手动默认优先。")}</p>
+    {recordingId && <button onClick={() => setCover(true)}>{tr("选择封面")}</button>}
     {tracks.map((track) => <div className="track-version" key={track.sourceTrackId} tabIndex={openActions ? -1 : undefined}
       onContextMenu={openActions ? (event) => {
         event.preventDefault(); event.stopPropagation();
@@ -83,6 +86,8 @@ export function TrackVersions({ tracks, revision, refresh, recordingId, defaultS
     {details && <TrackDetails key={`${details.providerInstanceId}-${details.sourceTrackId}`}
       sourceTrackId={details.sourceTrackId} providerInstanceId={details.providerInstanceId} close={() => setDetails(null)} />}
     {unlink && refresh && <UnlinkSong track={unlink.track} revision={unlink.revision} refresh={refresh} close={() => setUnlink(null)} />}
+    {cover && recordingId && <RecordingCover recordingId={recordingId} tracks={tracks} close={() => setCover(false)}
+      changed={(result) => services.recordingCoverChanged(result.recordingId, result.coverObjectId, result.candidates.map((candidate) => candidate.sourceTrackId))} />}
   </div>;
 }
 
