@@ -13,6 +13,7 @@ import { ServiceStatus } from "./ServiceStatus";
 const links = [
   ["/search", "search", "搜索"],
   ["/recommendations", "home", "推荐"],
+  ["/works", "album", "作品库"],
   ["/library", "music", "曲目列表"],
   ["/playlists", "folder", "歌单管理"],
 ];
@@ -104,13 +105,14 @@ export function AppShell() {
           ? "最近播放"
           : location.pathname.startsWith("/albums")
             ? "专辑"
+            : location.pathname.startsWith("/works/") ? "作品详情"
             : location.pathname.startsWith("/sources/") ? "来源歌单" : "歌单详情");
   const nav = (path: string, icon: string, label: string) => (
     <NavLink
       key={path}
       to={path}
       aria-label={label}
-      end
+      end={path !== "/works"}
       className={({ isActive }) =>
         `${styles.nav} ${isActive ? styles.active : ""}`
       }

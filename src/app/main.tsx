@@ -7,6 +7,8 @@ import { Login } from "./Login";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { AppShell } from "../layout/AppShell";
 import { Library } from "../features/Library";
+import { Works } from "../features/works/Works";
+import { WorkDetail } from "../features/works/WorkDetail";
 import { Search } from "../features/Search";
 import {
   Recommendations,
@@ -51,6 +53,8 @@ function Application() {
     <Routes>
       <Route element={<AppShell />}>
         <Route path="/library" element={<Library />} />
+        <Route path="/works" element={<Works />} />
+        <Route path="/works/:id" element={<WorkDetail />} />
         <Route path="/search" element={<Search />} />
         <Route path="/recommendations" element={<Recommendations />} />
         <Route path="/playlists" element={<Playlists />} />
