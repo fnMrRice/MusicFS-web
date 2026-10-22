@@ -57,7 +57,7 @@ export function Works() {
       <button type="button" onClick={() => { types.reload(); pages.reload(); }}>{tr("刷新列表")}</button>
     </form>
     <ErrorNotice error={types.error} retry={types.reload} />
-    <p className="notice">{tr("当前支持手工管理作品资料，目录导入和音轨关联尚未接入。")}</p>
+    <p className="notice">{tr("进入作品详情可以导入本地作品包，按目录播放音轨并查看附件。")}</p>
     <div className="work-cards">
       {pages.items.map((work) => <Link className="work-card" key={work.workId} to={`/works/${encodeURIComponent(work.workId)}`}>
         <span className="work-type">{availableTypes.find((type) => type.id === work.contentType)?.name ?? work.contentType}</span>

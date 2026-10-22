@@ -52,6 +52,7 @@ async function mock(page: Page) {
       const items = matches.slice(start, start + 1);
       return route.fulfill({ json: { items, nextAfter: start + 1 < matches.length ? items[0].workId : null } });
     }
+    if (path.endsWith("/packages") && method === "GET") return route.fulfill({ json: { items: [] } });
     if (path.startsWith("/works/") && method === "GET") {
       const work = state.works.find((item) => item.workId === decodeURIComponent(path.slice(7)));
       return work ? route.fulfill({ json: work }) : route.fulfill({ status: 404, json: { error: { code: "NOT_FOUND" } } });

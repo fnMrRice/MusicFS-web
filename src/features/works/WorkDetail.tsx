@@ -6,6 +6,7 @@ import { useResource } from "../../components/query";
 import { ErrorNotice } from "../../components/ui";
 import { tr, useLocale } from "../../i18n";
 import { WorkEditor } from "./WorkEditor";
+import { WorkPackages } from "./packages/WorkPackages";
 import "./works.css";
 
 export function WorkDetail() {
@@ -32,7 +33,6 @@ export function WorkDetail() {
         </div>
       </div>
       {!types.loading && !type && <p className="notice">{tr("此作品的内容类型当前不可用，已有资料可以阅读，编辑暂不可用。")}</p>}
-      <p className="notice">{tr("当前支持手工管理作品资料，目录导入和音轨关联尚未接入。")}</p>
       <div className="work-detail-grid">
         <section className="work-panel"><h3>{tr("作品简介")}</h3>
           <p className="work-description">{work.description || tr("尚未填写简介。")}</p>
@@ -54,6 +54,7 @@ export function WorkDetail() {
           </section>
         </div>
       </div>
+      <WorkPackages key={work.workId} workId={work.workId} editable={!!type && !types.loading} />
       {editing && type && <WorkEditor api={api} types={types.data ?? []} work={work}
         close={() => setEditing(false)} refresh={resource.reload}
         saved={() => { setEditing(false); resource.reload(); }} />}
