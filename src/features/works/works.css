@@ -4,6 +4,8 @@
 .work-heading p { margin: 0; }
 .work-filters { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; margin-bottom: 18px; }
 .work-filters label, .work-editor label { display: flex; flex-direction: column; gap: 7px; font-size: 13px; }
+.work-filters > label { margin: 0; }
+.work-filters input, .work-filters > button { min-height: 40px; }
 .work-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(270px, 100%), 1fr)); gap: 16px; }
 .work-card { border: 1px solid var(--line); border-radius: 12px; background: var(--panel); padding: 22px; text-decoration: none; min-width: 0; }
 .work-card:hover { background: var(--hover); }
