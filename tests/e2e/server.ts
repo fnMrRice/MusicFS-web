@@ -12,9 +12,13 @@ export async function startServer(options: { ncm?: boolean } = {}): Promise<Test
   const web = resolve(import.meta.dirname, '../..'); const server = resolve(web, '../server');
   const runtime = join(web, '.e2e-runtime'); mkdirSync(runtime, { recursive: true });
   const directory = mkdtempSync(join(runtime, 'run-')); const suffix = process.platform === 'win32' ? '.exe' : '';
-  const binaries = ['musicfs', 'musicfs-plugin-local', 'musicfs-plugin-audio-ffmpeg'];
-  if (options.ncm) binaries.push('musicfs-plugin-ncm');
-  for (const name of binaries) execFileSync('go', ['build', '-o', join(directory, name + suffix), `./src/app/${name}`], { cwd: server, stdio: 'pipe', windowsHide: true });
+  const binaries = [
+    ['musicfs', './src/app/musicfs'],
+    ['musicfs-plugin-local', './plugins/source/localfiles/cmd/musicfs-plugin-local'],
+    ['musicfs-plugin-audio-ffmpeg', './plugins/decoder/ffmpeg/cmd/musicfs-plugin-audio-ffmpeg'],
+  ];
+  if (options.ncm) binaries.push(['musicfs-plugin-ncm', './plugins/decoder/ncm/cmd/musicfs-plugin-ncm']);
+  for (const [name, packagePath] of binaries) execFileSync('go', ['build', '-o', join(directory, name + suffix), packagePath], { cwd: server, stdio: 'pipe', windowsHide: true });
   const music = join(directory, 'music'); mkdirSync(music);
   const fixtures = join(server, 'tests/testdata/audio');
   for (const name of ['markers.wav', '中文 空格曲目.wav', 'processing.aiff', 'corrupt.wav', 'empty.wav']) copyFileSync(join(fixtures, name), join(music, name));
