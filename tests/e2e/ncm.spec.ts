@@ -34,7 +34,7 @@ test('NCM MP3 decrypts to exact Range bytes and native browser audio without DSP
   const descriptor = await choose(page, 'synthetic-mp3.ncm');
   expect(descriptor).toMatchObject({ deliveryMode: 'proxy', seekMode: 'byteRange', outputProfile: { mime: 'audio/mpeg', codec: 'mp3' } });
   expect(descriptor.effectiveProcessing).toEqual([{ type: 'ncmDecrypt', gainDb: 0, version: '1', execution: 'server' }]);
-  await expect(page.getByRole('region', { name: '播放器', exact: true })).toContainText('服务端解密输出');
+  await expect(page.locator('.player-status')).toContainText('MP3 → MP3');
   await waitPlaying(page);
   const original = readFileSync(resolve(import.meta.dirname, '../../../server/tests/testdata/audio/vbr-untagged.mp3'));
   const head = await page.request.head(`${server.origin}${descriptor.streamUrl}`);
@@ -58,7 +58,7 @@ test('NCM FLAC decrypts before MP3 conversion and timeRestart reaches the real m
   const descriptor = await choose(page, 'synthetic-flac.ncm');
   expect(descriptor).toMatchObject({ deliveryMode: 'processed', seekMode: 'timeRestart', outputProfile: { mime: 'audio/mpeg', codec: 'mp3' } });
   expect(descriptor.effectiveProcessing).toContainEqual({ type: 'ncmDecrypt', gainDb: 0, version: '1', execution: 'server' });
-  await expect(page.getByRole('region', { name: '播放器', exact: true })).toContainText('服务端解密并转码输出');
+  await expect(page.locator('.player-status')).toHaveText('FLAC → MP3 · 2 声道');
   await waitPlaying(page);
   const [response] = await Promise.all([
     page.waitForResponse((response) => response.url().endsWith('/seek') && response.ok()),

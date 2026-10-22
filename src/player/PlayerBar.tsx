@@ -3,19 +3,8 @@ import { useEffect, useState, type CSSProperties } from "react";
 import { useServices, useStore } from "../app/services";
 import { Cover, duration, IconButton } from "../components/ui";
 import { MediaPanel } from "./MediaPanel";
+import { playbackFormat } from "./format";
 
-const phase: Record<string, string> = {
-  idle: "选择一首曲目，开始聆听",
-  resolving: "正在准备播放…",
-  loading: "正在加载…",
-  playing: "正在播放",
-  paused: "已暂停",
-  buffering: "正在缓冲…",
-  seeking: "正在定位…",
-  recovering: "正在恢复…",
-  ended: "播放结束",
-  error: "播放失败",
-};
 export function PlayerBar() {
   useLocale();
   const s = useServices();
@@ -49,17 +38,7 @@ export function PlayerBar() {
   const progress = timelineEnd > timelineStart
     ? (timelinePosition - timelineStart) / (timelineEnd - timelineStart)
     : 0;
-  const decrypted = playback?.effectiveProcessing.some(
-    (p) =>
-      !!p && typeof p === "object" && "type" in p && p.type === "ncmDecrypt",
-  );
-  const output = decrypted
-    ? playback?.deliveryMode === "processed"
-      ? "服务端解密并转码输出"
-      : "服务端解密输出"
-    : playback?.deliveryMode === "processed"
-      ? "服务端格式转换输出"
-      : "原流播放";
+  const format = state.track ? playbackFormat(state.track, playback) : tr("选择一首曲目，开始聆听");
   const localEffects = dsp.supported && !dsp.error && dsp.config.enabled && dsp.config.chain.some((node) => node.enabled);
   const commit = (value: number) => {
     s.player.seek(value);
@@ -104,9 +83,8 @@ export function PlayerBar() {
               ? state.track.artists?.join(" / ") || tr("未知歌手")
               : tr("你的音乐，随时相伴")}
           </small>
-          <small className="player-status">
-            {tr(phase[state.phase])}
-            {playback && ` · ${tr(output)}`}
+          <small className="player-status" title={format}>
+            {format}
             {playback && localEffects && ` · ${tr("本地音效")}`}
           </small>
         </div>
