@@ -69,17 +69,13 @@ function Application() {
         <Route
           path="/favorites"
           element={
-            <Empty title={tr("把喜欢的音乐留在身边")} icon="heart">
-              {tr("收藏接口尚未提供，此页面将在服务端能力就绪后接入。")}
-            </Empty>
+            <Empty title={tr("暂无收藏音乐")} icon="heart" />
           }
         />
         <Route
           path="/recent"
           element={
-            <Empty title={tr("每一次聆听，都值得回味")} icon="clock">
-              {tr("播放历史接口尚未提供，当前不会上传或持久化你的聆听记录。")}
-            </Empty>
+            <Empty title={tr("暂无播放记录")} icon="clock" />
           }
         />
         <Route path="*" element={<Navigate to="/library" replace />} />

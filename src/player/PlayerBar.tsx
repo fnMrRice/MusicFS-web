@@ -38,7 +38,7 @@ export function PlayerBar() {
   const progress = timelineEnd > timelineStart
     ? (timelinePosition - timelineStart) / (timelineEnd - timelineStart)
     : 0;
-  const format = state.track ? playbackFormat(state.track, playback) : tr("选择一首曲目，开始聆听");
+  const format = state.track ? playbackFormat(state.track, playback) : tr("暂无编码信息");
   const localEffects = dsp.supported && !dsp.error && dsp.config.enabled && dsp.config.chain.some((node) => node.enabled);
   const commit = (value: number) => {
     s.player.seek(value);
@@ -76,12 +76,12 @@ export function PlayerBar() {
         <Cover />
         <div>
           <strong>
-            {state.track?.title || state.track?.displayName || tr("尚未播放")}
+            {state.track?.title || state.track?.displayName || tr("暂无音频")}
           </strong>
           <small>
             {state.track
               ? state.track.artists?.join(" / ") || tr("未知歌手")
-              : tr("你的音乐，随时相伴")}
+              : tr("暂无作者")}
           </small>
           <small className="player-status" title={format}>
             {format}

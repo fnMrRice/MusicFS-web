@@ -186,7 +186,7 @@ export function AppShell() {
                 ),
               )
             ) : (
-              <p className={styles.hint}>{tr("把喜欢的音乐放在一起")}</p>
+              <p className={styles.hint}>{tr("歌单列表为空")}</p>
             ))}
           {prefs.playlists && sources.filter((source) => sourcePlaylists[source.id]?.items.length).map((source) => nav(
             `/sources/${encodeURIComponent(source.id)}/playlists`,
