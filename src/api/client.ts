@@ -121,6 +121,9 @@ export function errorMessage(error: unknown): string {
     ATTEMPT_CONFLICT: "播放状态已改变，请重新播放。",
     OUTCOME_UNKNOWN: "无法确认上次操作结果，请重新播放。",
     SOURCE_UNAVAILABLE: "来源暂不可用，请检查音乐目录。",
+    SOURCE_OFFLINE: "此音乐来源暂时离线，请检查来源状态后重试。",
+    SOURCE_TRACK_CHANGED: "来源文件已发生变化，请重新扫描曲库。",
+    NOT_FOUND: "未找到该内容，可能已被移除。",
   };
   const message =
     error.code === "PLATFORM_AUTH_REQUIRED"

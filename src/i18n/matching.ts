@@ -1,4 +1,12 @@
 export default {
+  "此音乐来源暂时离线，请检查来源状态后重试。": ["This music source is offline. Check its status and try again.", "此音樂來源暫時離線，請檢查來源狀態後重試。", "この音楽ソースはオフラインです。状態を確認して再試行してください。"],
+  "来源文件已发生变化，请重新扫描曲库。": ["The source file has changed. Scan the library again.", "來源檔案已發生變更，請重新掃描曲庫。", "ソースファイルが変更されました。ライブラリを再スキャンしてください。"],
+  "未找到该内容，可能已被移除。": ["This content could not be found. It may have been removed.", "找不到該內容，可能已被移除。", "コンテンツが見つかりません。削除された可能性があります。"],
+  "详情": ["Details", "詳情", "詳細"],
+  "查看 {0} 的详情": ["View details for {0}", "查看 {0} 的詳情", "{0} の詳細を表示"],
+  "来源版本详情": ["Source version details", "來源版本詳情", "ソースの詳細"],
+  "详细信息由此来源插件提供。": ["Details are provided by this source plugin.", "詳細資訊由此來源外掛程式提供。", "詳細情報はこのソースのプラグインから提供されます。"],
+  "此来源插件暂未提供详细信息。": ["This source plugin has not provided any details.", "此來源外掛程式暫未提供詳細資訊。", "このソースのプラグインから詳細情報が提供されていません。"],
   "一键合并重复音乐": ["Merge all duplicates", "一鍵合併重複音樂", "重複する曲を一括でまとめる"],
   "重新检查一键合并功能": ["Retry checking bulk merge availability", "重新檢查一鍵合併功能", "一括処理の対応状況を再確認"],
   "上次操作的确认记录已过期，请刷新曲库检查结果后重新选择。": ["The previous operation's confirmation record has expired. Refresh the library, check the result, and select again.", "上次操作的確認記錄已過期，請重新整理曲庫檢查結果後重新選擇。", "前回の操作の確認記録が期限切れです。ライブラリを更新して結果を確認し、選び直してください。"],

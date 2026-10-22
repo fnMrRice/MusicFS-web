@@ -1,0 +1,11 @@
+.track-details { min-width: 0; overflow-wrap: anywhere; }
+.track-details-title { font-size: 1.15rem; margin: 20px 0; }
+.track-detail-section { border-top: 1px solid var(--line); padding: 14px 0 4px; }
+.track-detail-section h4 { margin: 0 0 12px; }
+.track-detail-section dl { display: grid; gap: 12px; margin: 0; }
+.track-detail-field { display: grid; grid-template-columns: minmax(100px, 1fr) minmax(0, 3fr); gap: 16px; }
+.track-detail-field dt { color: var(--muted); }
+.track-detail-field dd { min-width: 0; margin: 0; white-space: pre-wrap; }
+@media (max-width: 600px) {
+  .track-detail-field { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+}

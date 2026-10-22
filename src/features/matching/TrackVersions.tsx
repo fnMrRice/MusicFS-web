@@ -8,6 +8,7 @@ import { Modal } from "../../components/Modal";
 import { useResource } from "../../components/query";
 import { tr, useLocale } from "../../i18n";
 import { useDecision } from "./useDecision";
+import { TrackDetails } from "./TrackDetails";
 
 export function TrackVersions({ tracks, revision, refresh }: {
   tracks: SourceTrack[]; revision?: number; refresh?: () => void;
@@ -17,6 +18,7 @@ export function TrackVersions({ tracks, revision, refresh }: {
   const matchingPending = useStore(services.matchingDecisions.pending);
   const sourceName = useSourceName();
   const [unlink, setUnlink] = useState<{ track: SourceTrack; revision?: number } | null>(null);
+  const [details, setDetails] = useState<SourceTrack | null>(null);
   return <div className="track-versions-list" aria-label={tr("来源版本")}>
     {tracks.map((track) => <div className="track-version" key={track.sourceTrackId}>
       <span className="track-version-name">{track.displayName}</span>
@@ -24,11 +26,14 @@ export function TrackVersions({ tracks, revision, refresh }: {
       <span className="format">{(track.container || track.codec)?.toUpperCase() || "—"}</span>
       <span>{duration(track.durationMs)}</span>
       <div className="track-version-actions">
+        <button onClick={() => setDetails(track)} aria-label={tr("查看 {0} 的详情", { 0: track.displayName })}>{tr("详情")}</button>
         <button disabled={track.availability !== "available"} onClick={() => services.play(track)}
           aria-label={tr("播放来源版本 {0}", { 0: track.displayName })}><Icon name="play" size={14} /> {tr("播放")}</button>
         {refresh && <button disabled={matchingPending.length > 0} onClick={() => setUnlink({ track, revision })} aria-label={tr("解除 {0} 的关联", { 0: track.displayName })}>{tr("解除关联")}</button>}
       </div>
     </div>)}
+    {details && <TrackDetails key={`${details.providerInstanceId}-${details.sourceTrackId}`}
+      sourceTrackId={details.sourceTrackId} providerInstanceId={details.providerInstanceId} close={() => setDetails(null)} />}
     {unlink && refresh && <UnlinkSong track={unlink.track} revision={unlink.revision} refresh={refresh} close={() => setUnlink(null)} />}
   </div>;
 }
