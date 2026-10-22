@@ -8,7 +8,9 @@ function session(value: AuthSession): AuthSession {
 }
 export class AuthApi {
   constructor(private client: ApiClient) {}
-  async ready(): Promise<Ready> { return this.client.request('/health/ready'); }
+  async ready(signal?: AbortSignal, timeoutMs?: number): Promise<Ready> {
+    return this.client.request('/health/ready', { signal, timeoutMs });
+  }
   async restore(): Promise<AuthSession> {
     const value = session(await this.client.request<AuthSession>('/auth/session'));
     this.client.csrfToken = value.csrfToken; return value;

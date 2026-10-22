@@ -8,6 +8,7 @@ import styles from "./Shell.module.css";
 import { ErrorBoundary } from "../app/ErrorBoundary";
 import { useMusicSources, useSourceName } from "../components/use-source-name";
 import { NicknameEditor } from "../features/profile/NicknameEditor";
+import { ServiceStatus } from "./ServiceStatus";
 
 const links = [
   ["/search", "search", "搜索"],
@@ -204,8 +205,8 @@ export function AppShell() {
             }
           />
           <h1>{tr(title)}</h1>
-          <span className={styles.connection}>{tr("已连接")}</span>
           <div className={styles.tools}>
+            <ServiceStatus />
             <IconButton
               icon="settings"
               label={tr("设置")}

@@ -40,6 +40,13 @@ const paths: Record<string, ReactNode> = {
       <circle cx="12" cy="12" r="3" />
     </>
   ),
+  server: (
+    <>
+      <rect x="3" y="3" width="18" height="7" rx="2" />
+      <rect x="3" y="14" width="18" height="7" rx="2" />
+      <path d="M7 6.5h.01M7 17.5h.01M11 6.5h6M11 17.5h6" />
+    </>
+  ),
   theme: <path d="m8 3-5 3-2 5 5 2v8h12v-8l5-2-2-5-5-3c0 5-8 5-8 0Z" />,
   back: <path d="m15 4-8 8 8 8" />,
   next: (
