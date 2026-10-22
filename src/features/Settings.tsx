@@ -5,11 +5,13 @@ import { useServices, useStore } from "../app/services";
 import { LanguageSelect } from "../i18n/LanguageSelect";
 import { MusicSources } from "./MusicSources";
 import { PluginStatus } from "./PluginStatus";
+import { DSPSettings } from "./dsp/DSPSettings";
 
 const tabs = [
   { id: "sources", label: "音乐源" },
   { id: "plugins", label: "插件管理" },
   { id: "playback", label: "播放配置" },
+  { id: "dsp", label: "DSP 配置" },
   { id: "other", label: "其他配置" },
 ] as const;
 type SettingsTab = (typeof tabs)[number]["id"];
@@ -95,6 +97,7 @@ export function Settings() {
                 </div>
             )}
             {tab.id === "playback" && <PlaybackSettings />}
+            {tab.id === "dsp" && <DSPSettings />}
             {tab.id === "other" && <OtherSettings />}
           </>}
         </div>

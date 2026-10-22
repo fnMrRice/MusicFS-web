@@ -7,6 +7,7 @@ import directories from "./directories";
 import scans from "./scans";
 import matching from "./matching";
 import pluginSettings from "./plugin-settings";
+import dsp from "./dsp";
 
 export type Locale = "en" | "zh-CN" | "zh-TW" | "ja";
 export type Language = "browser" | Locale;
@@ -20,6 +21,7 @@ const messages: Record<string, readonly string[]> = {
   ...scans,
   ...matching,
   ...pluginSettings,
+  ...dsp,
 };
 const columns: Record<Locale, number> = {
   en: 0,

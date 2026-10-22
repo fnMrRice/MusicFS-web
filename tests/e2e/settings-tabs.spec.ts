@@ -4,7 +4,7 @@ import { preview, type PreviewServer } from "vite";
 
 let server: PreviewServer;
 const origin = "http://127.0.0.1:18145";
-const tabNames = ["音乐源", "插件管理", "播放配置", "其他配置"];
+const tabNames = ["音乐源", "插件管理", "播放配置", "DSP 配置", "其他配置"];
 const processingLabel = "服务端处理（降低 6 dB，下一首生效）";
 const local = {
   id: instanceIds.local, name: "Fixture library", availability: "available", capabilities: [],
