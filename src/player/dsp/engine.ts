@@ -1,6 +1,8 @@
 import { LocalDSPGraph } from './graph';
 import { normalizeLocalDSP } from './model';
 import type { LocalDSPConfig } from './model';
+import { AudioOutputController } from './output-controller';
+import type { AudioOutputConfig, AudioOutputStatus } from './output';
 
 export interface LocalDSPAttachment {
   resume(): Promise<void>;
@@ -29,11 +31,17 @@ export class LocalDSPEngine {
   private error: string | null = null;
   private graphError: string | null = null;
   private resumeError: string | null = null;
+  private outputError: string | null = null;
   private cancelResumes = new Set<() => void>();
   private autoVolume = false;
+  private readonly output: AudioOutputController;
 
-  constructor(config: LocalDSPConfig, private readonly onError?: (message: string | null) => void) {
+  constructor(config: LocalDSPConfig, private readonly onError?: (message: string | null) => void, onOutputStatus?: (status: AudioOutputStatus) => void) {
     this.config = normalizeLocalDSP(config);
+    this.output = new AudioOutputController(LocalDSPEngine.supported, onOutputStatus, (failed) => {
+      this.outputError = failed ? '本地音频输出更新失败，请重新播放。' : null;
+      this.report(this.graphError ?? this.outputError ?? this.resumeError);
+    });
   }
 
   static supported(): boolean { return typeof audioContextConstructor() === 'function'; }
@@ -46,7 +54,7 @@ export class LocalDSPEngine {
 
   private reportGraph(message: string | null): void {
     this.graphError = message;
-    this.report(this.graphError ?? this.resumeError);
+    this.report(this.graphError ?? this.outputError ?? this.resumeError);
   }
 
   private ensureContext(): AudioContext | undefined {
@@ -57,6 +65,7 @@ export class LocalDSPEngine {
       return undefined;
     }
     this.context = new Context();
+    this.output.bind(this.context);
     return this.context;
   }
 
@@ -73,6 +82,15 @@ export class LocalDSPEngine {
   setAutoVolume(enabled: boolean): void {
     this.autoVolume = enabled;
     for (const attachment of this.attachments.values()) attachment.graph.setAutoVolume(enabled);
+  }
+
+  setOutput(config: AudioOutputConfig): void {
+    this.output.setConfig(config);
+  }
+
+  inspectOutput(): AudioOutputStatus {
+    try { this.ensureContext(); } catch { /* 探测失败时仍可使用原生音频播放。 */ }
+    return this.output.inspect();
   }
 
   // 必须在点击处理函数中同步发起 resume，不能等播放接口返回后才解锁。
@@ -108,12 +126,12 @@ export class LocalDSPEngine {
       if (context.state !== 'running') throw new DOMException('Audio context requires a user gesture', 'NotAllowedError');
       if (this.context === context) {
         this.resumeError = null;
-        this.report(this.graphError);
+        this.report(this.graphError ?? this.outputError);
       }
     } catch (error) {
       if (this.context === context) {
         this.resumeError = '本地音频处理尚未启动，请点击播放重试。';
-        this.report(this.graphError ?? this.resumeError);
+        this.report(this.graphError ?? this.outputError ?? this.resumeError);
       }
       throw error;
     }
@@ -128,11 +146,9 @@ export class LocalDSPEngine {
       context = this.ensureContext();
       if (context) {
         const count = Number.isInteger(channels) && channels >= 1 && channels <= 8 ? channels : 2;
-        const maximum = context.destination.maxChannelCount;
-        const desired = Math.min(maximum, Math.max(2, count));
-        if (desired > context.destination.channelCount) context.destination.channelCount = desired;
         graph = new LocalDSPGraph(context, this.config, count);
         graph.setAutoVolume(this.autoVolume);
+        this.output.add(graph);
         source = this.sources.get(audio) ?? context.createMediaElementSource(audio);
         this.sources.set(audio, source);
         source.connect(graph.input);
@@ -172,15 +188,18 @@ export class LocalDSPEngine {
             try {
               replacement = new LocalDSPGraph(attachedContext, this.config, count);
               replacement.setAutoVolume(this.autoVolume);
+              this.output.add(replacement);
               replacement.setVolume(volume);
               if (paused || started) replacement.setPaused(paused);
               attachedSource.disconnect();
               attachedSource.connect(replacement.input);
               attachedGraph.dispose();
+              this.output.remove(attachedGraph);
               attachedGraph = replacement;
               attachment.graph = replacement;
               this.reportGraph(null);
             } catch {
+              if (replacement) this.output.remove(replacement);
               replacement?.dispose();
               attachedSource.disconnect();
               attachedSource.connect(attachedGraph.input);
@@ -221,6 +240,7 @@ export class LocalDSPEngine {
             attachedSource.disconnect();
             attachedGraph.dispose();
             this.attachments.delete(audio);
+            this.output.remove(attachedGraph);
           },
         };
         this.attachments.set(audio, attachment);
@@ -228,6 +248,7 @@ export class LocalDSPEngine {
         return attachment;
       }
     } catch {
+      if (graph) this.output.remove(graph);
       graph?.dispose();
       if (source) {
         source.disconnect();
@@ -253,11 +274,13 @@ export class LocalDSPEngine {
     for (const attachment of [...this.attachments.values()]) attachment.detach();
     const context = this.context;
     this.context = undefined;
+    this.output.dispose();
     this.sources = new WeakMap();
     for (const cancel of this.cancelResumes) cancel();
     this.cancelResumes.clear();
     this.graphError = null;
     this.resumeError = null;
+    this.outputError = null;
     this.report(null);
     if (context && context.state !== 'closed') void context.close().catch(() => {});
   }

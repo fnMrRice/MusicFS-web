@@ -31,7 +31,7 @@ class Node {
   getFloatTimeDomainData = vi.fn((data: Float32Array) => { data.fill(0); });
   constructor(readonly category: string) {}
   connect = vi.fn((node: Node) => { this.connections.add(node); return node; });
-  disconnect = vi.fn(() => { this.connections.clear(); });
+  disconnect = vi.fn((node?: Node) => { if (node) this.connections.delete(node); else this.connections.clear(); });
 }
 
 class Context {
@@ -104,6 +104,61 @@ describe('Local DSP settings validation', () => {
 });
 
 describe('Local DSP audio graph (mock lifecycle; real rendering covered separately)', () => {
+  it('changes output live while preserving source, effects, balance gain, final mute and transition', async () => {
+    vi.useFakeTimers();
+    const status = vi.fn(); const engine = new LocalDSPEngine(configuration('equalizer'), undefined, status);
+    engine.setOutput({ layout: '7.1', expandStereo: true });
+    expect(Context.instances).toHaveLength(0);
+    expect(engine.inspectOutput()).toMatchObject({ maxChannels: 8, sourceChannels: null, outputChannels: null });
+    const context = Context.instances[0]; expect(context.destination.channelCount).toBe(2);
+    const attached = engine.attach(media());
+    engine.setAutoVolume(true); await attached.resume();
+    const source = context.nodes.find((node) => node.category === 'source')!;
+    const filter = context.nodes.find((node) => node.category === 'filter')!;
+    const autoInput = context.nodes.find((node) => node.category === 'analyser')!;
+    const autoOutput = [...autoInput.connections].find((node) => node.category === 'gain')!;
+    const { volume, transition } = outputNodes(context);
+    autoOutput.gain.value = .25; attached.setVolume(0); attached.prepareFadeIn();
+    const sourceConnections = source.connect.mock.calls.length;
+    engine.setOutput({ layout: '5.1', expandStereo: false });
+    expect(context.createMediaElementSource).toHaveBeenCalledOnce();
+    expect(source.connect).toHaveBeenCalledTimes(sourceConnections);
+    expect(filter.connections.size).toBeGreaterThan(0);
+    expect(autoOutput.gain.value).toBe(.25);
+    expect(autoInput.connections.has(autoOutput)).toBe(true);
+    expect(volume.gain.value).toBe(0); expect(transition.gain.value).toBe(0);
+    expect(vi.getTimerCount()).toBe(1);
+    expect(engine.inspectOutput()).toMatchObject({ sourceChannels: 2, outputChannels: 6, limited: false });
+    const nodes = context.nodes.length;
+    engine.setOutput({ layout: '5.1', expandStereo: false }); expect(context.nodes).toHaveLength(nodes);
+    attached.pause(); engine.setOutput({ layout: 'stereo', expandStereo: false });
+    expect(vi.getTimerCount()).toBe(0); expect(volume.gain.value).toBe(0);
+    const plainNodes = context.nodes.length;
+    engine.setOutput({ layout: 'stereo', expandStereo: true }); expect(context.nodes).toHaveLength(plainNodes);
+    engine.dispose(); expect(vi.getTimerCount()).toBe(0);
+    expect(context.nodes.every((node) => node.connections.size === 0)).toBe(true);
+    expect(status).toHaveBeenLastCalledWith(expect.objectContaining({ sourceChannels: null, outputChannels: null, maxChannels: null }));
+  });
+
+  it('keeps the previous route after allocation failure and preserves an unrelated resume error on recovery', async () => {
+    const report = vi.fn(); const engine = new LocalDSPEngine(defaultLocalDSP(), report);
+    const attached = engine.attach(media()); const context = Context.instances[0];
+    context.resume.mockRejectedValue(new DOMException('Gesture required', 'NotAllowedError'));
+    await expect(attached.resume()).rejects.toMatchObject({ name: 'NotAllowedError' });
+    const createMerger = context.createChannelMerger;
+    context.createChannelMerger = () => { throw new Error('Allocation failed'); };
+    expect(() => engine.setOutput({ layout: '7.1', expandStereo: true })).not.toThrow();
+    expect(report).toHaveBeenLastCalledWith(expect.stringContaining('输出更新失败'));
+    expect(engine.inspectOutput()).toMatchObject({ outputChannels: 2, limited: true });
+    expect(context.destination.channelCount).toBe(2);
+    context.createChannelMerger = createMerger;
+    engine.setOutput({ layout: '7.1', expandStereo: true });
+    expect(report).toHaveBeenLastCalledWith(expect.stringContaining('点击播放'));
+    context.resume.mockImplementation(async () => { context.state = 'running'; });
+    await attached.resume(); expect(report).toHaveBeenLastCalledWith(null);
+    engine.dispose(); expect(context.nodes.every((node) => node.connections.size === 0)).toBe(true);
+  });
+
   it('runs auto volume only during enabled playback and clears sampling on pause, seek and detach', async () => {
     vi.useFakeTimers();
     const engine = new LocalDSPEngine(configuration('gain')); engine.setAutoVolume(true);

@@ -9,8 +9,8 @@ const PEAK_CEILING = 0.95;
 export class AutoVolume {
   readonly input: AnalyserNode;
   readonly output: GainNode;
-  private readonly splitter: ChannelSplitterNode;
-  private readonly probes: AnalyserNode[] = [];
+  private splitter?: ChannelSplitterNode;
+  private probes: AnalyserNode[] = [];
   private readonly samples = new Float32Array(2048);
   private timer: ReturnType<typeof setInterval> | null = null;
   private enabled = false;
@@ -26,21 +26,35 @@ export class AutoVolume {
     this.input.smoothingTimeConstant = 0;
     this.output = context.createGain();
     this.input.connect(this.output);
-    const count = Number.isFinite(channels) ? Math.min(8, Math.max(1, Math.floor(channels))) : 2;
-    this.splitter = context.createChannelSplitter(count);
-    this.input.connect(this.splitter);
-    // 旁路逐声道测量，避免反相抵消或 LFE 在扬声器混音时被忽略；主路径保持原声道。
-    for (let channel = 0; channel < count; channel++) {
-      const probe = context.createAnalyser();
-      probe.fftSize = this.samples.length;
-      probe.smoothingTimeConstant = 0;
-      probe.channelCount = 1;
-      probe.channelCountMode = 'explicit';
-      probe.channelInterpretation = 'discrete';
-      this.splitter.connect(probe, channel);
-      this.probes.push(probe);
-    }
+    this.setChannels(channels);
     this.setGain(0, true);
+  }
+
+  /** 输出布局变更只更新测量探头，保留当前增益包络与唯一轮询器。 */
+  setChannels(channels: number): void {
+    const count = Number.isFinite(channels) ? Math.min(8, Math.max(1, Math.floor(channels))) : 2;
+    if (this.disposed || this.probes.length === count) return;
+    const splitter = this.context.createChannelSplitter(count);
+    const probes: AnalyserNode[] = [];
+    // 旁路逐声道测量，避免反相抵消或 LFE 在扬声器混音时被忽略；主路径保持原声道。
+    try {
+      for (let channel = 0; channel < count; channel++) {
+        const probe = this.context.createAnalyser();
+        probes.push(probe);
+        probe.fftSize = this.samples.length;
+        probe.smoothingTimeConstant = 0;
+        probe.channelCount = 1;
+        probe.channelCountMode = 'explicit';
+        probe.channelInterpretation = 'discrete';
+        splitter.connect(probe, channel);
+      }
+      this.input.connect(splitter);
+    } catch (error) {
+      splitter.disconnect(); probes.forEach((probe) => probe.disconnect()); throw error;
+    }
+    if (this.splitter) { this.input.disconnect(this.splitter); this.splitter.disconnect(); }
+    this.probes.forEach((probe) => probe.disconnect());
+    this.splitter = splitter; this.probes = probes;
   }
 
   setEnabled(enabled: boolean): void {
@@ -76,7 +90,7 @@ export class AutoVolume {
     this.stop();
     this.disposed = true;
     this.input.disconnect();
-    this.splitter.disconnect();
+    this.splitter?.disconnect();
     this.probes.forEach((probe) => probe.disconnect());
     this.output.disconnect();
   }

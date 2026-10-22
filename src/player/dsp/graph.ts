@@ -2,6 +2,9 @@ import type { LocalDSPConfig } from './model';
 import { createEffectUnit, smooth } from './nodes';
 import type { EffectUnit } from './nodes';
 import { AutoVolume } from './auto-volume';
+import { AudioOutputRouting } from './output-routing';
+import { defaultAudioOutput } from './output';
+import type { AudioOutputConfig } from './output';
 
 /** 每个媒体源拥有独立效果链，换歌释放全部内部连接，避免上一首混响残留。 */
 export class LocalDSPGraph {
@@ -12,6 +15,8 @@ export class LocalDSPGraph {
   private readonly volume: GainNode;
   private readonly transition: GainNode;
   private readonly autoVolume: AutoVolume;
+  private routing: AudioOutputRouting;
+  private outputConfig = defaultAudioOutput();
   private units = new Map<string, EffectUnit>();
   private order = '';
   private initialized = false;
@@ -19,7 +24,7 @@ export class LocalDSPGraph {
   private volumeValue = 1;
   private paused = false;
 
-  constructor(private readonly context: BaseAudioContext, config: LocalDSPConfig, private readonly channels = 2) {
+  constructor(private readonly context: BaseAudioContext, config: LocalDSPConfig, readonly channels = 2) {
     this.input = context.createGain();
     this.dry = context.createGain();
     this.gate = context.createGain();
@@ -27,9 +32,12 @@ export class LocalDSPGraph {
     this.volume = context.createGain();
     this.transition = context.createGain();
     this.autoVolume = new AutoVolume(context, channels);
-    this.input.connect(this.dry).connect(this.autoVolume.input);
+    this.routing = new AudioOutputRouting(context, channels, channels, false);
+    this.input.connect(this.dry).connect(this.routing.input);
     this.input.connect(this.gate);
-    this.wet.connect(this.autoVolume.input);
+    this.wet.connect(this.routing.input);
+    this.routing.output.connect(this.autoVolume.input);
+    for (const node of [this.transition, this.volume]) node.channelInterpretation = 'discrete';
     this.autoVolume.output.connect(this.transition).connect(this.volume).connect(context.destination);
     try { this.update(config); }
     catch (error) { this.dispose(); throw error; }
@@ -84,6 +92,24 @@ export class LocalDSPGraph {
 
   setAutoVolume(enabled: boolean): void { this.autoVolume.setEnabled(enabled); }
 
+  get outputChannels(): number { return this.routing.channels; }
+
+  setOutput(config: AudioOutputConfig, channels: number): void {
+    const expandStereo = config.expandStereo && this.channels === 2 && channels >= 6;
+    if (channels === this.outputChannels && expandStereo === this.outputConfig.expandStereo) return;
+    const routing = new AudioOutputRouting(this.context, this.channels, channels, expandStereo);
+    try {
+      routing.output.connect(this.autoVolume.input);
+      this.dry.connect(routing.input); this.wet.connect(routing.input);
+      this.autoVolume.setChannels(channels);
+    } catch (error) {
+      try { this.dry.disconnect(routing.input); this.wet.disconnect(routing.input); } catch { /* 连接失败时可能尚未建立目标连接。 */ }
+      routing.dispose(); throw error;
+    }
+    this.dry.disconnect(this.routing.input); this.wet.disconnect(this.routing.input);
+    this.routing.dispose(); this.routing = routing; this.outputConfig = { ...config, expandStereo };
+  }
+
   // 切歌包络使用独立增益，不改用户音量，也不会绕过暂停或静音状态。
   fadeTo(target: 0 | 1, durationMs: number): number {
     const duration = Number.isFinite(durationMs) ? Math.max(0, Math.min(2000, durationMs)) : 300;
@@ -110,6 +136,7 @@ export class LocalDSPGraph {
 
   dispose(): void {
     this.autoVolume.dispose();
+    this.routing.dispose();
     for (const unit of this.units.values()) unit.dispose();
     this.units.clear();
     for (const node of [this.input, this.dry, this.gate, this.wet, this.volume, this.transition]) node.disconnect();

@@ -27,6 +27,8 @@ export class ApiClient {
   onUnauthorized: (() => void) | null = null;
   constructor(private fetcher: typeof fetch = (...args) => fetch(...args)) {}
 
+  url(path: string): string { return `/api/v1${path}`; }
+
   async request<T>(path: string, options: RequestOptions = {}): Promise<T> {
     const csrfToken = this.csrfToken;
     const controller = new AbortController();
@@ -50,7 +52,7 @@ export class ApiClient {
       headers.set("Idempotency-Key", options.idempotencyKey);
     if (options.ifMatch) headers.set("If-Match", options.ifMatch);
     try {
-      const response = await this.fetcher(`/api/v1${path}`, {
+      const response = await this.fetcher(this.url(path), {
         method,
         headers,
         credentials: "same-origin",

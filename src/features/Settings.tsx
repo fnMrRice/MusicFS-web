@@ -199,7 +199,7 @@ function PlaybackSettings() {
       </label>
       <p className="muted">
         {tr(
-          "服务端负责格式转换、转码及必要的声道转换；音量与音效在浏览器中实时调整。",
+          "服务端负责格式转换与转码；音效和输出声道在浏览器中实时调整。",
         )}
       </p>
       <label className="check-label">

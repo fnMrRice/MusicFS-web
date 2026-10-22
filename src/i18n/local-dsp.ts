@@ -14,7 +14,7 @@ export default {
   "本地音效": ["Local effects", "本機音效", "ローカルエフェクト"],
   "服务端格式转换": ["Server format conversion", "伺服器格式轉換", "サーバーの形式変換"],
   "服务端格式转换输出": ["Server format conversion output", "伺服器格式轉換輸出", "サーバー形式変換の出力"],
-  "服务端未确认本地音效模式，请更新服务端后重新播放。": ["The server did not confirm local effects mode. Update the server and try playing again.", "伺服器未確認本機音效模式，請更新伺服器後重新播放。", "サーバーがローカルエフェクトモードを確認できませんでした。サーバーを更新して再生し直してください。"],
+  "服务端仍在处理音效或输出声道，请更新服务端后重新播放。": ["The server is still processing effects or output channels. Update the server and try playing again.", "伺服器仍在處理音效或輸出聲道，請更新伺服器後重新播放。", "サーバーがエフェクトまたは出力チャンネルを処理しています。サーバーを更新して再生し直してください。"],
   "音效在此浏览器处理，调整立即生效，无需重新播放。设置仅保存在本浏览器，按实例和账号区分。": ["Effects run in this browser. Adjustments apply immediately without restarting playback. Settings stay in this browser, separately for each server instance and account.", "音效在此瀏覽器處理，調整立即生效，無需重新播放。設定僅儲存在本瀏覽器，依實例和帳號區分。", "エフェクトはこのブラウザーで処理され、再生し直さずに変更が即時反映されます。設定はサーバーのインスタンスとアカウントごとに、このブラウザーだけに保存されます。"],
   "服务端负责格式转换、转码及必要的声道转换；Web 播放不会重复应用服务端音效。": ["The server handles format conversion, transcoding, and required channel conversion. Web playback does not apply server effects again.", "伺服器負責格式轉換、轉碼及必要的聲道轉換；Web 播放不會重複套用伺服器音效。", "サーバーは形式変換、トランスコード、必要なチャンネル変換を担当します。Web 再生ではサーバーのエフェクトを重複適用しません。"],
   "此浏览器不支持本地音效。仍可正常播放，音效设置会保留。": ["This browser does not support local effects. Playback remains available and your effect settings are kept.", "此瀏覽器不支援本機音效。仍可正常播放，音效設定會保留。", "このブラウザーはローカルエフェクトに対応していません。再生は利用でき、エフェクト設定は保持されます。"],

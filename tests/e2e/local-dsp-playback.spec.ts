@@ -148,3 +148,55 @@ test('automatic volume measures stereo channels before phase cancellation', asyn
   expect((await outputSignal(page)).rms / baseline.rms).toBeGreaterThan(0.2);
   await logout(page);
 });
+
+test('output channels switch live with effects disabled and retain the stream, pause and mute', async ({ page }, info) => {
+  const { creates, controls, errors } = await setup(page, true);
+  const audio = page.locator('audio'), original = await audio.elementHandle();
+  const url = await audio.getAttribute('src');
+  const startedAt = await audio.evaluate((element: HTMLAudioElement) => element.currentTime);
+  const outputChannels = () => page.evaluate(() => {
+    const probe = (window as unknown as { musicfsAudioProbe: { context: AudioContext } }).musicfsAudioProbe;
+    return probe.context.destination.channelCount;
+  });
+  await page.getByRole('button', { name: '设置', exact: true }).click();
+  await page.getByRole('tab', { name: 'DSP 配置', exact: true }).click();
+  await page.getByRole('checkbox', { name: '启用本地音效', exact: true }).uncheck();
+  await page.getByRole('button', { name: '输出设置', exact: true }).click();
+  const layout = page.getByLabel('输出声道', { exact: true });
+  await layout.selectOption('stereo');
+  await expect.poll(outputChannels).toBe(2);
+  const stereo = await outputSignal(page);
+  expect(stereo.rms).toBeGreaterThan(0.01);
+  await layout.selectOption('mono');
+  await expect.poll(outputChannels).toBe(1);
+  await expect.poll(async () => (await outputSignal(page)).rms).toBeGreaterThan(0.01);
+  await layout.selectOption('stereo');
+  await expect.poll(outputChannels).toBe(2);
+  await expect.poll(async () => (await outputSignal(page)).rms).toBeGreaterThan(0.01);
+  expect(await audio.evaluate((element: HTMLAudioElement) => element.currentTime)).toBeGreaterThan(startedAt);
+  await page.getByRole('button', { name: '暂停', exact: true }).click();
+  await layout.selectOption('mono');
+  await expect.poll(outputChannels).toBe(1);
+  await expect.poll(async () => (await outputSignal(page)).rms).toBeLessThan(0.00001);
+  expect(await audio.evaluate((element: HTMLAudioElement) => element.paused)).toBe(true);
+  await layout.selectOption('stereo');
+  await expect.poll(outputChannels).toBe(2);
+  await expect.poll(async () => (await outputSignal(page)).rms).toBeLessThan(0.00001);
+  await page.getByRole('button', { name: '播放', exact: true }).click();
+  await waitPlaying(page);
+  await expect.poll(async () => (await outputSignal(page)).rms).toBeGreaterThan(0.01);
+  await page.getByRole('slider', { name: '音量', exact: true }).fill('0');
+  for (const value of ['mono', 'stereo']) {
+    await layout.selectOption(value);
+    await expect.poll(outputChannels).toBe(value === 'mono' ? 1 : 2);
+    await expect.poll(async () => (await outputSignal(page)).rms).toBeLessThan(0.00001);
+  }
+  expect(await original!.evaluate((element) => element === document.querySelector('audio'))).toBe(true);
+  expect(await audio.getAttribute('src')).toBe(url);
+  expect(creates).toHaveLength(1);
+  expect(creates[0].preferences).toEqual({ forceProcessing: false, gainDb: 0, dspExecution: 'client' });
+  expect(controls).toEqual([]);
+  expect(errors).toEqual([]);
+  await info.attach('live-output-channel-switch', { body: JSON.stringify({ stereo, finalChannels: await outputChannels(), physicalListening: 'Not performed' }), contentType: 'application/json' });
+  await logout(page);
+});

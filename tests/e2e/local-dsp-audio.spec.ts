@@ -154,7 +154,7 @@ test('song fades render a linear envelope without overriding volume or pause', a
     const { LocalDSPGraph } = await import(graphModule);
     async function render(mode: 'out' | 'in' | 'muted' | 'paused') {
       const context = new OfflineAudioContext(1, 24000, 48000);
-      const graph = new LocalDSPGraph(context, { enabled: true, chain: [] });
+      const graph = new LocalDSPGraph(context, { enabled: true, chain: [] }, 1);
       graph.setVolume(mode === 'muted' ? 0 : 0.3);
       if (mode === 'paused') graph.setPaused(true);
       if (mode === 'out') graph.fadeTo(0, 300); else graph.fadeIn(300);

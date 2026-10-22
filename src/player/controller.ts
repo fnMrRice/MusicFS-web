@@ -171,9 +171,9 @@ export class PlayerController {
   private attach(playback: Playback, generation: number): void {
     if (playback.dspExecution !== "client" || playback.effectiveProcessing.some((step) =>
       !step || typeof step !== "object" || !("type" in step) ||
-      !["channelMix", "channelmix", "ncmDecrypt"].includes(String(step.type)))) {
+      !["ncmDecrypt", "transcode"].includes(String(step.type)))) {
       this.state.playback = playback;
-      this.fail("服务端未确认本地音效模式，请更新服务端后重新播放。");
+      this.fail("服务端仍在处理音效或输出声道，请更新服务端后重新播放。");
       return;
     }
     if (playback.resumeDecision !== "continue") {

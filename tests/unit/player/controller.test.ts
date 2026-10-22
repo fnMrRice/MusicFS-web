@@ -121,21 +121,24 @@ describe('Player controller (Mock media; not decoder validation)', () => {
     expect(s.api.create.mock.calls[0][2]).toEqual({ forceProcessing: true, gainDb: 0, dspExecution: 'client' });
     s.controller.stop();
   });
-  it('refuses an unconfirmed execution mode or a server effect before attaching audio', async () => {
+  it('refuses unconfirmed execution, server effects and both channel mix names before attaching audio', async () => {
     for (const response of [
       { ...playback(), dspExecution: 'server' },
       { ...playback(), effectiveProcessing: [{ type: 'gain', execution: 'server', gainDb: -6 }] },
+      { ...playback(), effectiveProcessing: [{ type: 'channelMix', execution: 'server', parameters: { outputChannels: 6 } }] },
+      { ...playback(), effectiveProcessing: [{ type: 'channelmix', execution: 'server', parameters: { outputChannels: 8 } }] },
     ]) {
       const s = setup(vi.fn().mockResolvedValue(response));
       await s.controller.select(track);
       expect(s.controller.state.phase).toBe('error');
+      expect(s.controller.state.message).toContain('音效或输出声道');
       expect(s.factory).not.toHaveBeenCalled();
       s.controller.stop();
     }
   });
-  it('accepts required server conversion and decryption with local effects', async () => {
+  it('accepts format transcoding and decryption without server effects or channel mixing', async () => {
     const s = setup(vi.fn().mockResolvedValue({ ...playback(), effectiveProcessing: [
-      { type: 'channelMix', execution: 'server' }, { type: 'ncmDecrypt', execution: 'server' },
+      { type: 'transcode', execution: 'server' }, { type: 'ncmDecrypt', execution: 'server' },
     ] }));
     await s.controller.select(track);
     expect(s.factory).toHaveBeenCalledOnce();

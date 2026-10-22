@@ -7,6 +7,7 @@ const key = "musicfs:server%3Aa:user%3Ab:preferences";
 
 beforeEach(() => {
   saved.clear();
+  vi.stubGlobal("window", { location: { href: "https://musicfs.test/" } });
   vi.stubGlobal("document", { createElement: () => ({ canPlayType: () => "probably" }) });
   vi.stubGlobal("localStorage", {
     getItem: (name: string) => saved.get(name) ?? null,

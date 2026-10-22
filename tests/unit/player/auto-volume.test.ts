@@ -57,6 +57,29 @@ beforeEach(() => {
 afterEach(() => { volume.dispose(); vi.useRealTimers(); });
 
 describe('Automatic volume balancing', () => {
+  it('retains gain automation and a single timer while replacing channel probes', () => {
+    play(); vi.advanceTimersByTime(300);
+    const gain = context.output.gain.value;
+    const updates = context.output.gain.setTargetAtTime.mock.calls.length;
+    const immediateUpdates = context.output.gain.setValueAtTime.mock.calls.length;
+    const oldProbes = [...context.probes];
+    context.createChannelSplitter.mockImplementation(() => ({ connect: vi.fn(), disconnect: vi.fn() }));
+    volume.setChannels(6);
+    expect(context.output.gain.value).toBe(gain);
+    expect(context.output.gain.setTargetAtTime).toHaveBeenCalledTimes(updates);
+    expect(context.output.gain.setValueAtTime).toHaveBeenCalledTimes(immediateUpdates);
+    expect(vi.getTimerCount()).toBe(1);
+    expect(context.input.disconnect).toHaveBeenCalledWith(context.splitter);
+    const reads = oldProbes.map((probe) => probe.getFloatTimeDomainData.mock.calls.length);
+    vi.advanceTimersByTime(100);
+    oldProbes.forEach((probe, index) => expect(probe.getFloatTimeDomainData).toHaveBeenCalledTimes(reads[index]));
+    const allocationCount = context.analysers.length;
+    volume.setChannels(6);
+    expect(context.analysers).toHaveLength(allocationCount);
+    volume.stop(); volume.setChannels(2);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
   it('preserves the audio path while disabled and polls only during enabled playback', () => {
     expect(context.input.connect).toHaveBeenCalledWith(context.output);
     expect(context.input.connect).toHaveBeenCalledWith(context.splitter);

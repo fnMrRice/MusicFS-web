@@ -7,6 +7,7 @@ const instances: Services[] = [];
 
 beforeEach(() => {
   saved.clear();
+  vi.stubGlobal("window", { location: { href: "https://musicfs.test/" } });
   vi.stubGlobal("document", { createElement: () => ({ canPlayType: () => "probably" }) });
   vi.stubGlobal("localStorage", {
     getItem: (key: string) => saved.get(key) ?? null,

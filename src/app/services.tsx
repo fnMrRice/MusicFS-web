@@ -27,6 +27,7 @@ import { LocalScans } from "../library/local-scans";
 import { ConfigurationScans } from "../library/configuration-scans";
 import type { PluginOperation } from "../api/directories";
 import { LocalDSPSettingsStore } from "./local-dsp-settings";
+import { AudioOutputSettingsStore } from "./audio-output-settings";
 import { LocalDSPEngine } from "../player/dsp/engine";
 import { MatchingApi } from "../api/matching";
 import { MatchingDecisions } from "../library/matching-decisions";
@@ -90,7 +91,9 @@ export class Services {
   });
   preferences = new Store<PreferencesState>({ ...defaults });
   localDSP = new LocalDSPSettingsStore(LocalDSPEngine.supported());
-  private dsp = new LocalDSPEngine(this.localDSP.value.config, (message) => this.localDSP.reportError(message));
+  audioOutput = new AudioOutputSettingsStore(LocalDSPEngine.supported());
+  private dsp = new LocalDSPEngine(this.localDSP.value.config, (message) => this.localDSP.reportError(message),
+    (status) => this.audioOutput.reportStatus(status));
   playlists = new Store<Playlist[]>([]);
   queue = new PlaybackQueue();
   player: PlayerController;
@@ -135,6 +138,12 @@ export class Services {
       config = this.localDSP.value.config;
       this.dsp.setConfig(config);
     });
+    let output = this.audioOutput.value.config;
+    this.audioOutput.subscribe(() => {
+      if (output === this.audioOutput.value.config) return;
+      output = this.audioOutput.value.config;
+      this.dsp.setOutput(output);
+    });
     this.content.onlineInstances.subscribe(() => this.sourcePlaylists.update(this.content.onlineInstances.value));
     this.player = new PlayerController(
       new PlaybackApi(this.client),
@@ -168,6 +177,7 @@ export class Services {
       ? `musicfs:${encodeURIComponent(ready.instanceId)}:${encodeURIComponent(session.user.id)}:preferences`
       : null;
   }
+  inspectAudioOutput(): void { this.dsp.inspectOutput(); }
   private accept(session: AuthSession): void {
     this.player.stop();
     this.queue.forgetSelection();
@@ -183,6 +193,8 @@ export class Services {
     void this.favorites.load();
     this.profile.setUser(session.user.id);
     this.localDSP.setSession(this.auth.value.ready!.instanceId, session.user.id);
+    // ready.instanceId 是每次启动的进程身份；输出偏好按稳定服务地址保存。
+    this.audioOutput.setSession(new URL(this.client.url(""), window.location.href).href, session.user.id);
     this.reloadSourceNames();
     this.capabilityEvents.start(session.csrfToken);
     let saved: Partial<PreferencesState> = {};
@@ -303,6 +315,7 @@ export class Services {
     this.player.setTransitions(false, defaults.fadeDurationMs);
     this.dsp.setAutoVolume(false);
     this.localDSP.clear();
+    this.audioOutput.clear();
     this.auth.set({
       ...this.auth.value,
       session: null,
