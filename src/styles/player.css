@@ -187,10 +187,6 @@
 .volume-slider:focus-within .volume-value {
   display: block;
 }
-.player .tooltip {
-  top: auto;
-  bottom: calc(100% + 12px);
-}
 .player-panel {
   position: absolute;
   z-index: 2;

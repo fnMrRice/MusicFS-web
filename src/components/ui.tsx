@@ -1,5 +1,6 @@
 import { tr, useLocale, statusText } from "../i18n";
 import { useServices } from "../app/services";
+import { Tooltip } from "./Tooltip";
 import {
   useEffect,
   useRef,
@@ -166,31 +167,17 @@ export function IconButton({
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & { icon: string; label: string }) {
   useLocale();
-  const [dismissed, setDismissed] = useState(false);
   return (
-    <span className="tip-wrap" onMouseLeave={() => setDismissed(false)}>
+    <Tooltip label={label} disabled={props["aria-expanded"] === true || props["aria-expanded"] === "true"}>
       <button
         type="button"
         {...props}
         aria-label={label}
         className={`icon-button ${props.className ?? ""}`}
-        onBlur={(e) => {
-          setDismissed(false);
-          props.onBlur?.(e);
-        }}
-        onKeyDown={(e) => {
-          if (e.key === "Escape") setDismissed(true);
-          props.onKeyDown?.(e);
-        }}
       >
         <Icon name={icon} />
       </button>
-      {!dismissed && (
-        <span role="tooltip" className="tooltip">
-          {label}
-        </span>
-      )}
-    </span>
+    </Tooltip>
   );
 }
 export function Empty({

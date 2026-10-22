@@ -155,28 +155,26 @@ p {
   display: inline-flex;
 }
 .tooltip {
-  display: none;
-  position: absolute;
-  top: calc(100% + 9px);
-  left: 50%;
-  transform: translateX(-50%);
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: max-content;
+  max-width: min(360px, calc(100vw - 16px));
   padding: 7px 10px;
   font-size: 12px;
+  line-height: 1.5;
+  color: var(--text);
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 5px;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
   z-index: 70;
   box-shadow: 0 5px 20px var(--shadow);
   pointer-events: none;
 }
-.tip-wrap:hover .tooltip,
-.tip-wrap:focus-within .tooltip {
-  display: block;
+.tooltip[data-keyboard="false"] {
   animation: tooltip 0.4s step-end;
-}
-.tip-wrap:focus-within .tooltip {
-  animation: none;
 }
 @keyframes tooltip {
   from {

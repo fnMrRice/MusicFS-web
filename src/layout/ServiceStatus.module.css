@@ -1,6 +1,5 @@
 .root, .trigger { position: relative; }
 .trigger { display: flex; }
-.trigger :global(button[aria-expanded="true"] + .tooltip) { display: none; }
 .dot {
   display: inline-block;
   flex-shrink: 0;
