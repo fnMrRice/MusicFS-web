@@ -42,6 +42,21 @@ describe("Manual recording decisions", () => {
       .rejects.toMatchObject({ code: "REVISION_CONFLICT", status: 409 });
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
+  it.each(["low-bitrate", null])("sets or clears the default source without changing its recording (%s)", async (sourceTrackId) => {
+    const fetcher = vi.fn<typeof fetch>(async () => Response.json({ revision: 8, operationId: "default", recordingId: "recording" }));
+    const client = new ApiClient(fetcher); client.csrfToken = "csrf";
+    await new MatchingApi(client).mutate({ kind: "default-source", expectedRevision: 7, recordingId: "recording", sourceTrackId }, "default-key");
+    const [url, options] = fetcher.mock.calls[0];
+    expect(url).toBe("/api/v1/matching/default-source");
+    expect(JSON.parse(options?.body as string)).toEqual({ expectedRevision: 7, recordingId: "recording", sourceTrackId });
+    expect(new Headers(options?.headers).get("Idempotency-Key")).toBe("default-key");
+    expect(new Headers(options?.headers).get("X-CSRF-Token")).toBe("csrf");
+  });
+  it("keeps an invalid default-source confirmation from appearing successful", async () => {
+    const fetcher = vi.fn<typeof fetch>(async () => Response.json({ revision: 8, operationId: "default", recordingId: "other-recording" }));
+    await expect(new MatchingApi(new ApiClient(fetcher)).mutate({ kind: "default-source", expectedRevision: 7,
+      recordingId: "recording", sourceTrackId: null }, "default-key")).rejects.toMatchObject({ code: "INVALID_RESPONSE" });
+  });
   it("pages global candidates and rejects missing comparison tracks", async () => {
     const fetcher = vi.fn<typeof fetch>(async () => Response.json({ revision: 1, items: [{ candidateId: "pair", score: 90,
       left: { sourceTrackId: "a" }, right: { sourceTrackId: "b" }, leftTrack: track("a"), rightTrack: track("b"), reasons: [] }], nextAfter: "next" }));

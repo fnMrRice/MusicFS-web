@@ -142,7 +142,7 @@ export function TrackTable({
           <tbody>
             {tracks.map((t, i) => (
               <TrackRow
-                key={t.sourceTrackId}
+                key={t.versions && t.versions.length > 1 && t.recordingId ? `recording:${t.recordingId}` : t.sourceTrackId}
                 track={t}
                 number={i + 1}
                 provider={sourceName(
@@ -262,7 +262,8 @@ function TrackRow({
       </td>
     </tr>
     {expanded && versions.length > 1 && <tr className="track-versions"><td colSpan={9}>
-      <TrackVersions tracks={versions} revision={matchingRevision} refresh={onMatchingChange} />
+      <TrackVersions tracks={versions} revision={matchingRevision} refresh={onMatchingChange}
+        recordingId={t.recordingId} defaultSourceTrackId={t.sourceTrackId} manualSourceTrackId={t.manualSourceTrackId} />
     </td></tr>}
     </Fragment>
   );

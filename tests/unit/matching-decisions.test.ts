@@ -58,6 +58,22 @@ describe("Session-owned matching decisions", () => {
     decisions.setSession("other-server", "alice"); expect(decisions.pending.value).toEqual([]);
     decisions.setSession("server", "alice"); expect(decisions.pending.value[0]).toMatchObject({ key: "alice-key", status: "uncertain" });
   });
+  it.each(["manual-version", null])("restores and confirms a default-source change after refresh (%s)", async (sourceTrackId) => {
+    storage();
+    const selection: MatchingRequest = { kind: "default-source", expectedRevision: 2, recordingId: "recording", sourceTrackId };
+    const fetcher = vi.fn<typeof fetch>().mockRejectedValueOnce(new Error("Disconnected")).mockResolvedValueOnce(Response.json(result));
+    const api = new MatchingApi(new ApiClient(fetcher));
+    const first = new MatchingDecisions(api, vi.fn()); first.setSession("server", "alice");
+    await expect(first.submit(selection, "default-key")).rejects.toMatchObject({ code: "NETWORK_ERROR" });
+    const changed = vi.fn();
+    const restored = new MatchingDecisions(api, changed); restored.setSession("server", "alice");
+    expect(restored.pending.value).toEqual([{ key: "default-key", request: selection, status: "uncertain" }]);
+    await restored.submit({ ...selection, expectedRevision: 99, sourceTrackId: "different" }, "default-key");
+    expect(fetcher.mock.calls[1][1]?.body).toBe(fetcher.mock.calls[0][1]?.body);
+    expect(new Headers(fetcher.mock.calls[1][1]?.headers).get("Idempotency-Key")).toBe("default-key");
+    expect(restored.pending.value).toEqual([]);
+    expect(changed).toHaveBeenCalledTimes(1);
+  });
   it("clears a rejected stale decision without changing its expected revision", async () => {
     storage();
     const fetcher = vi.fn<typeof fetch>(async () => Response.json({ error: { code: "REVISION_CONFLICT" } }, { status: 409 }));

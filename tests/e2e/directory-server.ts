@@ -1,6 +1,6 @@
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { copyFileSync, cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { dirname, join, resolve } from 'node:path';
 import { yamlFixture, type FixtureConfig } from '../fixtures/config-yaml';
@@ -30,7 +30,7 @@ async function freePort(): Promise<number> {
   return address.port;
 }
 
-export async function startDirectoryServer(): Promise<DirectoryTestServer> {
+export async function startDirectoryServer(options: { audioTools?: boolean } = {}): Promise<DirectoryTestServer> {
   const web = resolve(import.meta.dirname, '../..');
   const source = process.env.MUSICFS_E2E_SERVER_SOURCE
     ? resolve(process.env.MUSICFS_E2E_SERVER_SOURCE) : resolve(web, '../server');
@@ -47,9 +47,11 @@ export async function startDirectoryServer(): Promise<DirectoryTestServer> {
   };
   try {
     console.log('Building isolated directory test server and local plugin');
-    for (const [name, packagePath] of [
+    const binaries = [
       ['musicfs', './src/app/musicfs'], ['musicfs-plugin-local', './plugins/source/localfiles/cmd/musicfs-plugin-local'],
-    ]) {
+    ];
+    if (options.audioTools) binaries.push(['musicfs-plugin-audio-ffmpeg', './plugins/decoder/ffmpeg/cmd/musicfs-plugin-audio-ffmpeg']);
+    for (const [name, packagePath] of binaries) {
       execFileSync('go', ['build', '-o', join(directory, name + suffix), packagePath], {
         cwd: source, stdio: 'pipe', windowsHide: true,
       });
@@ -77,6 +79,10 @@ export async function startDirectoryServer(): Promise<DirectoryTestServer> {
     const port = await freePort();
     const origin = `http://127.0.0.1:${port}`;
     const token = randomBytes(32).toString('hex');
+    const ffmpeg = process.env.MUSICFS_E2E_FFMPEG ?? 'D:\\Software\\MultiMedia\\ffmpeg-6.1.1-full_build-shared\\bin\\ffmpeg.exe';
+    const ffprobe = process.env.MUSICFS_E2E_FFPROBE ?? 'D:\\Software\\MultiMedia\\ffmpeg-6.1.1-full_build-shared\\bin\\ffprobe.exe';
+    if (options.audioTools && (!existsSync(ffmpeg) || !existsSync(ffprobe)))
+      throw new Error('Set MUSICFS_E2E_FFMPEG and MUSICFS_E2E_FFPROBE to installed binaries');
     const config: FixtureConfig = {
       configVersion: 1, listen: `127.0.0.1:${port}`, pluginBundle: '',
       dataRoot: join(directory, 'data'), mediaRoot: join(directory, 'media'), cacheRoot: join(directory, 'cache'),
@@ -87,7 +93,10 @@ export async function startDirectoryServer(): Promise<DirectoryTestServer> {
           instanceId: instanceIds.local, name: '目录管理测试', enabled: true,
           permissions: { readDirectories: [allowedRoot, secondAllowedRoot] }, config: {},
         }],
-      }],
+      }, ...(options.audioTools ? [{
+        pluginId: 'musicfs.plugin.decoder.ffmpeg', executable: join(directory, 'musicfs-plugin-audio-ffmpeg' + suffix), enabled: true,
+        instances: [{ instanceId: instanceIds.ffmpeg, enabled: true, config: { ffmpegPath: ffmpeg, ffprobePath: ffprobe } }],
+      }] : [])],
     };
     const configuration = yamlFixture(config);
     const configPath = join(directory, 'config.yaml');

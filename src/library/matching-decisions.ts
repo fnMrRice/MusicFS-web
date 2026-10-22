@@ -15,6 +15,7 @@ function valid(value: unknown): value is PendingDecision {
   if (request.kind === "links") return Array.isArray(request.sourceTrackIds) && request.sourceTrackIds.length >= 2 &&
     request.sourceTrackIds.length <= 256 && request.sourceTrackIds.every(id) && (request.targetRecordingId === null || id(request.targetRecordingId));
   if (request.kind === "unlinks") return id(request.sourceTrackId);
+  if (request.kind === "default-source") return id(request.recordingId) && (request.sourceTrackId === null || id(request.sourceTrackId));
   return request.kind === "exclusions" && id(request.leftSourceTrackId) && id(request.rightSourceTrackId) && typeof request.excluded === "boolean";
 }
 

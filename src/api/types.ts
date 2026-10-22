@@ -14,10 +14,12 @@ export interface SourceTrack {
   title: string | null; artists: string[] | null; durationMs: number | null;
   codec: string | null; container: string | null; bitrateBps: number | null;
   availability: string; assetId: string | null; recordingId?: string | null;
+  asset?: { fileSizeBytes?: number | null } | null;
+  manualSourceTrackId?: string | null;
   versions?: SourceTrack[];
 }
 export interface TrackPage { items: SourceTrack[]; nextCursor: string | null; libraryRevision: string; matchingRevision?: number }
-export interface OutputProfile { mime: string; codec: string | null; container: string | null; transport: string; channels?: number; layout?: string; sampleRate?: number }
+export interface OutputProfile { mime: string; codec: string | null; container: string | null; transport: string; channels?: number; layout?: string; sampleRate?: number; bitrateBps?: number | null }
 export interface Playback {
   sessionId: string; attemptId: string; assetId: string; representationId: string;
   dspExecution: 'server' | 'client';

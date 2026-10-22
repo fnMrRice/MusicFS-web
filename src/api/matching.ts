@@ -20,6 +20,7 @@ export type MatchingRequest =
   | { kind: "bulk-merge"; expectedRevision: number; mode: BulkMergeMode; minimumScore?: number }
   | { kind: "links"; expectedRevision: number; sourceTrackIds: string[]; targetRecordingId: string | null }
   | { kind: "unlinks"; expectedRevision: number; sourceTrackId: string }
+  | { kind: "default-source"; expectedRevision: number; recordingId: string; sourceTrackId: string | null }
   | { kind: "exclusions"; expectedRevision: number; leftSourceTrackId: string; rightSourceTrackId: string; excluded: boolean };
 
 export function bulkMergeRequest(mode: BulkMergeMode, revision: number, minimumScore = 80): MatchingRequest {
@@ -72,6 +73,9 @@ export class MatchingApi {
   async mutate(request: MatchingRequest, key: string, signal?: AbortSignal): Promise<MatchingMutation> {
     const { kind, ...body } = request;
     const result = await this.client.request<MatchingMutation>(`/matching/${kind}`, { method: "POST", body, idempotencyKey: key, signal });
+    if (kind === "default-source" && (!result || !Number.isSafeInteger(result.revision) || result.revision < 0 ||
+      typeof result.operationId !== "string" || !result.operationId || result.recordingId !== request.recordingId))
+      throw new ApiError("INVALID_RESPONSE", "Invalid default source result");
     if (kind === "bulk-merge" && (!result || !isBulkMergeMutation(result) || !Number.isSafeInteger(result.revision) ||
       result.revision < 0 || typeof result.operationId !== "string" || !result.operationId || result.recordingId !== null))
       throw new ApiError("INVALID_RESPONSE", "Invalid bulk merge result");

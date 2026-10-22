@@ -13,11 +13,13 @@ export function MatchingRecovery() {
   return <>
     {pending.map((item) => <div className="notice" key={item.key} role="status">
       {item.status === "pending" ? tr(item.request.kind === "bulk-merge" ? "正在合并重复音乐，可离开此页面。" :
-        "正在保存歌曲关联，可离开此页面。") : tr("上次歌曲关联操作的结果尚未确认，请继续确认。")}
+        item.request.kind === "default-source" ? "正在保存默认版本，可离开此页面。" :
+        "正在保存歌曲关联，可离开此页面。") : tr(item.request.kind === "default-source" ?
+        "上次默认版本设置的结果尚未确认，请继续确认。" : "上次歌曲关联操作的结果尚未确认，请继续确认。")}
       {item.status === "uncertain" && <button onClick={() => {
         setError(null);
         void services.matchingDecisions.submit(item.request, item.key).catch((cause) => setError(errorMessage(cause)));
-      }}>{tr("继续确认关联结果")}</button>}
+      }}>{tr(item.request.kind === "default-source" ? "继续确认默认版本" : "继续确认关联结果")}</button>}
     </div>)}
     {result && <BulkMergeSummary result={result} />}
     <ErrorNotice error={error} />

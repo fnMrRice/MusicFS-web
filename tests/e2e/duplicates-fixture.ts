@@ -13,8 +13,8 @@ export interface DuplicateTrack {
 }
 
 /** 使用隔离的真实服务与三个相同音频副本，不接触用户音乐库。 */
-export async function duplicateFixture(page: Page): Promise<{ server: DirectoryTestServer; tracks: DuplicateTrack[] }> {
-  const server = await startDirectoryServer();
+export async function duplicateFixture(page: Page, options: { audioTools?: boolean } = {}): Promise<{ server: DirectoryTestServer; tracks: DuplicateTrack[] }> {
+  const server = await startDirectoryServer(options);
   try {
     copyFileSync(join(server.selectedRoot, 'selected.wav'), join(server.selectedRoot, 'third.wav'));
     await login(page, server);
@@ -22,7 +22,8 @@ export async function duplicateFixture(page: Page): Promise<{ server: DirectoryT
     const path = `${server.origin}/api/v1/admin/plugin-instances/${instanceIds.local}/configuration`;
     const config = await (await api.get(path)).json();
     const session = await (await api.get(`${server.origin}/api/v1/auth/session`)).json();
-    const defaults = { recursive: false, maxDepth: 0, importLyrics: false, excludePatterns: [], skipHidden: true, respectNoMedia: true };
+    const defaults = { ...config.importOptions.importDefaults, recursive: false, maxDepth: 0,
+      importLyrics: false, excludePatterns: [], skipHidden: true, respectNoMedia: true };
     const response = await api.put(path, {
       headers: { Origin: server.origin, 'X-CSRF-Token': session.csrfToken, 'If-Match': config.revision, 'Idempotency-Key': crypto.randomUUID() },
       data: { musicRoots: [
@@ -30,7 +31,7 @@ export async function duplicateFixture(page: Page): Promise<{ server: DirectoryT
         { id: 'second-root', name: 'Second folder', path: server.secondSelectedRoot, importDefaults: defaults },
       ] },
     });
-    expect(response.status()).toBe(202);
+    expect(response.status(), await response.text()).toBe(202);
     const operation = await response.json();
     await expect.poll(async () => (await (await api.get(`${server.origin}/api/v1/admin/plugin-operations/${operation.operationId}`)).json()).status).toBe('succeeded');
     await scan(api, server.origin);

@@ -3,7 +3,7 @@ import { useEffect, useId, useRef, useState, type CSSProperties } from "react";
 import { useServices, useStore } from "../app/services";
 import { Cover, duration, Icon, IconButton } from "../components/ui";
 import { MediaPanel } from "./MediaPanel";
-import { playbackFormat } from "./format";
+import { playbackFormat, playbackFormatTitle } from "./format";
 import type { PlaybackMode } from "./playback-queue";
 import { VolumeControl } from "./VolumeControl";
 
@@ -117,7 +117,7 @@ export function PlayerBar() {
               ? state.track.artists?.join(" / ") || tr("未知歌手")
               : tr("暂无作者")}
           </small>
-          <small className="player-status" title={format}>
+          <small className="player-status" title={state.track ? playbackFormatTitle(state.track, playback) : format}>
             {format}
             {playback && localEffects && ` · ${tr("本地音效")}`}
           </small>
