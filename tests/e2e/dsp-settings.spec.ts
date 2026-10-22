@@ -5,7 +5,7 @@ import type { DSPSaveRequest, DSPSettings, DSPValidation } from "../../src/api/d
 
 let server: PreviewServer;
 const origin = "http://127.0.0.1:18158";
-const bufferLabel = "DSP Buffer 大小（帧）";
+
 test.beforeAll(async () => { server = await preview({ preview: { host: "127.0.0.1", port: 18158, strictPort: true } }); });
 test.afterAll(async () => { await new Promise<void>((resolve) => server?.httpServer.close(() => resolve())); });
 
@@ -57,16 +57,26 @@ async function mock(page: Page, admin = false) {
   return control;
 }
 
-async function openPersonal(page: Page) {
+async function openServer(page: Page, personal = true) {
   await page.goto(`${origin}/#/settings?tab=dsp`);
-  await expect(page.getByLabel("使用全局配置", { exact: true })).toBeChecked();
-  await page.getByLabel("使用全局配置", { exact: true }).uncheck();
+  await page.getByRole("button", { name: "服务端格式转换", exact: true }).click();
+  if (personal) {
+    await expect(page.getByLabel("使用全局配置", { exact: true })).toBeChecked();
+    await page.getByLabel("使用全局配置", { exact: true }).uncheck();
+  }
 }
 
-test("users add repeated effects, reorder, edit buffer and persist settings across refresh", async ({ page }, info) => {
+const savedMessage = "格式转换设置已保存，下次播放时生效。";
+
+test("local effects update immediately, support repeats and reordering, and persist without server saves", async ({ page }, info) => {
   const control = await mock(page);
-  await openPersonal(page);
-  await expect(page.getByRole("button", { name: "全局默认 DSP", exact: true })).toHaveCount(0);
+  control.personal.settings.chain = [{ name: "gain", version: 1, params: { gainDB: -20 } }];
+  await page.goto(`${origin}/#/settings?tab=dsp`);
+  await expect(page.getByRole("heading", { name: "本地音效", exact: true })).toBeVisible();
+  await expect(page.getByLabel("启用本地音效", { exact: true })).toBeChecked();
+  await expect(page.locator(".dsp-chain > li")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "保存设置", exact: true })).toHaveCount(0);
+  await expect(page.getByLabel("DSP Buffer 大小（帧）", { exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "添加效果", exact: true }).click();
   await page.getByRole("button", { name: "添加效果", exact: true }).click();
   const nodes = page.locator(".dsp-chain > li");
@@ -77,112 +87,128 @@ test("users add repeated effects, reorder, edit buffer and persist settings acro
   await nodes.nth(1).getByRole("button", { name: "删除 增益", exact: true }).click();
   await page.getByLabel("选择效果", { exact: true }).selectOption("equalizer");
   await page.getByRole("button", { name: "添加效果", exact: true }).click();
-  await page.getByLabel("中心频率（Hz）", { exact: true }).fill("2500");
-  await page.getByLabel(bufferLabel, { exact: true }).fill("1024");
+  await page.getByRole("slider", { name: "调节 中心频率（Hz）", exact: true }).fill("2500");
+  await expect(page.getByLabel("中心频率（Hz）", { exact: true })).toHaveValue("2500");
+  await nodes.nth(0).getByLabel("启用 增益", { exact: true }).uncheck();
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("musicfs:local-dsp:v1:dsp-test:listener")!));
+  expect(saved).toMatchObject({ enabled: true, chain: [
+    { kind: "gain", enabled: false, params: { gain: -6 } },
+    { kind: "equalizer", enabled: true, params: { frequency: 2500 } },
+  ] });
+  await page.getByLabel("启用本地音效", { exact: true }).uncheck();
+  await page.reload();
+  await expect(page.getByLabel("启用本地音效", { exact: true })).not.toBeChecked();
+  await expect(page.getByLabel("中心频率（Hz）", { exact: true })).toHaveValue("2500");
+  await expect(nodes.first().getByLabel("增益（dB）", { exact: true })).toHaveValue("-6");
+  expect(control.requests.filter((path) => path.includes("/dsp/settings"))).toEqual([]);
+  expect(control.saves).toEqual([]);
+  await page.screenshot({ path: info.outputPath("local-dsp-desktop.png") });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await nodes.last().scrollIntoViewIfNeeded();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: info.outputPath("local-dsp-mobile.png") });
+  await page.getByRole("button", { name: "恢复本地默认", exact: true }).click();
+  await expect(nodes).toHaveCount(0);
+  await expect(page.getByLabel("启用本地音效", { exact: true })).toBeChecked();
+});
+
+test("local parameters clamp on blur and report unavailable browser storage", async ({ page }) => {
+  await mock(page);
+  await page.addInitScript(() => {
+    const original = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (key, value) {
+      if (key.startsWith("musicfs:local-dsp:")) throw new Error("Storage blocked");
+      return original.call(this, key, value);
+    };
+  });
+  await page.goto(`${origin}/#/settings?tab=dsp`);
+  await page.getByRole("button", { name: "添加效果", exact: true }).click();
+  await page.getByLabel("增益（dB）", { exact: true }).fill("99");
+  await page.getByRole("heading", { name: "本地音效", exact: true }).click();
+  await expect(page.getByLabel("增益（dB）", { exact: true })).toHaveValue("12");
+  await expect(page.getByText("本地存储不可用，当前设置仅在本次页面内保留，刷新后可能丢失。", { exact: true })).toBeVisible();
+});
+
+test("unsupported browsers retain effect controls and explain bypass", async ({ page }) => {
+  await mock(page);
+  await page.addInitScript(() => {
+    Object.defineProperty(window, "AudioContext", { value: undefined, configurable: true });
+    Object.defineProperty(window, "webkitAudioContext", { value: undefined, configurable: true });
+  });
+  await page.goto(`${origin}/#/settings?tab=dsp`);
+  await expect(page.getByLabel("启用本地音效", { exact: true })).toBeDisabled();
+  await expect(page.getByText("此浏览器不支持本地音效。仍可正常播放，音效设置会保留。", { exact: true })).toBeVisible();
+  await expect(page.getByText("本地音效已开启，参数实时生效。", { exact: true })).toHaveCount(0);
+});
+
+test("server controls edit channel conversion without resubmitting legacy sound effects", async ({ page }) => {
+  const control = await mock(page);
+  control.personal.settings.chain = [{ name: "gain", version: 1, params: { gainDB: -12 } }];
+  await openServer(page);
+  await expect(page.getByRole("button", { name: "全局格式转换", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "添加效果", exact: true })).toHaveCount(0);
+  await expect(page.getByLabel("DSP Buffer 大小（帧）", { exact: true })).toHaveCount(0);
   await page.getByLabel("输出声道", { exact: true }).selectOption("5.1");
-  await expect(page.getByText("在 48 kHz 下，每块约 21.33 毫秒。", { exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "保存设置", exact: true })).toBeEnabled();
-  await page.getByRole("button", { name: "保存设置", exact: true }).click();
-  await expect(page.getByText("DSP 设置已保存，将在下一次播放生效。当前歌曲保持原配置。", { exact: true })).toBeVisible();
+  const save = page.getByRole("button", { name: "保存设置", exact: true });
+  await expect(save).toBeEnabled(); await save.click();
+  await expect(page.getByText(savedMessage, { exact: true })).toBeVisible();
   expect(control.saves[0].body).toEqual({ expectedRevision: 3, schemaRevision: "dsp-settings-v1", settings: {
-    outputLayout: "5.1", bufferFrames: 1024, chain: [
-      { name: "gain", version: 1, params: { gainDB: -6 } }, { name: "equalizer", version: 1, params: { frequencyHz: 2500 } },
-    ],
+    outputLayout: "5.1", bufferFrames: 4096, chain: [],
   } });
   await page.reload();
-  await expect(page.getByLabel(bufferLabel, { exact: true })).toHaveValue("1024");
-  await expect(page.getByLabel("增益（dB）", { exact: true })).toHaveValue("-6");
-  await expect(page.getByLabel("使用全局配置", { exact: true })).not.toBeChecked();
-  await expect(page.getByLabel("处理链预览", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "服务端格式转换", exact: true }).click();
+  await expect(page.getByLabel("输出声道", { exact: true })).toHaveValue("5.1");
   expect(control.requests.some((path) => path.endsWith("/global") || path.includes("/admin/"))).toBe(false);
-  await page.screenshot({ path: info.outputPath("dsp-desktop.png") });
-  await nodes.first().scrollIntoViewIfNeeded();
-  await page.screenshot({ path: info.outputPath("dsp-desktop-chain.png") });
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.getByRole("heading", { name: "DSP 配置", exact: true }).scrollIntoViewIfNeeded();
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  await page.screenshot({ path: info.outputPath("dsp-mobile.png") });
-  await nodes.last().scrollIntoViewIfNeeded();
-  await page.screenshot({ path: info.outputPath("dsp-mobile-chain.png") });
-  await page.getByRole("button", { name: "保存设置", exact: true }).scrollIntoViewIfNeeded();
-  await page.screenshot({ path: info.outputPath("dsp-mobile-actions.png") });
 });
 
-test("buffer bounds and a terminal node reject invalid chains without losing the draft", async ({ page }) => {
-  await mock(page); await openPersonal(page);
-  const save = page.getByRole("button", { name: "保存设置", exact: true });
-  await page.getByLabel(bufferLabel, { exact: true }).fill("63"); await expect(save).toBeDisabled();
-  await page.getByLabel(bufferLabel, { exact: true }).fill("16385"); await expect(save).toBeDisabled();
-  await page.getByLabel(bufferLabel, { exact: true }).fill("1024.5"); await expect(save).toBeDisabled();
-  await page.getByLabel(bufferLabel, { exact: true }).fill("64");
-  await page.getByLabel("选择效果", { exact: true }).selectOption("terminal");
-  await page.getByRole("button", { name: "添加效果", exact: true }).click();
-  await page.getByLabel("选择效果", { exact: true }).selectOption("gain");
-  await page.getByRole("button", { name: "添加效果", exact: true }).click();
-  await expect(page.getByRole("alert")).toContainText("Terminal output cannot continue DSP"); await expect(save).toBeDisabled();
-  await page.getByRole("button", { name: "下移 终端测试效果", exact: true }).click();
-  await expect(save).toBeEnabled();
-  await expect(page.getByLabel(bufferLabel, { exact: true })).toHaveValue("64");
-  await expect(page.getByLabel("处理链预览", { exact: true })).toContainText("不可继续 DSP");
-});
-
-test("conflicts retain the draft and retries retain the original operation identity", async ({ page }) => {
-  const control = await mock(page); await openPersonal(page);
-  await page.getByLabel(bufferLabel, { exact: true }).fill("2048");
+test("server conflicts retain the channel draft and retries retain operation identity", async ({ page }) => {
+  const control = await mock(page); await openServer(page);
+  await page.getByLabel("输出声道", { exact: true }).selectOption("5.1");
   control.conflict = true;
   const save = page.getByRole("button", { name: "保存设置", exact: true });
   await expect(save).toBeEnabled(); await save.click();
   await expect(page.getByRole("alert")).toContainText("你的草稿已保留");
-  await expect(page.getByLabel(bufferLabel, { exact: true })).toHaveValue("2048");
+  await expect(page.getByLabel("输出声道", { exact: true })).toHaveValue("5.1");
   await page.getByRole("button", { name: "读取最新版本，保留草稿", exact: true }).click();
-  await expect(page.getByLabel(bufferLabel, { exact: true })).toHaveValue("2048");
   control.fail = true;
   await expect(save).toBeEnabled(); await save.click();
   await expect(page.getByRole("button", { name: "重试上次操作", exact: true })).toBeVisible();
-  await expect(page.getByLabel(bufferLabel, { exact: true })).toBeDisabled();
+  await expect(page.getByLabel("输出声道", { exact: true })).toBeDisabled();
   await page.getByRole("button", { name: "重试上次操作", exact: true }).click();
-  await expect(page.getByText("DSP 设置已保存，将在下一次播放生效。当前歌曲保持原配置。", { exact: true })).toBeVisible();
+  await expect(page.getByText(savedMessage, { exact: true })).toBeVisible();
   expect(control.saves[1].key).toBe(control.saves[2].key);
   expect(control.saves[1].body.expectedRevision).toBe(4);
 });
 
-test("administrators edit global defaults and personal inheritance follows later updates", async ({ page }) => {
+test("administrators edit global output channels and personal inheritance follows updates", async ({ page }) => {
   const control = await mock(page, true);
-  await page.goto(`${origin}/#/settings?tab=dsp`);
-  await expect(page.getByLabel(bufferLabel, { exact: true })).toBeDisabled();
-  await page.getByRole("button", { name: "全局默认 DSP", exact: true }).click();
-  const global = page.locator(".dsp-settings:visible");
-  await global.getByLabel(bufferLabel, { exact: true }).fill("8192");
-  await expect(global.getByRole("button", { name: "保存设置", exact: true })).toBeEnabled();
-  await global.getByRole("button", { name: "保存设置", exact: true }).click();
-  await expect(global.getByText("DSP 设置已保存，将在下一次播放生效。当前歌曲保持原配置。", { exact: true })).toBeVisible();
+  await openServer(page, false);
+  await page.getByRole("button", { name: "全局格式转换", exact: true }).click();
+  const editor = page.locator(".server-dsp-settings:visible");
+  await editor.getByLabel("输出声道", { exact: true }).selectOption("7.1");
+  await expect(editor.getByRole("button", { name: "保存设置", exact: true })).toBeEnabled();
+  await editor.getByRole("button", { name: "保存设置", exact: true }).click();
+  await expect(editor.getByText(savedMessage, { exact: true })).toBeVisible();
   expect(control.saves[0].scope).toBe("global");
-  await page.getByRole("button", { name: "我的 DSP", exact: true }).click();
-  const personal = page.locator(".dsp-settings:visible");
-  await expect(personal.getByLabel(bufferLabel, { exact: true })).toHaveValue("8192");
-  await personal.getByLabel("使用全局配置", { exact: true }).uncheck();
-  await personal.getByLabel(bufferLabel, { exact: true }).fill("1024");
-  await expect(personal.getByRole("button", { name: "保存设置", exact: true })).toBeEnabled();
-  await personal.getByRole("button", { name: "保存设置", exact: true }).click();
-  await expect(personal.getByRole("button", { name: "保存设置", exact: true })).toBeDisabled();
-  await personal.getByRole("button", { name: "恢复默认草稿", exact: true }).click();
-  expect(control.saves).toHaveLength(2);
-  await expect(personal.getByLabel("使用全局配置", { exact: true })).not.toBeChecked();
-  await personal.getByLabel("使用全局配置", { exact: true }).check();
-  await personal.getByRole("button", { name: "保存设置", exact: true }).click();
-  await expect(personal.getByText("DSP 设置已保存，将在下一次播放生效。当前歌曲保持原配置。", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "我的格式转换", exact: true }).click();
+  await expect(editor.getByLabel("输出声道", { exact: true })).toHaveValue("7.1");
+  await editor.getByLabel("使用全局配置", { exact: true }).uncheck();
+  await editor.getByLabel("输出声道", { exact: true }).selectOption("5.1");
+  await expect(editor.getByRole("button", { name: "保存设置", exact: true })).toBeEnabled();
+  await editor.getByRole("button", { name: "保存设置", exact: true }).click();
+  await expect(editor.getByRole("button", { name: "保存设置", exact: true })).toBeDisabled();
+  await editor.getByLabel("使用全局配置", { exact: true }).check();
+  await editor.getByRole("button", { name: "保存设置", exact: true }).click();
+  await expect(editor.getByText(savedMessage, { exact: true })).toBeVisible();
   expect(control.saves[2].body).toEqual({ expectedRevision: 4, schemaRevision: "dsp-settings-v1", inheritGlobal: true });
-  await page.reload();
-  await expect(page.getByLabel("使用全局配置", { exact: true })).toBeChecked();
-  await expect(page.getByLabel(bufferLabel, { exact: true })).toHaveValue("8192");
 });
 
-test("unavailable DSP remains readable and explains why saving is unavailable", async ({ page }) => {
+test("unavailable server conversion remains readable and cannot save", async ({ page }) => {
   const control = await mock(page);
   control.personal.available = false; control.personal.unavailableReason = "Audio processor unavailable";
-  await openPersonal(page);
+  await openServer(page);
   await expect(page.getByText("Audio processor unavailable", { exact: true })).toBeVisible();
-  await page.getByLabel(bufferLabel, { exact: true }).fill("512");
+  await page.getByLabel("输出声道", { exact: true }).selectOption("5.1");
   await expect(page.getByRole("button", { name: "保存设置", exact: true })).toBeDisabled();
   expect(control.saves).toHaveLength(0);
 });

@@ -50,7 +50,7 @@ export interface PluginStorage {
 }
 export interface PluginDSP {
   configured: boolean;
-  chainState: "not_configured" | "not_in_chain" | "in_chain";
+  chainState: "disabled" | "not_configured" | "not_in_chain" | "in_chain";
   nodes: {
     position: number;
     name: string;

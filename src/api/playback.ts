@@ -3,6 +3,7 @@ import type { Capabilities, ObservedError, Playback, Preferences } from './types
 
 export function validatePlayback(value: Playback): Playback {
   if (!value || typeof value.sessionId !== 'string' || typeof value.attemptId !== 'string'
+    || !['client', 'server'].includes(value.dspExecution)
     || typeof value.assetId !== 'string' || typeof value.representationId !== 'string'
     || typeof value.streamUrl !== 'string' || !value.streamUrl.startsWith('/api/v1/') || value.streamUrl.startsWith('//')
     || !['direct', 'proxy', 'processed'].includes(value.deliveryMode) || !['byteRange', 'timeRestart', 'none'].includes(value.seekMode)

@@ -5,7 +5,7 @@ import { preview, type PreviewServer } from "vite";
 let server: PreviewServer;
 const origin = "http://127.0.0.1:18145";
 const tabNames = ["音乐源", "插件管理", "播放配置", "DSP 配置", "其他配置"];
-const processingLabel = "服务端处理（降低 6 dB，下一首生效）";
+const processingLabel = "强制服务端转码（下一首生效）";
 const local = {
   id: instanceIds.local, name: "Fixture library", availability: "available", capabilities: [],
   plugin: { id: "musicfs.plugin.source.localfiles", name: "Local files", localizedNames: { "zh-CN": "本地音乐" }, features: ["music-source"] },
@@ -56,7 +56,14 @@ test("settings group existing controls and preserve playback preferences across 
   await expect(page.getByRole("heading", { name: "插件列表", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "本地音乐", exact: true })).toHaveCount(0);
   await tabs.getByRole("tab", { name: "播放配置", exact: true }).click();
+  await expect(page.getByLabel("切歌淡出淡入", { exact: true })).not.toBeChecked();
+  await expect(page.getByLabel("自动音量平衡", { exact: true })).not.toBeChecked();
+  await expect(page.getByLabel("淡出淡入时长（毫秒）", { exact: true })).toHaveCount(0);
   await page.getByLabel(processingLabel).check();
+  await page.getByLabel("切歌淡出淡入", { exact: true }).check();
+  await expect(page.getByLabel("淡出淡入时长（毫秒）", { exact: true })).toHaveValue("300");
+  await page.getByLabel("淡出淡入时长（毫秒）", { exact: true }).fill("750");
+  await page.getByLabel("自动音量平衡", { exact: true }).check();
   await page.getByRole("slider", { name: "默认音量", exact: true }).fill("0.42");
   await tabs.getByRole("tab", { name: "其他配置", exact: true }).click();
   await expect(page.locator(".language-select select")).toBeVisible();
@@ -68,11 +75,35 @@ test("settings group existing controls and preserve playback preferences across 
   await page.reload();
   await expect(page).toHaveURL(/\/settings\?tab=playback$/);
   await expect(page.getByLabel(processingLabel)).toBeChecked();
+  await expect(page.getByLabel("切歌淡出淡入", { exact: true })).toBeChecked();
+  await expect(page.getByLabel("淡出淡入时长（毫秒）", { exact: true })).toHaveValue("750");
+  await expect(page.getByLabel("自动音量平衡", { exact: true })).toBeChecked();
   await expect(page.getByRole("slider", { name: "默认音量", exact: true })).toHaveValue("0.42");
   await page.setViewportSize({ width: 390, height: 844 });
+  await tabs.scrollIntoViewIfNeeded();
   for (const tab of await tabs.getByRole("tab").all()) await expect(tab).toBeInViewport();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: info.outputPath("settings-playback-mobile.png") });
+});
+
+test("playback fades clamp duration and retain the preference while disabled", async ({ page }) => {
+  const requests = await mock(page);
+  await page.goto(`${origin}/#/settings?tab=playback`);
+  await page.getByLabel("切歌淡出淡入", { exact: true }).check();
+  const duration = page.getByLabel("淡出淡入时长（毫秒）", { exact: true });
+  await duration.fill("50");
+  await page.getByRole("heading", { name: "播放", exact: true }).click();
+  await expect(duration).toHaveValue("100");
+  await duration.fill("3000");
+  await page.getByRole("heading", { name: "播放", exact: true }).click();
+  await expect(duration).toHaveValue("2000");
+  await page.getByLabel("切歌淡出淡入", { exact: true }).uncheck();
+  await expect(duration).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByLabel("切歌淡出淡入", { exact: true })).not.toBeChecked();
+  await page.getByLabel("切歌淡出淡入", { exact: true }).check();
+  await expect(duration).toHaveValue("2000");
+  expect(requests.filter((path) => path.includes("/dsp/settings") || path.includes("/playback/sessions"))).toEqual([]);
 });
 
 test("tab navigation replaces history and unknown tab URLs fall back to music sources", async ({ page }) => {

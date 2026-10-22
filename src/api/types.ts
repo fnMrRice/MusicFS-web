@@ -17,9 +17,10 @@ export interface SourceTrack {
   versions?: SourceTrack[];
 }
 export interface TrackPage { items: SourceTrack[]; nextCursor: string | null; libraryRevision: string; matchingRevision?: number }
-export interface OutputProfile { mime: string; codec: string; container: string; transport: string }
+export interface OutputProfile { mime: string; codec: string; container: string; transport: string; channels?: number; layout?: string; sampleRate?: number }
 export interface Playback {
   sessionId: string; attemptId: string; assetId: string; representationId: string;
+  dspExecution: 'server' | 'client';
   deliveryMode: 'direct' | 'proxy' | 'processed'; outputProfile: OutputProfile;
   streamUrl: string; expiresAt: string; seekMode: 'byteRange' | 'timeRestart' | 'none';
   seekableRange: { startMs: number; endMs: number } | null;
@@ -29,5 +30,5 @@ export interface Playback {
 export interface Capabilities {
   htmlAudio: true; formats: { mime: string; canPlay: CanPlayTypeResult }[];
 }
-export interface Preferences { forceProcessing: boolean; gainDb: number }
+export interface Preferences { forceProcessing: boolean; gainDb: number; dspExecution?: 'server' | 'client' }
 export interface ObservedError { code: string; message: string; outputProfile?: OutputProfile }

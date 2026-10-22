@@ -25,6 +25,8 @@ import { LocalScanState } from "../library/local-scan-state";
 import { LocalScans } from "../library/local-scans";
 import { ConfigurationScans } from "../library/configuration-scans";
 import type { PluginOperation } from "../api/directories";
+import { LocalDSPSettingsStore } from "./local-dsp-settings";
+import { LocalDSPEngine } from "../player/dsp/engine";
 import { MatchingApi } from "../api/matching";
 import { MatchingDecisions } from "../library/matching-decisions";
 
@@ -40,6 +42,9 @@ interface PreferencesState {
   mine: boolean;
   playlists: boolean;
   processing: boolean;
+  fadeEnabled: boolean;
+  fadeDurationMs: number;
+  autoVolume: boolean;
 }
 const defaults: PreferencesState = {
   theme: "system",
@@ -47,6 +52,9 @@ const defaults: PreferencesState = {
   mine: true,
   playlists: true,
   processing: false,
+  fadeEnabled: false,
+  fadeDurationMs: 300,
+  autoVolume: false,
 };
 export class Services {
   client = new ApiClient();
@@ -70,6 +78,8 @@ export class Services {
     error: null,
   });
   preferences = new Store<PreferencesState>({ ...defaults });
+  localDSP = new LocalDSPSettingsStore(LocalDSPEngine.supported());
+  private dsp = new LocalDSPEngine(this.localDSP.value.config, (message) => this.localDSP.reportError(message));
   playlists = new Store<Playlist[]>([]);
   queue = new Store<{ items: SourceTrack[]; index: number; repeat: boolean }>({
     items: [],
@@ -79,6 +89,7 @@ export class Services {
   player: PlayerController;
   playerState: Store<PlayerController["state"]>;
   currentTrack = new Store<string | null>(null);
+  private settledQueue: { items: SourceTrack[]; index: number } | null = null;
   private generation = 0;
   private sourceRequest: AbortController | null = null;
   private playlistRequest: AbortController | null = null;
@@ -106,14 +117,29 @@ export class Services {
     return this.libraries.get(provider)!;
   }
   constructor(root: HTMLElement) {
+    let config = this.localDSP.value.config;
+    this.localDSP.subscribe(() => {
+      if (config === this.localDSP.value.config) return;
+      config = this.localDSP.value.config;
+      this.dsp.setConfig(config);
+    });
     this.content.onlineInstances.subscribe(() => this.sourcePlaylists.update(this.content.onlineInstances.value));
     this.player = new PlayerController(
       new PlaybackApi(this.client),
-      audioFactory(root),
+      audioFactory(root, this.dsp),
       capabilities(document.createElement("audio")),
+      () => this.dsp.unlock(),
     );
     this.playerState = new Store({ ...this.player.state });
+    this.player.onSelectionCancelled = () => {
+      if (this.settledQueue) this.queue.set({ ...this.queue.value, ...this.settledQueue });
+    };
     this.player.onChange = () => {
+      // 仅提交已开始解析的选择，保留切歌中 stop 发出的瞬时空曲目之前的队列。
+      if (this.player.state.phase === "resolving" && this.playerState.value.phase !== "resolving") {
+        const { items, index } = this.queue.value;
+        this.settledQueue = { items, index };
+      }
       const ended =
         this.player.state.phase === "ended" &&
         this.playerState.value.phase !== "ended";
@@ -134,6 +160,9 @@ export class Services {
       : null;
   }
   private accept(session: AuthSession): void {
+    this.player.stop();
+    this.settledQueue = null;
+    this.dsp.dispose();
     this.sourcePlaylists.clear();
     this.content.clearOnlineInstances();
     this.libraryApi.clearProviderInstances();
@@ -142,6 +171,7 @@ export class Services {
     this.configurationScans.setSession(this.auth.value.ready!.instanceId, session.user.id);
     this.matchingDecisions.setSession(this.auth.value.ready!.instanceId, session.user.id);
     this.profile.setUser(session.user.id);
+    this.localDSP.setSession(this.auth.value.ready!.instanceId, session.user.id);
     this.reloadSourceNames();
     this.capabilityEvents.start(session.csrfToken);
     let saved: Partial<PreferencesState> = {};
@@ -166,8 +196,14 @@ export class Services {
       mine: saved?.mine !== false,
       playlists: saved?.playlists !== false,
       processing: saved?.processing === true,
+      fadeEnabled: saved?.fadeEnabled === true,
+      fadeDurationMs: typeof saved?.fadeDurationMs === "number" && Number.isFinite(saved.fadeDurationMs)
+        ? Math.max(100, Math.min(2000, saved.fadeDurationMs)) : defaults.fadeDurationMs,
+      autoVolume: saved?.autoVolume === true,
     });
     this.player.setVolume(this.preferences.value.volume);
+    this.player.setTransitions(this.preferences.value.fadeEnabled, this.preferences.value.fadeDurationMs);
+    this.dsp.setAutoVolume(this.preferences.value.autoVolume);
     void this.reloadPlaylists().catch(() => {});
   }
   async connect(): Promise<void> {
@@ -250,10 +286,15 @@ export class Services {
     ++this.generation;
     this.playlistRequest?.abort();
     this.player.stop();
+    this.dsp.dispose();
     this.queue.set({ items: [], index: -1, repeat: false });
+    this.settledQueue = null;
     this.playlists.set([]);
     this.client.csrfToken = null;
     this.preferences.set({ ...defaults });
+    this.player.setTransitions(false, defaults.fadeDurationMs);
+    this.dsp.setAutoVolume(false);
+    this.localDSP.clear();
     this.auth.set({
       ...this.auth.value,
       session: null,
@@ -264,6 +305,8 @@ export class Services {
   preference(patch: Partial<PreferencesState>): void {
     this.preferences.set({ ...this.preferences.value, ...patch });
     this.player.setVolume(this.preferences.value.volume);
+    this.player.setTransitions(this.preferences.value.fadeEnabled, this.preferences.value.fadeDurationMs);
+    this.dsp.setAutoVolume(this.preferences.value.autoVolume);
     const key = this.key();
     if (key)
       try {
@@ -319,10 +362,12 @@ export class Services {
   playbackPreferences(): Preferences {
     return {
       forceProcessing: this.preferences.value.processing,
-      gainDb: this.preferences.value.processing ? -6 : 0,
+      gainDb: 0,
+      dspExecution: "client",
     };
   }
   enqueue(items: SourceTrack[]): void {
+    const previous = this.queue.value;
     this.queue.set({
       ...this.queue.value,
       items: [
@@ -330,6 +375,9 @@ export class Services {
         ...items.filter((t) => t.availability === "available"),
       ],
     });
+    if (this.settledQueue?.items === previous.items && this.settledQueue.index === previous.index) {
+      this.settledQueue = { items: this.queue.value.items, index: previous.index };
+    }
   }
   next(direction: number): void {
     const q = this.queue.value;

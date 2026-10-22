@@ -2,6 +2,7 @@ import type { ManagedPlugin, PluginDSP, PluginStorage } from "../api/directories
 import { tr } from "../i18n";
 
 const chainStates: Record<PluginDSP["chainState"], string> = {
+  disabled: "已禁用",
   not_configured: "未配置",
   not_in_chain: "已配置，未入链",
   in_chain: "已加入处理链",

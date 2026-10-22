@@ -4,6 +4,11 @@ import { DSPApi, dspError, type DSPSaveRequest, type DSPSettingsPage, type DSPVa
 import { useServices } from "../../app/services";
 import { draftOf, settingsFingerprint, settingsOf, validDraft, type DSPDraft } from "./model";
 
+// 格式转换页面不读取或重新提交服务端保存的音效链。
+function formatPage(page: DSPSettingsPage): DSPSettingsPage {
+  return { ...page, settings: { ...page.settings, chain: [] }, defaults: { ...page.defaults, chain: [] } };
+}
+
 export function useDSPSettings(scope: "personal" | "global", refreshToken = 0, saved?: () => void) {
   const services = useServices();
   const api = useMemo(() => new DSPApi(services.client, scope), [services, scope]);
@@ -26,7 +31,7 @@ export function useDSPSettings(scope: "personal" | "global", refreshToken = 0, s
 
   useEffect(() => {
     const controller = new AbortController();
-    void api.get(controller.signal).then((page) => {
+    void api.get(controller.signal).then(formatPage).then((page) => {
       if (controller.signal.aborted) return;
       setData(page); setDraft(draftOf(page.settings)); setInheritGlobal(page.usesGlobal); setLoading(false);
     }, (cause) => {
@@ -60,7 +65,7 @@ export function useDSPSettings(scope: "personal" | "global", refreshToken = 0, s
     const controller = new AbortController(); request.current = controller;
     setBusy(true); setError(null);
     try {
-      const page = await api.get(controller.signal);
+      const page = formatPage(await api.get(controller.signal));
       if (controller.signal.aborted) return;
       setData(page); setDraft((current) => inheritGlobal ? draftOf(page.defaults) : !dirty || !current ? draftOf(page.settings) : current);
       if (!dirty) setInheritGlobal(page.usesGlobal);
@@ -84,10 +89,10 @@ export function useDSPSettings(scope: "personal" | "global", refreshToken = 0, s
     const controller = new AbortController(); request.current = controller;
     setBusy(true); setError(null); setMessage("");
     try {
-      const page = await api.save(operation.request, operation.key, controller.signal);
+      const page = formatPage(await api.save(operation.request, operation.key, controller.signal));
       if (controller.signal.aborted) return;
       setData(page); setDraft(draftOf(page.settings)); setInheritGlobal(page.usesGlobal); pending.current = null; setUncertain(false);
-      setMessage("DSP 设置已保存，将在下一次播放生效。当前歌曲保持原配置。");
+      setMessage("格式转换设置已保存，下次播放时生效。");
       saved?.();
     } catch (cause) {
       if (controller.signal.aborted) return;

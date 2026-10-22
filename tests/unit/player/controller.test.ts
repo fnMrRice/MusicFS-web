@@ -14,6 +14,133 @@ function setup(create = vi.fn().mockResolvedValue(playback())) {
   return { controller, api, audio, factory, event: (type: MediaObservation['type'], seconds = 0, paused = false) => observe({ type, seconds, paused }) };
 }
 describe('Player controller (Mock media; not decoder validation)', () => {
+  it('fades a playing song before replacing it and fades in the new selection', async () => {
+    const s = setup();
+    const fade = deferred<void>();
+    s.audio.fadeOut = vi.fn().mockReturnValue(fade.promise);
+    s.audio.fadeIn = vi.fn();
+    s.controller.setTransitions(true, 500);
+    await s.controller.select(track);
+    expect(s.audio.fadeIn).toHaveBeenCalledWith(500);
+    s.event('playing');
+    const changing = s.controller.select({ ...track, sourceTrackId: 'other' });
+    expect(s.audio.fadeOut).toHaveBeenCalledWith(500);
+    expect(s.api.create).toHaveBeenCalledOnce();
+    fade.resolve(); await changing;
+    expect(s.api.create).toHaveBeenCalledTimes(2);
+    expect(s.audio.fadeIn).toHaveBeenCalledTimes(2);
+    s.controller.stop();
+  });
+  it('a stop during fade cancels the pending selection', async () => {
+    const s = setup(); const fade = deferred<void>();
+    s.audio.fadeOut = vi.fn().mockReturnValue(fade.promise);
+    s.controller.setTransitions(true, 300);
+    await s.controller.select(track); s.event('playing');
+    const changing = s.controller.select({ ...track, sourceTrackId: 'other' });
+    s.controller.stop(); fade.resolve(); await changing;
+    expect(s.api.create).toHaveBeenCalledOnce();
+    expect(s.controller.state.phase).toBe('idle');
+  });
+  it('a pause during the outgoing fade leaves the next selection paused', async () => {
+    const s = setup(); const fade = deferred<void>();
+    s.audio.fadeOut = vi.fn().mockReturnValue(fade.promise);
+    s.controller.setTransitions(true, 300);
+    await s.controller.select(track); s.event('playing');
+    const changing = s.controller.select({ ...track, sourceTrackId: 'other' });
+    s.controller.toggle(); fade.resolve(); await changing;
+    expect(s.audio.play).toHaveBeenCalledOnce();
+    expect(s.controller.state.phase).toBe('paused');
+    s.controller.stop();
+  });
+  it('a valid native seek cancels every pending fading selection before its promise resumes', async () => {
+    const s = setup(); const first = deferred<void>(); const second = deferred<void>();
+    const cancelled = vi.fn(); s.controller.onSelectionCancelled = cancelled;
+    s.audio.fadeOut = vi.fn().mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+    s.audio.cancelFade = vi.fn(() => { first.resolve(); second.resolve(); });
+    s.controller.setTransitions(true, 300);
+    await s.controller.select(track); s.event('playing');
+    const one = s.controller.select({ ...track, sourceTrackId: 'next' });
+    const two = s.controller.select({ ...track, sourceTrackId: 'later' });
+    s.controller.seek(10_000);
+    await Promise.all([one, two]);
+    expect(cancelled).toHaveBeenCalledOnce();
+    expect(s.api.create).toHaveBeenCalledOnce();
+    expect(s.audio.seek).toHaveBeenCalledWith(10);
+    expect(s.controller.state.track?.sourceTrackId).toBe(track.sourceTrackId);
+    s.controller.stop();
+  });
+  it('an invalid native seek leaves the pending selection and fade intact', async () => {
+    const s = setup(); const fade = deferred<void>();
+    const cancelled = vi.fn(); s.controller.onSelectionCancelled = cancelled;
+    s.audio.fadeOut = vi.fn().mockReturnValue(fade.promise); s.audio.cancelFade = vi.fn();
+    Object.defineProperty(s.audio, 'seekable', { value: [{ start: 0, end: 5 }] });
+    s.controller.setTransitions(true, 300);
+    await s.controller.select(track); s.event('playing');
+    const changing = s.controller.select({ ...track, sourceTrackId: 'next' });
+    s.controller.seek(40_000); s.controller.seek(10_000);
+    expect(cancelled).not.toHaveBeenCalled();
+    expect(s.audio.cancelFade).not.toHaveBeenCalled();
+    fade.resolve(); await changing;
+    expect(s.controller.state.track?.sourceTrackId).toBe('next');
+    s.controller.stop();
+  });
+  it('a server seek cancels the pending song and keeps the original session', async () => {
+    const descriptor = { ...playback(), seekMode: 'timeRestart' } as Playback;
+    const s = setup(vi.fn().mockResolvedValue(descriptor)); const fade = deferred<void>();
+    const cancelled = vi.fn(); s.controller.onSelectionCancelled = cancelled;
+    s.audio.fadeOut = vi.fn().mockReturnValue(fade.promise);
+    s.audio.cancelFade = vi.fn(() => fade.resolve());
+    s.api.control.mockResolvedValue({ ...descriptor, attemptId: 'seeked', positionOriginMs: 10_000 });
+    s.controller.setTransitions(true, 300);
+    await s.controller.select(track); s.event('playing');
+    const changing = s.controller.select({ ...track, sourceTrackId: 'next' });
+    s.controller.seek(10_000); await changing; await Promise.resolve();
+    expect(cancelled).toHaveBeenCalledOnce();
+    expect(s.api.create).toHaveBeenCalledOnce();
+    expect(s.api.control).toHaveBeenCalledOnce();
+    expect(s.controller.state.track?.sourceTrackId).toBe(track.sourceTrackId);
+    expect(s.controller.state.playback?.attemptId).toBe('seeked');
+    s.controller.stop();
+  });
+  it('fades a natural ending once and cancels the envelope on a seek', async () => {
+    const s = setup();
+    s.audio.fadeOut = vi.fn().mockResolvedValue(undefined); s.audio.cancelFade = vi.fn();
+    s.controller.setTransitions(true, 500);
+    await s.controller.select(track); s.event('playing');
+    s.event('timeupdate', 29.6); s.event('timeupdate', 29.8);
+    expect(s.audio.fadeOut).toHaveBeenCalledOnce();
+    expect(s.audio.fadeOut).toHaveBeenCalledWith(400);
+    s.controller.seek(10000);
+    expect(s.audio.cancelFade).toHaveBeenCalled();
+    expect(s.audio.seek).toHaveBeenCalledWith(10);
+    s.controller.stop();
+  });
+  it('requests local effects with no server gain even when a caller has old preferences', async () => {
+    const s = setup();
+    await s.controller.select(track, { forceProcessing: true, gainDb: -6, dspExecution: 'server' });
+    expect(s.api.create.mock.calls[0][2]).toEqual({ forceProcessing: true, gainDb: 0, dspExecution: 'client' });
+    s.controller.stop();
+  });
+  it('refuses an unconfirmed execution mode or a server effect before attaching audio', async () => {
+    for (const response of [
+      { ...playback(), dspExecution: 'server' },
+      { ...playback(), effectiveProcessing: [{ type: 'gain', execution: 'server', gainDb: -6 }] },
+    ]) {
+      const s = setup(vi.fn().mockResolvedValue(response));
+      await s.controller.select(track);
+      expect(s.controller.state.phase).toBe('error');
+      expect(s.factory).not.toHaveBeenCalled();
+      s.controller.stop();
+    }
+  });
+  it('accepts required server conversion and decryption with local effects', async () => {
+    const s = setup(vi.fn().mockResolvedValue({ ...playback(), effectiveProcessing: [
+      { type: 'channelMix', execution: 'server' }, { type: 'ncmDecrypt', execution: 'server' },
+    ] }));
+    await s.controller.select(track);
+    expect(s.factory).toHaveBeenCalledOnce();
+    s.controller.stop();
+  });
   it('shows playback-specific guidance when a required decoder is unavailable', async () => {
     const s = setup(vi.fn().mockRejectedValue(new ApiError('UNSUPPORTED', 'NCM decryption plugin is unavailable', 415)));
     await s.controller.select(track);

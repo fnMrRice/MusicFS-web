@@ -22,6 +22,7 @@ export function PlayerBar() {
   const state = useStore(s.playerState);
   const q = useStore(s.queue);
   const prefs = useStore(s.preferences);
+  const dsp = useStore(s.localDSP);
   const [panel, setPanel] = useState<"queue" | "media" | null>(null);
   const [seek, setSeek] = useState<number | null>(null);
   useEffect(() => {
@@ -57,8 +58,9 @@ export function PlayerBar() {
       ? "服务端解密并转码输出"
       : "服务端解密输出"
     : playback?.deliveryMode === "processed"
-      ? "服务端处理输出"
+      ? "服务端格式转换输出"
       : "原流播放";
+  const localEffects = dsp.supported && !dsp.error && dsp.config.enabled && dsp.config.chain.some((node) => node.enabled);
   const commit = (value: number) => {
     s.player.seek(value);
     setSeek(null);
@@ -105,6 +107,7 @@ export function PlayerBar() {
           <small className="player-status">
             {tr(phase[state.phase])}
             {playback && ` · ${tr(output)}`}
+            {playback && localEffects && ` · ${tr("本地音效")}`}
           </small>
         </div>
       </div>
@@ -191,6 +194,7 @@ export function PlayerBar() {
           <button onClick={() => s.player.stop()}>{tr("停止播放")}</button>
         </div>
       )}
+      {dsp.error && state.track && <div className="playback-message" role="alert">{statusText(dsp.error)}</div>}
       {panel && (
         <div className="player-panel">
           <div className="section-title">

@@ -157,7 +157,10 @@ test('keyboard reaches scrollable library and final minimal player controls', as
   await login(page, server); await scan(page.request, server.origin);
   await page.getByRole('button', { name: '刷新列表' }).click(); await expect(page.locator('tbody tr')).toHaveCount(100);
   await page.getByLabel('来源', { exact: true }).focus();
-  await page.keyboard.press('Tab'); await expect(page.getByRole('button', { name: '刷新列表' })).toBeFocused();
+  // 来源与刷新之间还包含已交付的合并/重复识别操作，逐个验证可用控件的焦点顺序。
+  const controls = page.locator('.filter-end button:not([disabled])');
+  for (const control of await controls.all()) { await page.keyboard.press('Tab'); await expect(control).toBeFocused(); }
+  await expect(page.getByRole('button', { name: '刷新列表' })).toBeFocused();
   await page.getByRole('button', { name: '播放 markers.wav', exact: true }).click(); await waitPlaying(page);
   await page.getByRole('button', { name: '停止', exact: true }).scrollIntoViewIfNeeded();
   await expect(page.getByRole('button', { name: '停止', exact: true })).toBeInViewport();

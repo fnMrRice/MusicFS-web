@@ -182,23 +182,77 @@ function OtherSettings() {
 function PlaybackSettings() {
   const s = useServices();
   const prefs = useStore(s.preferences);
+  const { supported } = useStore(s.localDSP);
+  const [fadeDraft, setFadeDraft] = useState<string | null>(null);
   return (
     <div className="settings-card">
       <h3>{tr("播放")}</h3>
       <label className="check-label">
         <input
           type="checkbox"
-          aria-label={tr("服务端处理（降低 6 dB，下一首生效）")}
+          aria-label={tr("强制服务端转码（下一首生效）")}
           checked={prefs.processing}
           onChange={(e) => s.preference({ processing: e.target.checked })}
         />
-        {tr("请求服务端处理，降低 6 dB（下一首生效）")}
+        {tr("强制服务端转码（下一首生效）")}
       </label>
       <p className="muted">
         {tr(
-          "服务端根据实际插件能力协商输出；播放器会显示最终生效的处理。音量调节在浏览器中完成。",
+          "服务端负责格式转换、转码及必要的声道转换；音量与音效在浏览器中实时调整。",
         )}
       </p>
+      <label className="check-label">
+        <input
+          type="checkbox"
+          aria-label={tr("切歌淡出淡入")}
+          checked={prefs.fadeEnabled}
+          disabled={!supported}
+          onChange={(event) => s.preference({ fadeEnabled: event.target.checked })}
+        />
+        {tr("切歌淡出淡入")}
+      </label>
+      <p className="muted">{tr("切歌时先淡出当前曲目，再淡入新曲目。暂停、停止和定位立即响应。")}</p>
+      {prefs.fadeEnabled && <>
+        <label>
+          {tr("淡出淡入时长（毫秒）")}{" "}
+          <input
+            aria-label={tr("淡出淡入时长（毫秒）")}
+            type="number"
+            min={100}
+            max={2000}
+            step={1}
+            disabled={!supported}
+            value={fadeDraft ?? prefs.fadeDurationMs}
+            onChange={(event) => {
+              const value = event.target.value;
+              setFadeDraft(value);
+              const number = Number(value);
+              if (value.trim() && Number.isInteger(number) && number >= 100 && number <= 2000) s.preference({ fadeDurationMs: number });
+            }}
+            onBlur={() => {
+              if (fadeDraft !== null && fadeDraft.trim() && Number.isFinite(Number(fadeDraft))) {
+                s.preference({ fadeDurationMs: Math.max(100, Math.min(2000, Math.round(Number(fadeDraft)))) });
+              }
+              setFadeDraft(null);
+            }}
+          />
+        </label>
+        <p className="muted">{tr("100–2000 毫秒，默认 300 毫秒。此时长分别用于淡出和淡入。")}</p>
+      </>}
+      <label className="check-label">
+        <input
+          type="checkbox"
+          aria-label={tr("自动音量平衡")}
+          checked={prefs.autoVolume}
+          disabled={!supported}
+          onChange={(event) => s.preference({ autoVolume: event.target.checked })}
+        />
+        {tr("自动音量平衡")}
+      </label>
+      <p className="muted">{tr("根据播放音量缓慢调整，减小曲目之间的音量差异；静音与安静段落不会被持续放大。")}</p>
+      <p className="muted">{tr("音量根据当前播放信号实时估计，刚开始播放时需要逐步调整。")}</p>
+      {!supported && <p className="muted" role="status">{tr("此浏览器不支持淡出淡入和自动音量平衡，设置会保留。")}</p>}
+      <p className="muted">{tr("这些偏好仅保存在当前浏览器，按实例和账号区分。")}</p>
       <label>
         {tr("默认音量")}{" "}
         <input

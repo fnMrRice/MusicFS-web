@@ -23,7 +23,12 @@ async function save(page: Page, editor: Locator, global = false) {
   return await response.json() as DSPSettingsPage;
 }
 
-test("real server catalog, global default, personal buffer and inheritance survive refresh and restart", async ({ page }, info) => {
+async function openServer(page: Page, origin: string) {
+  await page.goto(`${origin}/#/settings?tab=dsp`);
+  await page.getByRole("button", { name: "服务端格式转换", exact: true }).click();
+}
+
+test("real server only exposes channel conversion and persists global and personal output layouts", async ({ page }, info) => {
   test.setTimeout(180_000);
   test.skip(!existsSync(ffmpeg) || !existsSync(ffprobe), "Set MUSICFS_E2E_FFMPEG and MUSICFS_E2E_FFPROBE to installed binaries");
   server = await startDirectoryServer();
@@ -34,37 +39,34 @@ test("real server catalog, global default, personal buffer and inheritance survi
   writeFileSync(server.configPath, server.configuration + plugin.slice(plugin.indexOf("\n") + 1));
   await server.restart();
   await login(page, server);
-  await page.goto(`${server.origin}/#/settings?tab=dsp`);
+  await openServer(page, server.origin);
   const initial = await (await page.request.get(`${server.origin}/api/v1/dsp/settings`)).json() as DSPSettingsPage;
   expect(initial.available).toBe(true);
-  expect(initial.catalog.map((item) => item.name)).toEqual(expect.arrayContaining(["gain", "bypass", "equalizer", "compressor", "reverb", "channelmix"]));
+  expect(initial.catalog).toEqual([]);
   await expect(page.getByLabel("使用全局配置", { exact: true })).toBeChecked();
-  await page.getByRole("button", { name: "全局默认 DSP", exact: true }).click();
-  const editor = page.locator(".dsp-settings:visible");
-  await editor.getByLabel("DSP Buffer 大小（帧）", { exact: true }).fill("2048");
-  await editor.getByLabel("选择效果", { exact: true }).selectOption("equalizer");
-  await editor.getByRole("button", { name: "添加效果", exact: true }).click();
-  await editor.getByLabel("中心频率（Hz）", { exact: true }).fill("1800");
-  await editor.getByLabel("增益（dB）", { exact: true }).fill("-3");
+  await expect(page.getByRole("button", { name: "添加效果", exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "全局格式转换", exact: true }).click();
+  const editor = page.locator(".server-dsp-settings:visible");
+  await editor.getByLabel("输出声道", { exact: true }).selectOption("5.1");
   const global = await save(page, editor, true);
-  expect(global).toMatchObject({ scope: "global", usesGlobal: false, settings: { bufferFrames: 2048, chain: [
-    { name: "equalizer", params: { frequencyHz: 1800, gainDB: -3, q: 0.707 } },
-  ] } });
-  await page.getByRole("button", { name: "我的 DSP", exact: true }).click();
-  await expect(editor.getByLabel("DSP Buffer 大小（帧）", { exact: true })).toHaveValue("2048");
+  expect(global).toMatchObject({ scope: "global", usesGlobal: false, settings: { outputLayout: "5.1", chain: [] } });
+  await page.getByRole("button", { name: "我的格式转换", exact: true }).click();
+  await expect(editor.getByLabel("输出声道", { exact: true })).toHaveValue("5.1");
   await editor.getByLabel("使用全局配置", { exact: true }).uncheck();
-  await editor.getByLabel("DSP Buffer 大小（帧）", { exact: true }).fill("512");
-  expect(await save(page, editor)).toMatchObject({ usesGlobal: false, settings: { bufferFrames: 512 } });
+  await editor.getByLabel("输出声道", { exact: true }).selectOption("stereo");
+  expect(await save(page, editor)).toMatchObject({ usesGlobal: false, settings: { outputLayout: "stereo", chain: [] } });
   await page.reload();
-  await expect(editor.getByLabel("DSP Buffer 大小（帧）", { exact: true })).toHaveValue("512");
+  await page.getByRole("button", { name: "服务端格式转换", exact: true }).click();
+  await expect(editor.getByLabel("输出声道", { exact: true })).toHaveValue("stereo");
   await expect(editor.getByLabel("使用全局配置", { exact: true })).not.toBeChecked();
   await editor.getByLabel("使用全局配置", { exact: true }).check();
-  expect(await save(page, editor)).toMatchObject({ usesGlobal: true, settings: { bufferFrames: 2048 } });
+  expect(await save(page, editor)).toMatchObject({ usesGlobal: true, settings: { outputLayout: "5.1", chain: [] } });
   const read = await (await page.request.get(`${server.origin}/api/v1/dsp/settings`)).json() as DSPSettingsPage;
   expect(read.settings).toEqual(global.settings);
   await server.restart();
   await page.reload();
+  await page.getByRole("button", { name: "服务端格式转换", exact: true }).click();
   await expect(editor.getByLabel("使用全局配置", { exact: true })).toBeChecked();
-  await expect(editor.getByLabel("DSP Buffer 大小（帧）", { exact: true })).toHaveValue("2048");
-  await page.screenshot({ path: info.outputPath("dsp-real-inherited.png") });
+  await expect(editor.getByLabel("输出声道", { exact: true })).toHaveValue("5.1");
+  await page.screenshot({ path: info.outputPath("dsp-real-format-inherited.png") });
 });

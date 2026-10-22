@@ -20,6 +20,7 @@ import { playbackErrorMessage } from "./errors";
 export class PlayerController {
   state = initialState();
   onChange: (() => void) | null = null;
+  onSelectionCancelled: (() => void) | null = null;
   private generation = 0;
   private controller: AbortController | null = null;
   private audio: AudioPort | null = null;
@@ -27,6 +28,17 @@ export class PlayerController {
   private recovery = new RecoveryBudget();
   private bufferingTimer: ReturnType<typeof setTimeout> | null = null;
   private volume = 0.8;
+  private selection = 0;
+  private pendingSelection: number | null = null;
+  private fadeEnabled = false;
+  private fadeDurationMs = 300;
+  private pendingFadeIn = 0;
+  private fadingAttempt: string | null = null;
+  setTransitions(enabled: boolean, durationMs: number): void {
+    this.fadeEnabled = enabled;
+    this.fadeDurationMs = Number.isFinite(durationMs) ? Math.max(100, Math.min(2000, durationMs)) : 300;
+    if (!enabled) { this.audio?.cancelFade?.(); this.pendingFadeIn = 0; this.fadingAttempt = null; }
+  }
   setVolume(value: number): void {
     this.volume = Math.max(0, Math.min(1, value));
     this.audio?.setVolume?.(this.volume);
@@ -39,6 +51,7 @@ export class PlayerController {
       this.state.phase = "paused";
       this.emit();
     } else {
+      this.unlockAudio();
       this.state.wantsPlay = true;
       const generation = this.generation;
       const audio = this.audio;
@@ -57,18 +70,32 @@ export class PlayerController {
     private api: Pick<PlaybackApi, "create" | "close" | "control">,
     private createAudio: AudioFactory,
     private capabilities: Capabilities,
+    private unlockAudio: () => void = () => {},
   ) {}
   async select(
     track: SourceTrack,
     preferences: Preferences = { forceProcessing: false, gainDb: 0 },
   ): Promise<void> {
+    this.unlockAudio();
+    const selection = ++this.selection;
+    let wantsPlay = true;
+    if (this.fadeEnabled && this.audio && this.state.wantsPlay && this.state.phase === "playing") {
+      this.pendingSelection = selection;
+      await this.audio.fadeOut?.(this.fadeDurationMs);
+      if (selection !== this.selection) return;
+      this.pendingSelection = null;
+      wantsPlay = this.state.wantsPlay || ["ended"].includes(this.state.phase);
+    }
     this.stop();
+    this.pendingFadeIn = this.fadeEnabled ? this.fadeDurationMs : 0;
+    // 浏览器音效始终由本地执行；旧服务端配置不得叠加到新会话。
+    preferences = { ...preferences, gainDb: 0, dspExecution: "client" };
     const generation = this.generation;
     this.state = {
       ...initialState(),
       track,
       phase: "resolving",
-      wantsPlay: true,
+      wantsPlay,
     };
     this.emit();
     this.controller = new AbortController();
@@ -125,6 +152,10 @@ export class PlayerController {
     }
   }
   stop(): void {
+    ++this.selection;
+    this.pendingSelection = null;
+    this.pendingFadeIn = 0;
+    this.fadingAttempt = null;
     ++this.generation;
     this.controller?.abort();
     this.queue?.dispose();
@@ -138,6 +169,13 @@ export class PlayerController {
     this.emit();
   }
   private attach(playback: Playback, generation: number): void {
+    if (playback.dspExecution !== "client" || playback.effectiveProcessing.some((step) =>
+      !step || typeof step !== "object" || !("type" in step) ||
+      !["channelMix", "channelmix", "ncmDecrypt"].includes(String(step.type)))) {
+      this.state.playback = playback;
+      this.fail("服务端未确认本地音效模式，请更新服务端后重新播放。");
+      return;
+    }
     if (playback.resumeDecision !== "continue") {
       this.state.playback = playback;
       this.fail(
@@ -159,8 +197,10 @@ export class PlayerController {
       )
         return;
       this.observe(event);
-    });
+    }, playback.outputProfile.channels);
     this.audio.setVolume?.(this.volume);
+    if (this.pendingFadeIn) this.audio.fadeIn?.(this.pendingFadeIn);
+    this.pendingFadeIn = 0;
     this.emit();
     if (this.state.wantsPlay)
       void this.audio.play().catch((error: unknown) => {
@@ -187,6 +227,17 @@ export class PlayerController {
     if (this.state.playback)
       this.state.positionMs = trackPosition(this.state.playback, event.seconds);
     switch (event.type) {
+      case "timeupdate": {
+        const playback = this.state.playback;
+        const end = playback?.seekableRange?.endMs ?? this.state.track?.durationMs;
+        const remaining = end == null ? Infinity : end - this.state.positionMs;
+        if (this.fadeEnabled && playback && this.state.wantsPlay && this.state.phase === "playing" &&
+          remaining > 0 && remaining <= this.fadeDurationMs && this.fadingAttempt !== playback.attemptId) {
+          this.fadingAttempt = playback.attemptId;
+          void this.audio?.fadeOut?.(remaining);
+        }
+        break;
+      }
       case "playing":
         this.clearBufferingTimer();
         this.state.phase = "playing";
@@ -263,6 +314,7 @@ export class PlayerController {
       return;
     }
     if (playback.seekMode === "timeRestart" && this.queue) {
+      this.cancelSelectionForSeek();
       this.clearBufferingTimer();
       this.audio?.destroy();
       this.audio = null;
@@ -292,7 +344,19 @@ export class PlayerController {
       this.emit();
       return;
     }
+    this.cancelSelectionForSeek();
     this.audio.seek(seconds);
+  }
+  private cancelSelectionForSeek(): void {
+    // 先失效待切歌请求，再取消包络；取消包络可能立即唤醒 select 的等待。
+    if (this.pendingSelection !== null) {
+      ++this.selection;
+      this.pendingSelection = null;
+      this.onSelectionCancelled?.();
+    }
+    this.pendingFadeIn = 0;
+    this.fadingAttempt = null;
+    this.audio?.cancelFade?.();
   }
   private fail(message: string): void {
     this.clearBufferingTimer();

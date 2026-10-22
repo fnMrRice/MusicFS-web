@@ -25,6 +25,10 @@
 .dsp-scope [aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
 .dsp-settings .dsp-inherit { display: flex; flex-direction: row; align-items: center; justify-content: flex-start; gap: 9px; margin-block: 16px; }
 .dsp-settings .dsp-inherit input { width: auto; }
+.dsp-settings .dsp-toggle { display: flex; align-items: center; gap: 9px; margin-block: 16px; }
+.dsp-settings .dsp-toggle input { width: auto; }
+.local-dsp-parameter { display: grid; gap: 8px; min-width: 0; }
+.local-dsp-parameter-inputs { display: grid; grid-template-columns: minmax(0, 1fr) 96px; align-items: center; gap: 12px; }
 @media (max-width: 540px) {
   .dsp-output-controls, .dsp-parameters { grid-template-columns: 1fr; }
   .dsp-node { padding: 12px; }
