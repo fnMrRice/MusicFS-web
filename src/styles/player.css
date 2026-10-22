@@ -120,6 +120,9 @@
   width: 52px;
   height: 52px;
 }
+.transport .playback-mode-active {
+  color: var(--accent);
+}
 .play-main svg {
   fill: currentColor;
 }
@@ -141,6 +144,34 @@
   width: 76px;
   height: 4px;
 }
+.volume-slider {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+}
+.volume-value {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 12px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 5px 9px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 5px 20px var(--shadow);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 3;
+}
+.volume-slider:hover .volume-value,
+.volume-slider:focus-within .volume-value {
+  display: block;
+}
 .player .tooltip {
   top: auto;
   bottom: calc(100% + 12px);
@@ -161,6 +192,24 @@
 }
 .player-panel h2 {
   margin: 0;
+}
+.player-panel .section-title {
+  gap: 8px;
+}
+.player-panel .section-title h2 {
+  margin-right: auto;
+}
+.lyrics-toggle[aria-pressed="true"],
+.pin-lyrics[aria-pressed="true"] {
+  color: var(--accent);
+  background: var(--hover);
+}
+.shuffle-queue {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  white-space: nowrap;
 }
 .queue-list {
   padding-left: 22px;
@@ -243,14 +292,11 @@
   .player {
     gap: 6px;
   }
-  .player-extras > .tip-wrap:first-child {
-    display: none;
-  }
 }
 @media (max-width: 580px) {
   .player {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 1fr) auto;
     gap: 4px;
     padding: 13px 12px 6px;
   }
@@ -264,15 +310,9 @@
     width: 40px;
     height: 40px;
   }
-  .transport > .tip-wrap:first-child {
-    display: none;
-  }
   .player-extras {
     grid-column: 1/-1;
     justify-content: flex-end;
-  }
-  .player-extras > .tip-wrap:first-child {
-    display: inline-flex;
   }
   .player-extras input {
     width: 90px;

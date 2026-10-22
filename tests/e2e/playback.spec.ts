@@ -37,7 +37,7 @@ test('real login, CSRF rejection, scanning, fixed pages, refresh restore, and lo
   expect((await page.request.get(`${server.origin}/api/v1/auth/session`)).status()).toBe(401);
 });
 
-test('real original WAV decodes, pauses, seeks through Range, switches, and stops', async ({ page, browser }, info) => {
+test('real original WAV decodes, pauses, seeks through Range, switches, and unloads on logout', async ({ page, browser }, info) => {
   await login(page, server);
   const responses: { status: number; range: string | null; contentType: string | null }[] = [];
   page.on('response', (response) => { if (response.url().endsWith('/stream')) responses.push({ status: response.status(), range: response.headers()['content-range'] ?? null, contentType: response.headers()['content-type'] ?? null }); });
@@ -58,7 +58,7 @@ test('real original WAV decodes, pauses, seeks through Range, switches, and stop
   for (const name of ['markers.wav', 'pagination-000.wav', 'markers.wav']) await page.getByRole('button', { name: `播放 ${name}`, exact: true }).click();
   await waitPlaying(page); await expect(page.getByRole('region', { name: '播放器' }).getByText('markers.wav', { exact: true })).toBeVisible();
   await page.screenshot({ path: info.outputPath('original-playback.png'), fullPage: true });
-  await page.getByRole('button', { name: '停止', exact: true }).click(); await expect(page.locator('audio')).toHaveCount(0);
+  await logout(page); await expect(page.locator('audio')).toHaveCount(0);
   writeFileSync(join(server.directory, 'original-evidence.json'), JSON.stringify({ browser: browser.version(), responses, decodedRms: energy, physicalListening: 'Not performed' }, null, 2));
   await info.attach('browser-media-evidence', { body: JSON.stringify({ browser: browser.version(), responses, decodedRms: energy, physicalListening: 'Not performed' }, null, 2), contentType: 'application/json' });
 });
@@ -96,10 +96,10 @@ test('unsupported AIFF becomes streaming processed MP3 and timeRestart preserves
   const evidence = { browser: browser.version(), rawAIFFErrorCode: rawError, initial, attempts, decodedSeekSignal: signal, physicalListening: 'Not performed' };
   writeFileSync(join(server.directory, 'processed-evidence.json'), JSON.stringify(evidence, null, 2));
   await info.attach('processed-evidence', { body: JSON.stringify(evidence, null, 2), contentType: 'application/json' });
-  await page.getByRole('button', { name: '停止', exact: true }).click(); await expect(page.locator('audio')).toHaveCount(0);
+  await logout(page); await expect(page.locator('audio')).toHaveCount(0);
 });
 
-test('long processed output decodes before HTTP stream completes and cancellation unloads media', async ({ page, browser }, info) => {
+test('long processed output decodes before HTTP stream completes and logout unloads media', async ({ page, browser }, info) => {
   await login(page, server); await showAll(page);
   const completed = new Set<string>(); let firstResponseAt = 0;
   page.on('requestfinished', (request) => { if (request.url().endsWith('/stream')) completed.add(request.url()); });
@@ -111,7 +111,7 @@ test('long processed output decodes before HTTP stream completes and cancellatio
   const finishedAtFirstDecodedSample = completed.has(url);
   expect(energy).toBeGreaterThan(.01); expect(finishedAtFirstDecodedSample).toBe(false);
   writeFileSync(join(server.directory, 'streaming-evidence.json'), JSON.stringify({ browser: browser.version(), startedAt, firstResponseAt, decodedAt, decodedRms: energy, finishedAtFirstDecodedSample, physicalListening: 'Not performed' }, null, 2));
-  await page.getByRole('button', { name: '停止', exact: true }).click(); await expect(page.locator('audio')).toHaveCount(0);
+  await logout(page); await expect(page.locator('audio')).toHaveCount(0);
   await info.attach('streaming-timing', { body: JSON.stringify({ browser: browser.version(), startedAt, firstResponseAt, decodedAt, decodedRms: energy, finishedAtFirstDecodedSample, physicalListening: 'Not performed' }, null, 2), contentType: 'application/json' });
 });
 
@@ -162,9 +162,13 @@ test('keyboard reaches scrollable library and final minimal player controls', as
   for (const control of await controls.all()) { await page.keyboard.press('Tab'); await expect(control).toBeFocused(); }
   await expect(page.getByRole('button', { name: '刷新列表' })).toBeFocused();
   await page.getByRole('button', { name: '播放 markers.wav', exact: true }).click(); await waitPlaying(page);
-  await page.getByRole('button', { name: '停止', exact: true }).scrollIntoViewIfNeeded();
-  await expect(page.getByRole('button', { name: '停止', exact: true })).toBeInViewport();
+  await expect(page.getByRole('button', { name: '停止', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: '暂停', exact: true }).scrollIntoViewIfNeeded();
+  await expect(page.getByRole('button', { name: '暂停', exact: true })).toBeInViewport();
+  await expect(page.getByRole('button', { name: '播放模式：顺序播放，点击切换', exact: true })).toBeInViewport();
   await page.screenshot({ path: info.outputPath('minimal-web.png'), fullPage: true });
   await page.getByRole('region', { name: '播放器', exact: true }).screenshot({ path: info.outputPath('player-detail.png') });
-  await page.getByRole('button', { name: '停止', exact: true }).click(); await expect(page.locator('audio')).toHaveCount(0);
+  await page.getByRole('button', { name: '暂停', exact: true }).click();
+  await expect.poll(() => page.locator('audio').evaluate((audio: HTMLAudioElement) => audio.paused)).toBe(true);
+  await logout(page); await expect(page.locator('audio')).toHaveCount(0);
 });

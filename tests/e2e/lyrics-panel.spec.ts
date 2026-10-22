@@ -1,0 +1,157 @@
+import { expect, test, type Page } from '@playwright/test';
+import { preview, type PreviewServer } from 'vite';
+import { playback, track } from '../fixtures/dto';
+import { waitPlaying } from './helpers';
+
+let server: PreviewServer;
+let origin: string;
+const preferenceKey = 'musicfs:lyrics-panel:listener:preferences';
+test.beforeAll(async () => {
+  server = await preview({ preview: { host: '127.0.0.1', port: 0 } });
+  const address = server.httpServer.address();
+  if (!address || typeof address === 'string') throw new Error('Preview address unavailable');
+  origin = `http://127.0.0.1:${address.port}`;
+});
+test.afterAll(async () => { await new Promise<void>((resolve) => server?.httpServer.close(() => resolve())); });
+
+function sound(): Buffer {
+  const bytes = 8000 * 60 * 2, data = Buffer.alloc(44 + bytes);
+  data.write('RIFF', 0); data.writeUInt32LE(36 + bytes, 4); data.write('WAVEfmt ', 8);
+  data.writeUInt32LE(16, 16); data.writeUInt16LE(1, 20); data.writeUInt16LE(1, 22);
+  data.writeUInt32LE(8000, 24); data.writeUInt32LE(16000, 28);
+  data.writeUInt16LE(2, 32); data.writeUInt16LE(16, 34); data.write('data', 36); data.writeUInt32LE(bytes, 40);
+  return data;
+}
+
+async function setup(page: Page) {
+  const creates: string[] = [], errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  const wav = sound();
+  await page.route('**/api/v1/**', async (route) => {
+    const request = route.request(), path = new URL(request.url()).pathname;
+    if (path.endsWith('/stream')) return route.fulfill({ contentType: 'audio/wav', body: wav });
+    const media = /\/media\/lyrics-(.+)$/.exec(path);
+    if (media) return route.fulfill({ contentType: 'text/plain; charset=utf-8', body: `${media[1]} 第一行\n${media[1]} 第二行` });
+    if (request.method() === 'DELETE') return route.fulfill({ status: 204 });
+    let json: unknown = { items: [], nextCursor: null, nextAfter: null, libraryRevision: '1' };
+    if (path.endsWith('/health/ready')) json = { product: 'MusicFS', ready: true, apiVersion: '1', instanceId: 'lyrics-panel' };
+    if (path.endsWith('/auth/session')) json = { csrfToken: 'fixture', user: { id: 'listener', role: 'user' } };
+    if (path.endsWith('/source-tracks')) json = { items: ['Alpha', 'Beta'].map((name) => ({
+      ...track, sourceTrackId: name, assetId: name, displayName: `${name}.wav`, durationMs: 60000,
+    })), nextCursor: null, libraryRevision: '1' };
+    const selection = /\/source-tracks\/([^/]+)\/media-selection$/.exec(path);
+    if (selection) json = { bindings: [{ objectId: `lyrics-${selection[1]}`, field: 'lyrics', current: true, state: 'available' }] };
+    if (path.endsWith('/playback/sessions') && request.method() === 'POST') {
+      creates.push(request.postDataJSON().sourceTrackId);
+      json = { ...playback(`attempt-${creates.length}`), seekableRange: { startMs: 0, endMs: 60000 } };
+    }
+    return route.fulfill({ json });
+  });
+  await page.goto(`${origin}/#/library`);
+  await expect(page.getByRole('button', { name: '账号菜单', exact: true })).toBeVisible();
+  return { creates, errors };
+}
+
+const lyrics = (page: Page) => page.getByRole('button', { name: '歌词', exact: true });
+const panel = (page: Page) => page.locator('.player-panel');
+const queue = (page: Page) => page.getByRole('button', { name: '播放队列', exact: true });
+const preferences = (page: Page) => page.evaluate((key) => JSON.parse(localStorage.getItem(key) ?? '{}'), preferenceKey);
+async function play(page: Page, name = 'Alpha'): Promise<void> {
+  await page.getByRole('button', { name: `播放 ${name}.wav`, exact: true }).click(); await waitPlaying(page);
+}
+async function expectLyrics(page: Page, name = 'Alpha'): Promise<void> {
+  await expect(panel(page).getByRole('heading', { name: '歌词', exact: true })).toBeVisible();
+  await expect(panel(page).locator('.lyrics')).toHaveText(`${name} 第一行\n${name} 第二行`);
+  await expect(lyrics(page)).toHaveAttribute('aria-expanded', 'true');
+}
+async function openPinned(page: Page): Promise<void> {
+  await lyrics(page).click(); await expectLyrics(page);
+  await page.getByRole('button', { name: '固定歌词', exact: true }).click();
+  await expect(page.getByRole('button', { name: '取消固定歌词', exact: true })).toBeVisible();
+  await expect(lyrics(page)).toHaveAttribute('aria-pressed', 'true');
+}
+async function clickOutside(page: Page): Promise<void> {
+  await page.getByRole('columnheader', { name: '曲名', exact: true }).click();
+}
+
+test('lyrics has the renamed entry and temporary panels close on outside clicks', async ({ page }) => {
+  const { creates, errors } = await setup(page);
+  await expect(page.getByRole('button', { name: '歌词与封面', exact: true })).toHaveCount(0);
+  await expect(lyrics(page)).toBeDisabled();
+  await expect(panel(page)).toHaveCount(0);
+  await play(page);
+  await expect(panel(page)).toHaveCount(0);
+  expect(await lyrics(page).getAttribute('aria-pressed')).toBeNull();
+  const audio = page.locator('audio'), source = await audio.getAttribute('src');
+  await lyrics(page).click(); await expectLyrics(page);
+  await expect(page.getByRole('button', { name: '固定歌词', exact: true })).toBeVisible();
+  await clickOutside(page);
+  await expect(panel(page)).toHaveCount(0);
+  await expect(lyrics(page)).toHaveAttribute('aria-expanded', 'false');
+  expect(await audio.getAttribute('src')).toBe(source); expect(creates).toEqual(['Alpha']);
+  expect(errors).toEqual([]);
+});
+
+test('pinned lyrics stays open outside, toggles visibility and unpins without closing', async ({ page }, info) => {
+  const { creates, errors } = await setup(page);
+  await play(page); await openPinned(page);
+  await expect.poll(() => preferences(page)).toMatchObject({ lyricsPinned: true });
+  await clickOutside(page); await expectLyrics(page);
+  await page.screenshot({ path: info.outputPath('pinned-lyrics.png') });
+  await lyrics(page).click();
+  await expect(panel(page)).toHaveCount(0);
+  await expect(lyrics(page)).toHaveAttribute('aria-pressed', 'false');
+  await expect(lyrics(page)).toHaveAttribute('aria-expanded', 'false');
+  await lyrics(page).click(); await expectLyrics(page);
+  await page.getByRole('button', { name: '关闭面板', exact: true }).click();
+  await expect(panel(page)).toHaveCount(0);
+  await expect(lyrics(page)).toHaveAttribute('aria-pressed', 'false');
+  await expect.poll(() => preferences(page)).toMatchObject({ lyricsPinned: true });
+  await lyrics(page).click(); await expectLyrics(page);
+  await page.keyboard.press('Escape');
+  await expect(panel(page)).toHaveCount(0);
+  await expect(lyrics(page)).toHaveAttribute('aria-pressed', 'false');
+  await lyrics(page).click(); await expectLyrics(page);
+  await page.getByRole('button', { name: '取消固定歌词', exact: true }).click();
+  await expectLyrics(page);
+  expect(await lyrics(page).getAttribute('aria-pressed')).toBeNull();
+  await expect.poll(() => preferences(page)).toMatchObject({ lyricsPinned: false });
+  await clickOutside(page); await expect(panel(page)).toHaveCount(0);
+  expect(creates).toEqual(['Alpha']); expect(errors).toEqual([]);
+});
+
+test('the saved pin waits for a track after refresh and then opens current lyrics', async ({ page }) => {
+  const { creates, errors } = await setup(page);
+  await play(page); await openPinned(page);
+  await page.reload();
+  await expect(lyrics(page)).toBeDisabled();
+  await expect(panel(page)).toHaveCount(0);
+  await expect(page.locator('audio')).toHaveCount(0);
+  await expect.poll(() => preferences(page)).toMatchObject({ lyricsPinned: true });
+  await play(page, 'Beta'); await expectLyrics(page, 'Beta');
+  await expect(lyrics(page)).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('button', { name: '取消固定歌词', exact: true })).toBeVisible();
+  await clickOutside(page); await expectLyrics(page, 'Beta');
+  expect(creates).toEqual(['Alpha', 'Beta']); expect(errors).toEqual([]);
+});
+
+test('closing the queue restores visible pinned lyrics but preserves explicit hiding', async ({ page }) => {
+  const { creates, errors } = await setup(page);
+  await play(page); await openPinned(page);
+  await queue(page).click();
+  await expect(panel(page).getByRole('heading', { name: '播放队列', exact: true })).toBeVisible();
+  await queue(page).click(); await expectLyrics(page);
+  await queue(page).click();
+  await expect(panel(page).getByRole('heading', { name: '播放队列', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '关闭面板', exact: true }).click(); await expectLyrics(page);
+  await lyrics(page).click();
+  await expect(panel(page)).toHaveCount(0);
+  await expect(lyrics(page)).toHaveAttribute('aria-pressed', 'false');
+  await queue(page).click();
+  await expect(panel(page).getByRole('heading', { name: '播放队列', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '关闭面板', exact: true }).click();
+  await expect(panel(page)).toHaveCount(0);
+  await expect(lyrics(page)).toHaveAttribute('aria-pressed', 'false');
+  await expect.poll(() => preferences(page)).toMatchObject({ lyricsPinned: true });
+  expect(creates).toEqual(['Alpha']); expect(errors).toEqual([]);
+});

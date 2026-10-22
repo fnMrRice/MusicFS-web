@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { preview, type PreviewServer } from 'vite';
 import { playback, track } from '../fixtures/dto';
 import { installAudioProbe, outputSignal } from '../fixtures/audio-probe';
-import { waitPlaying } from './helpers';
+import { logout, waitPlaying } from './helpers';
 
 let server: PreviewServer;
 const origin = 'http://127.0.0.1:18161';
@@ -97,7 +97,7 @@ test('real browser output changes live without replacing the stream or requestin
   expect(errors).toEqual([]);
   await info.attach('local-dsp-output', { body: JSON.stringify({ baseline, attenuated, ratio: attenuated.rms / baseline.rms, physicalListening: 'Not performed' }), contentType: 'application/json' });
   await page.screenshot({ path: info.outputPath('local-dsp-live.png') });
-  await page.getByRole('button', { name: '停止', exact: true }).click();
+  await logout(page);
   await expect(audio).toHaveCount(0);
 });
 
@@ -133,7 +133,7 @@ test('automatic volume balances real output live and preserves pause, mute and t
   expect(errors).toEqual([]);
   await info.attach('automatic-volume-output', { body: JSON.stringify({ loud, balanced, physicalListening: 'Not performed' }), contentType: 'application/json' });
   await page.screenshot({ path: info.outputPath('automatic-volume-live.png') });
-  await page.getByRole('button', { name: '停止', exact: true }).click();
+  await logout(page);
 });
 
 test('automatic volume measures stereo channels before phase cancellation', async ({ page }) => {
@@ -146,5 +146,5 @@ test('automatic volume measures stereo channels before phase cancellation', asyn
   // 最终探针是单声道，因此用同一信号的前后比值验证反相信号仍被正确降低。
   await expect.poll(async () => (await outputSignal(page)).rms / baseline.rms).toBeLessThan(0.3);
   expect((await outputSignal(page)).rms / baseline.rms).toBeGreaterThan(0.2);
-  await page.getByRole('button', { name: '停止', exact: true }).click();
+  await logout(page);
 });

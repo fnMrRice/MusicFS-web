@@ -11,6 +11,7 @@ import type {
   Preferences,
 } from "../api/types";
 import { PlayerController } from "../player/controller";
+import { PlaybackQueue, type PlaybackMode } from "../player/playback-queue";
 import { audioFactory } from "../player/audio-adapter";
 import { capabilities } from "../player/capabilities";
 import { Store } from "./store";
@@ -29,6 +30,7 @@ import { LocalDSPSettingsStore } from "./local-dsp-settings";
 import { LocalDSPEngine } from "../player/dsp/engine";
 import { MatchingApi } from "../api/matching";
 import { MatchingDecisions } from "../library/matching-decisions";
+import { volumePreferences } from "./volume-preferences";
 
 interface AuthState {
   session: AuthSession | null;
@@ -39,6 +41,8 @@ interface AuthState {
 interface PreferencesState {
   theme: "dark" | "light" | "system";
   volume: number;
+  lastVolume: number;
+  lyricsPinned: boolean;
   mine: boolean;
   playlists: boolean;
   works: boolean;
@@ -50,6 +54,8 @@ interface PreferencesState {
 const defaults: PreferencesState = {
   theme: "system",
   volume: 0.8,
+  lastVolume: 0.8,
+  lyricsPinned: false,
   mine: true,
   playlists: true,
   works: false,
@@ -83,15 +89,10 @@ export class Services {
   localDSP = new LocalDSPSettingsStore(LocalDSPEngine.supported());
   private dsp = new LocalDSPEngine(this.localDSP.value.config, (message) => this.localDSP.reportError(message));
   playlists = new Store<Playlist[]>([]);
-  queue = new Store<{ items: SourceTrack[]; index: number; repeat: boolean }>({
-    items: [],
-    index: -1,
-    repeat: false,
-  });
+  queue = new PlaybackQueue();
   player: PlayerController;
   playerState: Store<PlayerController["state"]>;
   currentTrack = new Store<string | null>(null);
-  private settledQueue: { items: SourceTrack[]; index: number } | null = null;
   private generation = 0;
   private sourceRequest: AbortController | null = null;
   private playlistRequest: AbortController | null = null;
@@ -139,14 +140,11 @@ export class Services {
       () => this.dsp.unlock(),
     );
     this.playerState = new Store({ ...this.player.state });
-    this.player.onSelectionCancelled = () => {
-      if (this.settledQueue) this.queue.set({ ...this.queue.value, ...this.settledQueue });
-    };
+    this.player.onSelectionCancelled = () => this.queue.rollbackSelection();
     this.player.onChange = () => {
       // 仅提交已开始解析的选择，保留切歌中 stop 发出的瞬时空曲目之前的队列。
       if (this.player.state.phase === "resolving" && this.playerState.value.phase !== "resolving") {
-        const { items, index } = this.queue.value;
-        this.settledQueue = { items, index };
+        this.queue.commitSelection();
       }
       const ended =
         this.player.state.phase === "ended" &&
@@ -156,7 +154,7 @@ export class Services {
       if (current !== this.currentTrack.value) this.currentTrack.set(current);
       if (ended)
         queueMicrotask(() => {
-          if (this.player.state.phase === "ended") this.next(1);
+          if (this.player.state.phase === "ended") this.advanceQueue(1, true);
         });
     };
     this.client.onUnauthorized = () => this.clear();
@@ -169,7 +167,7 @@ export class Services {
   }
   private accept(session: AuthSession): void {
     this.player.stop();
-    this.settledQueue = null;
+    this.queue.forgetSelection();
     this.dsp.dispose();
     this.sourcePlaylists.clear();
     this.content.clearOnlineInstances();
@@ -195,12 +193,8 @@ export class Services {
         saved?.theme === "system"
           ? saved.theme
           : defaults.theme,
-      volume:
-        typeof saved?.volume === "number" &&
-        saved.volume >= 0 &&
-        saved.volume <= 1
-          ? saved.volume
-          : 0.8,
+      ...volumePreferences(saved),
+      lyricsPinned: saved?.lyricsPinned === true,
       mine: saved?.mine !== false,
       playlists: saved?.playlists !== false,
       works: saved?.works === true,
@@ -296,8 +290,7 @@ export class Services {
     this.playlistRequest?.abort();
     this.player.stop();
     this.dsp.dispose();
-    this.queue.set({ items: [], index: -1, repeat: false });
-    this.settledQueue = null;
+    this.queue.clear();
     this.playlists.set([]);
     this.client.csrfToken = null;
     this.preferences.set({ ...defaults });
@@ -312,7 +305,9 @@ export class Services {
     });
   }
   preference(patch: Partial<PreferencesState>): void {
-    this.preferences.set({ ...this.preferences.value, ...patch });
+    const volume = volumePreferences({ ...this.preferences.value, ...patch });
+    if (patch.volume !== undefined && volume.volume > 0) volume.lastVolume = volume.volume;
+    this.preferences.set({ ...this.preferences.value, ...patch, ...volume });
     this.player.setVolume(this.preferences.value.volume);
     this.player.setTransitions(this.preferences.value.fadeEnabled, this.preferences.value.fadeDurationMs);
     this.dsp.setAutoVolume(this.preferences.value.autoVolume);
@@ -323,6 +318,10 @@ export class Services {
       } catch {
         /* Preferences remain in memory. */
       }
+  }
+  toggleMute(): void {
+    const { volume, lastVolume } = this.preferences.value;
+    this.preference({ volume: volume > 0 ? 0 : lastVolume });
   }
   private async reloadSourceNames(): Promise<void> {
     this.sourceRequest?.abort();
@@ -356,17 +355,12 @@ export class Services {
       this.playlists.set(items);
   }
   play(track: SourceTrack, items?: SourceTrack[]): void {
-    const candidates = items?.filter((t) => t.availability === "available") ?? [
-      track,
-    ];
-    this.queue.set({
-      ...this.queue.value,
-      items: candidates,
-      index: candidates.findIndex(
-        (t) => t.sourceTrackId === track.sourceTrackId,
-      ),
-    });
+    this.queue.replace(track, items);
     void this.player.select(track, this.playbackPreferences());
+  }
+  playQueueIndex(index: number): void {
+    const track = this.queue.select(index);
+    if (track) void this.player.select(track, this.playbackPreferences());
   }
   playbackPreferences(): Preferences {
     return {
@@ -376,26 +370,17 @@ export class Services {
     };
   }
   enqueue(items: SourceTrack[]): void {
-    const previous = this.queue.value;
-    this.queue.set({
-      ...this.queue.value,
-      items: [
-        ...this.queue.value.items,
-        ...items.filter((t) => t.availability === "available"),
-      ],
-    });
-    if (this.settledQueue?.items === previous.items && this.settledQueue.index === previous.index) {
-      this.settledQueue = { items: this.queue.value.items, index: previous.index };
-    }
+    this.queue.enqueue(items);
   }
+  setPlaybackMode(mode: PlaybackMode): void { this.queue.setMode(mode); }
+  shuffleQueue(): void { this.queue.shuffle(); }
+  canNext(direction: number): boolean { return this.queue.canAdvance(direction); }
   next(direction: number): void {
-    const q = this.queue.value;
-    let index = q.index + direction;
-    if (q.repeat && q.items.length)
-      index = (index + q.items.length) % q.items.length;
-    if (index < 0 || index >= q.items.length) return;
-    this.queue.set({ ...q, index });
-    void this.player.select(q.items[index], this.playbackPreferences());
+    this.advanceQueue(direction);
+  }
+  private advanceQueue(direction: number, ended = false): void {
+    const track = this.queue.advance(direction, ended);
+    if (track) void this.player.select(track, this.playbackPreferences());
   }
 }
 export const ServicesContext = createContext<Services | null>(null);

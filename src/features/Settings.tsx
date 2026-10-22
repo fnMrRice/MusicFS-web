@@ -6,6 +6,7 @@ import { LanguageSelect } from "../i18n/LanguageSelect";
 import { MusicSources } from "./MusicSources";
 import { PluginStatus } from "./PluginStatus";
 import { DSPSettings } from "./dsp/DSPSettings";
+import { VolumeSlider } from "../player/VolumeControl";
 
 const tabs = [
   { id: "sources", label: "音乐源" },
@@ -255,15 +256,7 @@ function PlaybackSettings() {
       <p className="muted">{tr("这些偏好仅保存在当前浏览器，按实例和账号区分。")}</p>
       <label>
         {tr("默认音量")}{" "}
-        <input
-          aria-label={tr("默认音量")}
-          type="range"
-          min="0"
-          max="1"
-          step=".01"
-          value={prefs.volume}
-          onChange={(e) => s.preference({ volume: Number(e.target.value) })}
-        />
+        <VolumeSlider label={tr("默认音量")} />
       </label>
     </div>
   );

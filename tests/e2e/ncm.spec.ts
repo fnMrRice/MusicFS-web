@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import type { Playback } from '../../src/api/types';
-import { decodedSignal, login, seekTo, scan, waitPlaying } from './helpers';
+import { decodedSignal, login, logout, seekTo, scan, waitPlaying } from './helpers';
 import { startServer, type TestServer } from './server';
 
 let server: TestServer;
@@ -49,7 +49,7 @@ test('NCM MP3 decrypts to exact Range bytes and native browser audio without DSP
   await expect.poll(() => page.locator('audio').evaluate((audio: HTMLAudioElement) => audio.currentTime)).toBeGreaterThanOrEqual(4.3);
   const signal = await decodedSignal(page); expect(signal.rms).toBeGreaterThan(.01);
   await page.getByRole('region', { name: '播放器', exact: true }).screenshot({ path: info.outputPath('ncm-mp3-player.png') });
-  await page.getByRole('button', { name: '停止', exact: true }).click(); await expect(page.locator('audio')).toHaveCount(0);
+  await logout(page); await expect(page.locator('audio')).toHaveCount(0);
   await evidence(info, 'ncm-mp3-evidence.json', { browser: browser.version(), descriptor, sourceSha512: digest,
     range: range.headers()['content-range'], decodedSignal: signal, seekTargetMs: 4500 });
 });
@@ -71,7 +71,7 @@ test('NCM FLAC decrypts before MP3 conversion and timeRestart reaches the real m
   const signal = await decodedSignal(page); expect(signal.rms).toBeGreaterThan(.01);
   expect(signal.peakHz).toBeGreaterThan(600); expect(signal.peakHz).toBeLessThan(700);
   await page.getByRole('region', { name: '播放器', exact: true }).screenshot({ path: info.outputPath('ncm-flac-player.png') });
-  await page.getByRole('button', { name: '停止', exact: true }).click(); await expect(page.locator('audio')).toHaveCount(0);
+  await logout(page); await expect(page.locator('audio')).toHaveCount(0);
   await evidence(info, 'ncm-flac-evidence.json', { browser: browser.version(), descriptor, located, decodedSignal: signal });
 });
 
@@ -97,7 +97,7 @@ test('malformed NCM fails explicitly and does not prevent original WAV playback'
   expect(descriptor).toMatchObject({ deliveryMode: 'proxy', seekMode: 'byteRange', effectiveProcessing: [] }); await waitPlaying(page);
   const signal = await decodedSignal(page); expect(signal.rms).toBeGreaterThan(.01);
   await expect(page.getByRole('region', { name: '播放器', exact: true })).not.toContainText('服务端解密');
-  await page.getByRole('button', { name: '停止', exact: true }).click(); await expect(page.locator('audio')).toHaveCount(0);
+  await logout(page); await expect(page.locator('audio')).toHaveCount(0);
   await evidence(info, 'ncm-error-evidence.json', { browser: browser.version(), status: rejected.status(), code: error.error.code,
     errorShownByWeb: selectable, invalidAvailability: invalid.availability, recoveredOriginal: descriptor, decodedSignal: signal });
 });

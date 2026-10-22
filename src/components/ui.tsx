@@ -78,9 +78,23 @@ const paths: Record<string, ReactNode> = {
       <path d="m18 2 4 4-4 4M22 6H6a4 4 0 0 0-4 4m4 12-4-4 4-4m-4 4h16a4 4 0 0 0 4-4" />
     </>
   ),
+  "repeat-one": (
+    <>
+      <path d="m18 2 4 4-4 4M22 6H6a4 4 0 0 0-4 4m4 12-4-4 4-4m-4 4h16a4 4 0 0 0 4-4" />
+      <path d="m10 11 2-2v6m-2 0h4" />
+    </>
+  ),
+  sequence: <path d="M4 6h16M4 12h16M4 18h16m-4-4 4 4-4 4" />,
+  shuffle: <path d="M3 6h2c5 0 9 12 14 12h2m-4-4 4 4-4 4M3 18h2c2 0 4-2 6-5m3-4c2-2 3-3 5-3h2m-4-4 4 4-4 4" />,
   volume: (
     <>
       <path d="m11 3-6 5H2v8h3l6 5ZM15 7c4 2 4 8 0 10m3-13c7 4 7 12 0 16" />
+    </>
+  ),
+  "volume-muted": (
+    <>
+      <path d="m11 3-6 5H2v8h3l6 5Z" />
+      <path d="m3 3 18 18" />
     </>
   ),
   plus: <path d="M12 4v16M4 12h16" />,
@@ -105,6 +119,7 @@ const paths: Record<string, ReactNode> = {
     </>
   ),
   close: <path d="m5 5 14 14M19 5 5 19" />,
+  pin: <path d="M16 9V4l1-1H7l1 1v5l-3 3v2h14v-2l-3-3ZM12 14v8" />,
   album: (
     <>
       <rect x="3" y="3" width="18" height="18" rx="3" />

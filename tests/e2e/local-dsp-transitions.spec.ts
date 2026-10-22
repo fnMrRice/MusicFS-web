@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { preview, type PreviewServer } from 'vite';
 import { playback, track } from '../fixtures/dto';
 import { installAudioProbe, outputSignal } from '../fixtures/audio-probe';
-import { waitPlaying } from './helpers';
+import { logout, waitPlaying } from './helpers';
 
 let server: PreviewServer;
 const origin = 'http://127.0.0.1:18163';
@@ -69,7 +69,7 @@ function meanRms(samples: Sample[], at: number, from: number, to: number, attemp
   return selected.reduce((sum, sample) => sum + sample.rms, 0) / selected.length;
 }
 
-test('switching waits for audible fade-out, fades in after delayed playing and stop cancels a pending switch', async ({ page }, info) => {
+test('switching waits for audible fade-out, fades in after delayed playing and logout cancels a pending switch', async ({ page }, info) => {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await recordOutput(page);
@@ -112,6 +112,7 @@ test('switching waits for audible fade-out, fades in after delayed playing and s
     await page.getByRole('checkbox', { name: '切歌淡出淡入', exact: true }).check();
     await page.getByLabel('淡出淡入时长（毫秒）', { exact: true }).fill(String(duration));
     await page.getByRole('checkbox', { name: '自动音量平衡', exact: true }).uncheck();
+    await page.getByRole('button', { name: '展开作品库', exact: true }).click();
     await page.getByRole('link', { name: '曲目列表', exact: true }).click();
     await page.getByRole('button', { name: '播放 tone-a.wav', exact: true }).click();
     await waitPlaying(page);
@@ -140,11 +141,12 @@ test('switching waits for audible fade-out, fades in after delayed playing and s
 
     await page.getByRole('button', { name: '播放 tone-a.wav', exact: true }).click();
     await page.waitForTimeout(250);
-    await page.getByRole('button', { name: '停止', exact: true }).click();
+    await logout(page);
     await expect(page.locator('audio')).toHaveCount(0);
     await page.waitForTimeout(duration + 200);
     expect(creates).toHaveLength(2);
-    expect((await outputSignal(page)).rms).toBeLessThan(0.00001);
+    // 注销还会关闭音频上下文；关闭后的分析器可能保留最后一帧，直接确认输出已释放。
+    await expect.poll(() => page.evaluate(() => (window as unknown as ProbeWindow).musicfsAudioProbe?.context.state)).toBe('closed');
 
     const recording = await page.evaluate(() => {
       const log = (window as unknown as ProbeWindow).musicfsTransitionRecording;

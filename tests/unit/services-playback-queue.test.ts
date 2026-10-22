@@ -13,7 +13,7 @@ const settle = async () => { await Promise.resolve(); await Promise.resolve(); }
 beforeEach(() => {
   vi.stubGlobal("document", { createElement: () => ({ canPlayType: () => "probably" }) });
 });
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
 function setup() {
   const services = new Services({} as HTMLElement);
@@ -36,7 +36,12 @@ function setup() {
   player.onSelectionCancelled = services.player.onSelectionCancelled;
   services.player = player;
   player.setTransitions(true, 300);
-  return { services, player, api, fades, playing: () => observe({ type: "playing", seconds: 0, paused: false }) };
+  return {
+    services, player, api, fades,
+    playing: () => observe({ type: "playing", seconds: 0, paused: false }),
+    progress: () => observe({ type: "timeupdate", seconds: 12, paused: false }),
+    ended: () => observe({ type: "ended", seconds: 30, paused: true }),
+  };
 }
 
 describe("queue rollback when seeking during a track transition", () => {
@@ -46,7 +51,7 @@ describe("queue rollback when seeking during a track transition", () => {
     s.services.next(1); s.services.next(1);
     expect(s.services.queue.value.index).toBe(2);
     s.player.seek(10_000); await settle();
-    expect(s.services.queue.value).toEqual({ items: [first, second, third], index: 0, repeat: false });
+    expect(s.services.queue.value).toEqual({ items: [first, second, third], index: 0, mode: "sequence" });
     expect(s.player.state.track?.sourceTrackId).toBe("first");
     expect(s.api.create).toHaveBeenCalledOnce();
     s.player.stop();
@@ -56,9 +61,9 @@ describe("queue rollback when seeking during a track transition", () => {
     const s = setup();
     s.services.play(first, [first, second]); await settle(); s.playing();
     s.services.play(first, [other, first, third]);
-    s.services.queue.set({ ...s.services.queue.value, repeat: true });
+    s.services.setPlaybackMode("repeat-all");
     s.player.seek(10_000); await settle();
-    expect(s.services.queue.value).toEqual({ items: [first, second], index: 0, repeat: true });
+    expect(s.services.queue.value).toEqual({ items: [first, second], index: 0, mode: "repeat-all" });
     expect(s.api.create).toHaveBeenCalledOnce();
     s.player.stop();
   });
@@ -81,9 +86,119 @@ describe("queue rollback when seeking during a track transition", () => {
     expect(s.player.state.track?.sourceTrackId).toBe("second");
     s.services.play(other, [other, third]);
     s.player.seek(10_000); await settle();
-    expect(s.services.queue.value).toEqual({ items: [first, second], index: 1, repeat: false });
+    expect(s.services.queue.value).toEqual({ items: [first, second], index: 1, mode: "sequence" });
     expect(s.player.state.track?.sourceTrackId).toBe("second");
     expect(s.api.create).toHaveBeenCalledTimes(2);
+    s.player.stop();
+  });
+
+  it("keeps shuffled order and restores the actual duplicate entry when a fade is cancelled", async () => {
+    vi.spyOn(Math, "random").mockReturnValue(0);
+    const s = setup();
+    const duplicate = { ...first, title: "Another queue entry" };
+    s.services.play(duplicate, [first, second, duplicate]); await settle(); s.playing();
+    s.services.setPlaybackMode("repeat-all");
+    s.services.next(1);
+    s.services.shuffleQueue();
+    expect(s.services.queue.value.index).toBe(2);
+    s.player.seek(10_000); await settle();
+    expect(s.services.queue.value.items).toEqual([second, duplicate, first]);
+    expect(s.services.queue.value.index).toBe(1);
+    expect(s.services.queue.value.items[1]).toBe(duplicate);
+    expect(s.player.state.track).toBe(duplicate);
+    expect(s.api.create).toHaveBeenCalledOnce();
+    s.player.stop();
+  });
+
+  it("rolls back random navigation history together with a cancelled selection", async () => {
+    vi.spyOn(Math, "random").mockReturnValueOnce(0).mockReturnValue(0.99);
+    const s = setup();
+    s.services.setPlaybackMode("shuffle");
+    s.services.play(first, [first, second, third]); await settle(); s.playing();
+    s.services.next(1);
+    s.services.next(1);
+    expect(s.services.canNext(-1)).toBe(true);
+    s.player.seek(10_000); await settle();
+    expect(s.services.queue.value.index).toBe(0);
+    expect(s.services.canNext(-1)).toBe(false);
+    s.player.stop();
+  });
+
+  it("records only committed tracks after repeated random next requests during a fade", async () => {
+    vi.spyOn(Math, "random").mockReturnValueOnce(0).mockReturnValue(0.99);
+    const s = setup();
+    s.services.setPlaybackMode("shuffle");
+    s.services.play(first, [first, second, third]); await settle(); s.playing();
+    s.services.next(1); s.services.next(1);
+    expect(s.services.queue.value.index).toBe(2);
+    for (const fade of s.fades) fade.resolve();
+    await settle(); s.playing();
+    expect(s.player.state.track).toBe(third);
+    s.services.next(-1);
+    s.fades.at(-1)!.resolve(); await settle();
+    expect(s.player.state.track).toBe(first);
+    expect(s.services.canNext(-1)).toBe(false);
+    expect(s.api.create.mock.calls.map((call) => call[0])).toEqual(["first", "third", "first"]);
+    s.player.stop();
+  });
+});
+
+describe("playback modes and queue order", () => {
+  it("replays a finished track in repeat-one while manual next still selects its neighbour", async () => {
+    const s = setup();
+    s.player.setTransitions(false, 300);
+    s.services.setPlaybackMode("repeat-one");
+    s.services.play(first, [first, second]); await settle(); s.playing();
+    s.ended(); await settle();
+    expect(s.api.create).toHaveBeenCalledTimes(2);
+    expect(s.player.state.track).toBe(first);
+    expect(s.services.queue.value.index).toBe(0);
+    s.services.next(1); await settle();
+    expect(s.player.state.track).toBe(second);
+    expect(s.services.canNext(1)).toBe(false);
+    s.player.stop();
+  });
+
+  it("stops advancing at the end of sequence and wraps naturally in repeat-all", async () => {
+    const s = setup();
+    s.services.play(second, [first, second]); await settle(); s.playing();
+    s.ended(); await settle();
+    expect(s.player.state.phase).toBe("ended");
+    expect(s.api.create).toHaveBeenCalledOnce();
+    s.services.setPlaybackMode("repeat-all");
+    s.services.play(second, [first, second]); await settle(); s.playing();
+    s.ended(); await settle();
+    expect(s.player.state.track).toBe(first);
+    expect(s.services.queue.value.index).toBe(0);
+    s.player.stop();
+  });
+
+  it("shuffles queue entries without restarting playback or changing the progress", async () => {
+    vi.spyOn(Math, "random").mockReturnValue(0);
+    const s = setup();
+    s.services.play(first, [first, second, third]); await settle(); s.playing(); s.progress();
+    const currentPlayback = s.player.state.playback;
+    const currentPosition = s.player.state.positionMs;
+    s.services.shuffleQueue();
+    expect(s.services.queue.value.items).toEqual([second, third, first]);
+    expect(s.services.queue.value.index).toBe(2);
+    expect(s.player.state.playback).toBe(currentPlayback);
+    expect(s.player.state.positionMs).toBe(currentPosition);
+    expect(s.player.state.phase).toBe("playing");
+    expect(s.api.create).toHaveBeenCalledOnce();
+    expect(s.api.close).not.toHaveBeenCalled();
+    expect(s.fades).toHaveLength(0);
+    s.player.stop();
+  });
+
+  it("selects the requested duplicate queue entry and wraps from that exact index", async () => {
+    const s = setup();
+    s.services.play(first, [first, second, first]); await settle();
+    s.services.playQueueIndex(2); await settle();
+    expect(s.services.queue.value.index).toBe(2);
+    s.services.setPlaybackMode("repeat-all");
+    s.services.next(1); await settle();
+    expect(s.services.queue.value.index).toBe(0);
     s.player.stop();
   });
 });

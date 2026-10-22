@@ -180,8 +180,8 @@ export class PlayerController {
       this.state.playback = playback;
       this.fail(
         playback.resumeDecision === "restartRequired"
-          ? "无法确认续播位置，请选择从头播放或停止。"
-          : "此来源暂不可播放，请停止或选择其他歌曲。",
+          ? "无法确认续播位置，请选择从头播放。"
+          : "此来源暂不可播放，请选择其他歌曲。",
       );
       return;
     }

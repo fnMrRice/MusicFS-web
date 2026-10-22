@@ -1,29 +1,63 @@
 import { tr, useLocale, statusText } from "../i18n";
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useId, useRef, useState, type CSSProperties } from "react";
 import { useServices, useStore } from "../app/services";
-import { Cover, duration, IconButton } from "../components/ui";
+import { Cover, duration, Icon, IconButton } from "../components/ui";
 import { MediaPanel } from "./MediaPanel";
 import { playbackFormat } from "./format";
+import type { PlaybackMode } from "./playback-queue";
+import { VolumeControl } from "./VolumeControl";
+
+const playbackModes: { mode: PlaybackMode; icon: string; label: string }[] = [
+  { mode: "sequence", icon: "sequence", label: "顺序播放" },
+  { mode: "repeat-all", icon: "repeat", label: "列表循环" },
+  { mode: "repeat-one", icon: "repeat-one", label: "单曲循环" },
+  { mode: "shuffle", icon: "shuffle", label: "随机播放" },
+];
 
 export function PlayerBar() {
   useLocale();
   const s = useServices();
   const state = useStore(s.playerState);
   const q = useStore(s.queue);
-  const prefs = useStore(s.preferences);
+  const modeIndex = playbackModes.findIndex((option) => option.mode === q.mode);
+  const mode = playbackModes[modeIndex];
   const dsp = useStore(s.localDSP);
-  const [panel, setPanel] = useState<"queue" | "media" | null>(null);
+  const prefs = useStore(s.preferences);
+  const [queueOpen, setQueueOpen] = useState(false);
+  const [lyricsOpen, setLyricsOpen] = useState(prefs.lyricsPinned);
+  const panel = queueOpen ? "queue" : lyricsOpen && state.track ? "media" : null;
+  const panelRef = useRef<HTMLDivElement>(null);
+  const panelId = useId();
   const [seek, setSeek] = useState<number | null>(null);
+  const closePanel = () => {
+    if (queueOpen) setQueueOpen(false);
+    else setLyricsOpen(false);
+  };
   useEffect(() => {
     setSeek(null);
   }, [state.track?.sourceTrackId, state.playback?.attemptId]);
   useEffect(() => {
-    const close = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setPanel(null);
+    if (!panel) return;
+    const close = () => {
+      if (panel === "queue") setQueueOpen(false);
+      else setLyricsOpen(false);
     };
-    document.addEventListener("keydown", close);
-    return () => document.removeEventListener("keydown", close);
-  }, []);
+    const keydown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") close();
+    };
+    const outside = (event: PointerEvent) => {
+      if (panel !== "media" || prefs.lyricsPinned) return;
+      if (!(event.target instanceof Node) || panelRef.current?.contains(event.target)) return;
+      if (event.target instanceof Element && event.target.closest("[data-player-panel-trigger]")) return;
+      close();
+    };
+    document.addEventListener("keydown", keydown);
+    document.addEventListener("pointerdown", outside);
+    return () => {
+      document.removeEventListener("keydown", keydown);
+      document.removeEventListener("pointerdown", outside);
+    };
+  }, [panel, prefs.lyricsPinned]);
   const playback = state.playback;
   const range = playback?.seekableRange;
   const timelineStart = range?.startMs ?? 0;
@@ -91,15 +125,15 @@ export function PlayerBar() {
       </div>
       <div className="transport">
         <IconButton
-          icon="repeat"
-          label={q.repeat ? tr("关闭列表循环") : tr("列表循环")}
-          aria-pressed={q.repeat}
-          onClick={() => s.queue.set({ ...q, repeat: !q.repeat })}
+          icon={mode.icon}
+          label={tr("播放模式：{0}，点击切换", { 0: tr(mode.label) })}
+          className={q.mode === "sequence" ? "" : "playback-mode-active"}
+          onClick={() => s.setPlaybackMode(playbackModes[(modeIndex + 1) % playbackModes.length].mode)}
         />
         <IconButton
           icon="previous"
           label={tr("上一首")}
-          disabled={!q.items.length || (!q.repeat && q.index <= 0)}
+          disabled={!s.canNext(-1)}
           onClick={() => s.next(-1)}
         />
         <IconButton
@@ -112,9 +146,7 @@ export function PlayerBar() {
         <IconButton
           icon="next"
           label={tr("下一首")}
-          disabled={
-            !q.items.length || (!q.repeat && q.index >= q.items.length - 1)
-          }
+          disabled={!s.canNext(1)}
           onClick={() => s.next(1)}
         />
         <span className="time">
@@ -124,37 +156,31 @@ export function PlayerBar() {
       </div>
       <div className="player-extras">
         <IconButton
-          icon="stop"
-          label={tr("停止")}
-          disabled={!state.track}
-          onClick={() => s.player.stop()}
-        />
-        <IconButton
           icon="queue"
           label={tr("播放队列")}
           aria-expanded={panel === "queue"}
-          onClick={() => setPanel(panel === "queue" ? null : "queue")}
+          aria-controls={panel === "queue" ? panelId : undefined}
+          data-player-panel-trigger="queue"
+          onClick={() => {
+            if (!queueOpen && !prefs.lyricsPinned) setLyricsOpen(false);
+            setQueueOpen(!queueOpen);
+          }}
         />
         <IconButton
           icon="lyrics"
-          label={tr("歌词与封面")}
+          label={tr("歌词")}
+          className="lyrics-toggle"
+          aria-expanded={panel === "media"}
+          aria-pressed={prefs.lyricsPinned ? panel === "media" : undefined}
+          aria-controls={panel === "media" ? panelId : undefined}
+          data-player-panel-trigger="lyrics"
           disabled={!state.track}
-          onClick={() => setPanel(panel === "media" ? null : "media")}
+          onClick={() => {
+            setLyricsOpen(panel !== "media");
+            setQueueOpen(false);
+          }}
         />
-        <IconButton
-          icon="volume"
-          label={prefs.volume ? tr("静音") : tr("取消静音")}
-          onClick={() => s.preference({ volume: prefs.volume ? 0 : 0.8 })}
-        />
-        <input
-          aria-label={tr("音量")}
-          type="range"
-          min="0"
-          max="1"
-          step="0.01"
-          value={prefs.volume}
-          onChange={(e) => s.preference({ volume: Number(e.target.value) })}
-        />
+        <VolumeControl />
       </div>
       {state.message && (
         <div className="playback-message" role="alert">
@@ -169,18 +195,33 @@ export function PlayerBar() {
               {tr("从头播放")}
             </button>
           )}
-          <button onClick={() => s.player.stop()}>{tr("停止播放")}</button>
         </div>
       )}
       {dsp.error && state.track && <div className="playback-message" role="alert">{statusText(dsp.error)}</div>}
       {panel && (
-        <div className="player-panel">
+        <div className="player-panel" ref={panelRef} id={panelId} role="dialog"
+          aria-label={panel === "queue" ? tr("播放队列") : tr("歌词")}>
           <div className="section-title">
-            <h2>{panel === "queue" ? tr("播放队列") : tr("歌词与封面")}</h2>
+            <h2>{panel === "queue" ? tr("播放队列") : tr("歌词")}</h2>
+            {panel === "queue" && (
+              <button className="shuffle-queue" disabled={q.items.length < 2} onClick={() => s.shuffleQueue()}>
+                <Icon name="shuffle" size={16} />
+                {tr("打乱队列")}
+              </button>
+            )}
+            {panel === "media" && (
+              <IconButton
+                icon="pin"
+                className="pin-lyrics"
+                label={prefs.lyricsPinned ? tr("取消固定歌词") : tr("固定歌词")}
+                aria-pressed={prefs.lyricsPinned}
+                onClick={() => s.preference({ lyricsPinned: !prefs.lyricsPinned })}
+              />
+            )}
             <IconButton
               icon="close"
               label={tr("关闭面板")}
-              onClick={() => setPanel(null)}
+              onClick={closePanel}
             />
           </div>
           {panel === "queue" ? (
@@ -194,10 +235,8 @@ export function PlayerBar() {
                     <li key={`${t.sourceTrackId}:${i}`}>
                       <button
                         className={q.index === i ? "selected" : ""}
-                        onClick={() => {
-                          s.queue.set({ ...q, index: i });
-                          void s.player.select(t, s.playbackPreferences());
-                        }}
+                        aria-current={q.index === i ? "true" : undefined}
+                        onClick={() => s.playQueueIndex(i)}
                       >
                         {t.title || t.displayName}
                       </button>
