@@ -204,3 +204,12 @@
 .unavailable {
   color: var(--muted);
 }
+.track-row-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 2px;
+  width: max-content;
+}
+.track-row-actions .is-favorite { color: var(--accent); }
+.track-row-actions .is-favorite svg { fill: currentColor; }

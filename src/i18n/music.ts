@@ -1,4 +1,8 @@
 export default {
+  "当前时间，点击显示剩余时间": ["Elapsed time, click to show remaining time", "目前時間，點擊顯示剩餘時間", "再生時間。クリックで残り時間を表示"],
+  "剩余时间，点击显示当前时间": ["Remaining time, click to show elapsed time", "剩餘時間，點擊顯示目前時間", "残り時間。クリックで再生時間を表示"],
+  "总时间，点击显示剩余时间": ["Total time, click to show remaining time", "總時間，點擊顯示剩餘時間", "総再生時間。クリックで残り時間を表示"],
+  "剩余时间，点击显示总时间": ["Remaining time, click to show total time", "剩餘時間，點擊顯示總時間", "残り時間。クリックで総再生時間を表示"],
   "FIND YOUR NEXT FAVORITE": ["FIND YOUR NEXT FAVORITE", "發現下一首心頭好", "次のお気に入りを見つけよう"],
   "寻找此刻想听的音乐": ["Find your next favorite", "尋找此刻想聽的音樂", "今、聴きたい音楽を探そう"],
   "探索已连接的音乐来源。": ["Explore your connected music sources.", "探索已連接的音樂來源。", "接続した音楽ソースを探索しましょう。"],
@@ -175,4 +179,12 @@ export default {
   "当前账号暂无歌单。": ["This account has no playlists yet.", "目前帳號暫無歌單。", "このアカウントにはまだプレイリストがありません。"],
   "加载更多歌单": ["Load more playlists", "載入更多歌單", "プレイリストをさらに読み込む"],
   "刷新歌单": ["Refresh playlists", "重新整理歌單", "プレイリストを更新"],
+  "下一首播放": ["Play next", "下一首播放", "次に再生"],
+  "将 {0} 设为下一首播放": ["Play {0} next", "將 {0} 設為下一首播放", "{0} を次に再生"],
+  "收藏 {0}": ["Favorite {0}", "收藏 {0}", "{0} をお気に入りに追加"],
+  "取消收藏 {0}": ["Remove {0} from favorites", "取消收藏 {0}", "{0} をお気に入りから削除"],
+  "添加到播放列表": ["Add to play queue", "加入播放清單", "再生キューに追加"],
+  "已设为下一首播放": ["Added to play next", "已設為下一首播放", "次に再生する曲に追加しました"],
+  "暂无可播放曲目": ["No playable tracks", "暫無可播放曲目", "再生可能な曲がありません"],
+  "{0} 的更多操作": ["More actions for {0}", "{0} 的更多操作", "{0} のその他の操作"],
 } satisfies Record<string, readonly [string, string, string]>;

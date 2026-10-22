@@ -7,6 +7,7 @@ import { Login } from "./Login";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { AppShell } from "../layout/AppShell";
 import { Library } from "../features/Library";
+import { Favorites } from "../features/Favorites";
 import { Works } from "../features/works/Works";
 import { WorkDetail } from "../features/works/WorkDetail";
 import { Search } from "../features/Search";
@@ -66,12 +67,7 @@ function Application() {
         />
         <Route path="/albums/:id" element={<AlbumDetail />} />
         <Route path="/settings" element={<Settings />} />
-        <Route
-          path="/favorites"
-          element={
-            <Empty title={tr("暂无收藏音乐")} icon="heart" />
-          }
-        />
+        <Route path="/favorites" element={<Favorites />} />
         <Route
           path="/recent"
           element={

@@ -3,16 +3,17 @@ import type { SourceTrack } from "../../api/types";
 import { MatchingApi } from "../../api/matching";
 import { useServices, useStore } from "../../app/services";
 import { useSourceName } from "../../components/use-source-name";
-import { duration, ErrorNotice, Icon } from "../../components/ui";
+import { duration, ErrorNotice, Icon, IconButton } from "../../components/ui";
 import { Modal } from "../../components/Modal";
 import { useResource } from "../../components/query";
 import { tr, useLocale } from "../../i18n";
 import { useDecision } from "./useDecision";
 import { TrackDetails } from "./TrackDetails";
 
-export function TrackVersions({ tracks, revision, refresh, recordingId, defaultSourceTrackId, manualSourceTrackId }: {
+export function TrackVersions({ tracks, revision, refresh, recordingId, defaultSourceTrackId, manualSourceTrackId, openActions }: {
   tracks: SourceTrack[]; revision?: number; refresh?: () => void;
   recordingId?: string | null; defaultSourceTrackId: string; manualSourceTrackId?: string | null;
+  openActions?: (track: SourceTrack, x: number, y: number, origin: HTMLElement) => void;
 }) {
   useLocale();
   const services = useServices();
@@ -36,7 +37,19 @@ export function TrackVersions({ tracks, revision, refresh, recordingId, defaultS
   }
   return <div className="track-versions-list" aria-label={tr("来源版本")} aria-busy={decision.busy}>
     <p className="muted track-version-policy">{tr("自动选择可用版本中码率最高的；码率相同时选择较大的文件。手动默认优先。")}</p>
-    {tracks.map((track) => <div className="track-version" key={track.sourceTrackId}>
+    {tracks.map((track) => <div className="track-version" key={track.sourceTrackId} tabIndex={openActions ? -1 : undefined}
+      onContextMenu={openActions ? (event) => {
+        event.preventDefault(); event.stopPropagation();
+        openActions(track, event.clientX, event.clientY, event.currentTarget);
+      } : undefined}
+      onKeyDown={openActions ? (event) => {
+        if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) {
+          event.preventDefault(); event.stopPropagation();
+          const origin = event.target as HTMLElement;
+          const rect = origin.getBoundingClientRect();
+          openActions(track, rect.left, rect.bottom, origin);
+        }
+      } : undefined}>
       <span className="track-version-name">{track.displayName}</span>
       {track.sourceTrackId === defaultSourceTrackId && <span className="track-version-default">
         {tr(manualSourceTrackId === track.sourceTrackId ? "手动默认" : "自动默认")}
@@ -55,6 +68,11 @@ export function TrackVersions({ tracks, revision, refresh, recordingId, defaultS
         <button onClick={() => setDetails(track)} aria-label={tr("查看 {0} 的详情", { 0: track.displayName })}>{tr("详情")}</button>
         <button disabled={track.availability !== "available"} onClick={() => services.play(track)}
           aria-label={tr("播放来源版本 {0}", { 0: track.displayName })}><Icon name="play" size={14} /> {tr("播放")}</button>
+        {openActions && <IconButton icon="more" label={tr("{0} 的更多操作", { 0: track.displayName })} aria-haspopup="menu"
+          onClick={(event) => {
+            const rect = event.currentTarget.getBoundingClientRect();
+            openActions(track, rect.left, rect.bottom, event.currentTarget);
+          }} />}
         {refresh && <button disabled={matchingPending.length > 0} onClick={() => setUnlink({ track, revision })} aria-label={tr("解除 {0} 的关联", { 0: track.displayName })}>{tr("解除关联")}</button>}
       </div>
     </div>)}

@@ -211,3 +211,65 @@ test('mode and queue shuffle remain reachable on mobile and error messages have 
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: info.outputPath('mobile-playback-modes.png') });
 });
+
+test('time displays toggle independently without disturbing audio and retain their modes across tracks', async ({ page }) => {
+  const { creates, errors } = await setup(page);
+  const left = page.locator('.time button').nth(0), right = page.locator('.time button').nth(1);
+  await expect(left).toHaveAccessibleName('当前时间，点击显示剩余时间');
+  await expect(right).toHaveAccessibleName('总时间，点击显示剩余时间');
+  await expect(right).toHaveText('—');
+  await right.click();
+  await expect(right).toHaveAccessibleName('剩余时间，点击显示总时间');
+  await expect(right).toHaveText('—');
+  await expect(page.locator('audio')).toHaveCount(0);
+  expect(creates).toEqual([]);
+  await right.press('Enter');
+
+  await playAll(page);
+  await page.getByRole('button', { name: '暂停', exact: true }).click();
+  const audio = page.locator('audio'), original = await audio.elementHandle();
+  await audio.evaluate((element: HTMLAudioElement) => { element.currentTime = 12; });
+  await expect.poll(() => audio.evaluate((element: HTMLAudioElement) => element.seeking)).toBe(false);
+  await expect(left).toHaveText('00:12');
+  await expect(right).toHaveText('00:30');
+  const src = await audio.getAttribute('src');
+  // 时间显示操作不应触发播放、定位或重新加载音频。
+  const sideEffects = await audio.evaluateHandle((element) => {
+    const events: string[] = [];
+    for (const type of ['play', 'playing', 'seeking', 'loadstart', 'emptied']) {
+      element.addEventListener(type, () => events.push(type));
+    }
+    return events;
+  });
+  await left.click();
+  await expect(left).toHaveAccessibleName('剩余时间，点击显示当前时间');
+  await expect(left).toHaveText('-00:18');
+  await expect(right).toHaveText('00:30');
+  await right.press('Space');
+  await expect(right).toHaveText('-00:18');
+  await expect(left).toHaveText('-00:18');
+  await left.press('Enter');
+  await expect(left).toHaveText('00:12');
+  await expect(right).toHaveText('-00:18');
+  await right.click();
+  await expect(right).toHaveText('00:30');
+  await left.click();
+  await right.click();
+  expect(await original!.evaluate((element) => element === document.querySelector('audio'))).toBe(true);
+  expect(await audio.getAttribute('src')).toBe(src);
+  expect(await audio.evaluate((element: HTMLAudioElement) => ({ paused: element.paused, time: element.currentTime })))
+    .toEqual({ paused: true, time: 12 });
+  expect(await sideEffects.jsonValue()).toEqual([]);
+  expect(creates).toEqual(['track-1']);
+
+  await page.getByRole('button', { name: '下一首', exact: true }).click();
+  await waitPlaying(page);
+  await page.getByRole('button', { name: '暂停', exact: true }).click();
+  await audio.evaluate((element: HTMLAudioElement) => { element.currentTime = 8; });
+  await expect(left).toHaveAccessibleName('剩余时间，点击显示当前时间');
+  await expect(right).toHaveAccessibleName('剩余时间，点击显示总时间');
+  await expect(left).toHaveText('-00:22');
+  await expect(right).toHaveText('-00:22');
+  expect(creates).toEqual(['track-1', 'track-2']);
+  expect(errors).toEqual([]);
+});

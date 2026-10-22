@@ -1,11 +1,12 @@
 import { tr, useLocale, statusText } from "../i18n";
 import { useEffect, useId, useRef, useState, type CSSProperties } from "react";
 import { useServices, useStore } from "../app/services";
-import { Cover, duration, Icon, IconButton } from "../components/ui";
+import { Cover, Icon, IconButton } from "../components/ui";
 import { MediaPanel } from "./MediaPanel";
 import { playbackFormat, playbackFormatTitle } from "./format";
 import type { PlaybackMode } from "./playback-queue";
 import { VolumeControl } from "./VolumeControl";
+import { PlayerTime } from "./PlayerTime";
 
 const playbackModes: { mode: PlaybackMode; icon: string; label: string }[] = [
   { mode: "sequence", icon: "sequence", label: "顺序播放" },
@@ -149,10 +150,7 @@ export function PlayerBar() {
           disabled={!s.canNext(1)}
           onClick={() => s.next(1)}
         />
-        <span className="time">
-          {duration(state.positionMs)}
-          <span> / {duration(state.track?.durationMs ?? null)}</span>
-        </span>
+        <PlayerTime positionMs={seek ?? state.positionMs} durationMs={state.track?.durationMs ?? null} />
       </div>
       <div className="player-extras">
         <IconButton

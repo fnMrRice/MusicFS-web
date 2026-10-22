@@ -202,3 +202,65 @@ describe("playback modes and queue order", () => {
     s.player.stop();
   });
 });
+
+describe("track queue actions", () => {
+  it("appends and plays a requested track while preserving the existing queue", async () => {
+    const s = setup();
+    s.player.setTransitions(false, 300);
+    s.services.play(first, [first, second]); await settle(); s.playing();
+    s.services.play(first); await settle();
+    expect(s.services.queue.value.items).toEqual([first, second, first]);
+    expect(s.services.queue.value.index).toBe(2);
+    expect(s.player.state.track).toBe(first);
+    expect(s.api.create).toHaveBeenCalledTimes(2);
+    s.services.play({ ...third, availability: "unavailable" });
+    expect(s.services.queue.value.items).toEqual([first, second, first]);
+    expect(s.api.create).toHaveBeenCalledTimes(2);
+    s.player.stop();
+  });
+
+  it("keeps the appended track but restores the playing entry when its fade is cancelled", async () => {
+    const s = setup();
+    s.services.setPlaybackMode("shuffle");
+    s.services.play(first, [first, second]); await settle(); s.playing();
+    s.services.play(third);
+    expect(s.services.queue.value.index).toBe(2);
+    s.player.seek(10_000); await settle();
+    expect(s.services.queue.value.items).toEqual([first, second, third]);
+    expect(s.services.queue.value.index).toBe(0);
+    expect(s.services.canNext(-1)).toBe(false);
+    expect(s.player.state.track).toBe(first);
+    expect(s.api.create).toHaveBeenCalledOnce();
+    s.player.stop();
+  });
+
+  it("adds next tracks without interrupting playback and prioritizes them in shuffle mode", async () => {
+    vi.spyOn(Math, "random").mockReturnValue(0.99);
+    const s = setup();
+    s.player.setTransitions(false, 300);
+    s.services.setPlaybackMode("shuffle");
+    s.services.play(first, [first, second]); await settle(); s.playing(); s.progress();
+    s.services.playNext([third, other]);
+    expect(s.services.queue.value.items).toEqual([first, third, other, second]);
+    expect(s.services.queue.value.index).toBe(0);
+    expect(s.player.state.track).toBe(first);
+    expect(s.player.state.positionMs).toBe(12_000);
+    expect(s.api.create).toHaveBeenCalledOnce();
+    expect(s.fades).toHaveLength(0);
+    s.services.next(1); await settle();
+    expect(s.player.state.track).toBe(third);
+    s.services.next(1); await settle();
+    expect(s.player.state.track).toBe(other);
+    s.player.stop();
+  });
+
+  it("can stage the first next track without starting an empty player", async () => {
+    const s = setup();
+    s.services.playNext([first]);
+    expect(s.services.queue.value.index).toBe(-1);
+    expect(s.api.create).not.toHaveBeenCalled();
+    s.services.next(1); await settle();
+    expect(s.player.state.track).toBe(first);
+    s.player.stop();
+  });
+});

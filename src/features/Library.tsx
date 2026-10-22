@@ -109,7 +109,7 @@ export function Library() {
             >
               <option>{tr("全部格式")}</option>
             </select>
-            <label className="check-label" title={tr("等待收藏接口")}>
+            <label className="check-label" title={tr("请在我的收藏中查看已收藏曲目")}>
               <input type="checkbox" disabled />
               {tr("仅收藏")}
             </label>

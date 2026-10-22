@@ -2,7 +2,9 @@ import { tr, useLocale, statusText } from "../i18n";
 import { Fragment, useEffect, useRef, useState } from "react";
 import type { SourceTrack, Provider } from "../api/types";
 import { useServices, useStore } from "../app/services";
-import { Cover, duration, Icon, IconButton } from "../components/ui";
+import { Cover, duration, ErrorNotice, Icon, IconButton } from "../components/ui";
+import { ContextMenu } from "../components/ContextMenu";
+import { errorMessage } from "../api/client";
 import { AddToPlaylist } from "./playlists/AddToPlaylist";
 import { useSourceName } from "../components/use-source-name";
 import { MergeSongs } from "./matching/MergeSongs";
@@ -28,15 +30,24 @@ export function TrackTable({
   const sourceName = useSourceName();
   const s = useServices();
   const matchingPending = useStore(s.matchingDecisions.pending);
+  const favorites = useStore(s.favorites);
   const [selected, setSelected] = useState(new Set<string>());
   const [add, setAdd] = useState<SourceTrack[] | null>(null);
   const [merge, setMerge] = useState<{ tracks: SourceTrack[]; revision?: number } | null>(null);
   const [message, setMessage] = useState("");
+  const [favoriteBusy, setFavoriteBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [menu, setMenu] = useState<{ tracks: SourceTrack[]; x: number; y: number; origin: HTMLElement } | null>(null);
+  const feedbackKey = useRef(queryKey);
+  feedbackKey.current = queryKey;
   const check = useRef<HTMLInputElement>(null);
   useEffect(() => {
     setSelected(new Set());
     setMessage("");
+    setError(null);
+    setMenu(null);
   }, [queryKey]);
+  useEffect(() => { void s.favorites.load(); }, [s]);
   const chosen = tracks.filter((t) => selected.has(t.sourceTrackId));
   const all = tracks.length > 0 && chosen.length === tracks.length;
   useEffect(() => {
@@ -49,6 +60,21 @@ export function TrackTable({
       `已将 ${items.filter((t) => t.availability === "available").length} 首可用曲目加入队列`,
     );
   }
+  async function favorite(items: SourceTrack[], value: boolean) {
+    const key = queryKey;
+    setFavoriteBusy(true);
+    setError(null);
+    setMessage("");
+    const results = await Promise.allSettled(items.map((track) => s.favorites.setFavorite(track, value)));
+    setFavoriteBusy(false);
+    if (feedbackKey.current !== key) return;
+    const failure = results.find((result) => result.status === "rejected");
+    if (failure?.status === "rejected") setError(errorMessage(failure.reason));
+    else setMessage(value ? "已收藏" : "已取消收藏");
+  }
+  const menuPlayable = menu?.tracks.filter((track) => track.availability === "available") ?? [];
+  const menuFavorite = menu?.tracks.every((track) => s.favorites.has(track.sourceTrackId)) ?? false;
+  const favoriteDisabled = favoriteBusy || favorites.pending.length > 0 || favorites.loading || !favorites.loaded;
   return (
     <>
       <div className="list-actions">
@@ -58,7 +84,7 @@ export function TrackTable({
             <button onClick={() => enqueue(chosen)}>{tr("加入队列")}</button>
             <button onClick={() => setAdd(chosen)}>{tr("添加到歌单")}</button>
             {onMatchingChange && <button disabled={chosen.length < 2 || matchingPending.length > 0} onClick={() => setMerge({ tracks: chosen, revision: matchingRevision })}>{tr("合并歌曲")}</button>}
-            <button disabled title={tr("收藏接口尚未提供")}>
+            <button disabled={favoriteDisabled} onClick={() => void favorite(chosen, true)}>
               {tr("收藏")}
             </button>
             <button
@@ -106,6 +132,8 @@ export function TrackTable({
           {statusText(message)}
         </p>
       )}
+      <ErrorNotice error={error && error !== favorites.error ? error : null} />
+      <ErrorNotice error={favorites.error} retry={() => void s.favorites.load(true)} />
       <div className="table-wrap">
         <table className="tracks">
           <thead>
@@ -159,6 +187,12 @@ export function TrackTable({
                   })
                 }
                 add={() => setAdd([t])}
+                isFavorite={s.favorites.has(t.sourceTrackId)}
+                favoriteDisabled={favoriteDisabled}
+                toggleFavorite={() => void favorite([t], !s.favorites.has(t.sourceTrackId))}
+                playNext={() => { s.playNext([t]); setMessage("已设为下一首播放"); }}
+                openMenu={(x, y, origin) => setMenu({ tracks: selected.has(t.sourceTrackId) ? chosen : [t], x, y, origin })}
+                openVersionMenu={(track, x, y, origin) => setMenu({ tracks: [track], x, y, origin })}
                 matchingRevision={matchingRevision}
                 onMatchingChange={onMatchingChange}
               />
@@ -166,6 +200,19 @@ export function TrackTable({
           </tbody>
         </table>
       </div>
+      {menu && <ContextMenu {...menu} label={menu.tracks.length > 1
+        ? tr("已选择 {0} 首", { 0: menu.tracks.length }) : menu.tracks[0].title || menu.tracks[0].displayName}
+        close={() => setMenu(null)} actions={[
+          { label: tr("播放"), icon: "play", disabled: !menuPlayable.length, reason: !menuPlayable.length ? tr("暂无可播放曲目") : undefined,
+            run: () => { s.play(menuPlayable[0]); s.enqueue(menuPlayable.slice(1)); } },
+          { label: tr("下一首播放"), icon: "next", disabled: !menuPlayable.length, reason: !menuPlayable.length ? tr("暂无可播放曲目") : undefined,
+            run: () => { s.playNext(menuPlayable); setMessage("已设为下一首播放"); } },
+          { label: tr("添加到播放列表"), icon: "queue", disabled: !menuPlayable.length, reason: !menuPlayable.length ? tr("暂无可播放曲目") : undefined,
+            run: () => enqueue(menuPlayable) },
+          { label: tr(menuFavorite ? "取消收藏" : "收藏"), icon: "heart", disabled: favoriteDisabled,
+            run: () => void favorite(menu.tracks, !menuFavorite) },
+          { label: tr("添加到歌单"), icon: "plus", run: () => setAdd(menu.tracks) },
+        ]} />}
       {add && <AddToPlaylist tracks={add} close={() => setAdd(null)} />}
       {merge && onMatchingChange && <MergeSongs tracks={merge.tracks} revision={merge.revision}
         close={() => setMerge(null)} refresh={() => { setSelected(new Set()); onMatchingChange(); }} />}
@@ -179,6 +226,12 @@ function TrackRow({
   checked,
   toggle,
   add,
+  isFavorite,
+  favoriteDisabled,
+  toggleFavorite,
+  playNext,
+  openMenu,
+  openVersionMenu,
   matchingRevision,
   onMatchingChange,
 }: {
@@ -188,6 +241,12 @@ function TrackRow({
   checked: boolean;
   toggle: () => void;
   add: () => void;
+  isFavorite: boolean;
+  favoriteDisabled: boolean;
+  toggleFavorite: () => void;
+  playNext: () => void;
+  openMenu: (x: number, y: number, origin: HTMLElement) => void;
+  openVersionMenu: (track: SourceTrack, x: number, y: number, origin: HTMLElement) => void;
   matchingRevision?: number;
   onMatchingChange?: () => void;
 }) {
@@ -201,6 +260,16 @@ function TrackRow({
     <Fragment>
     <tr
       className={`${playing ? "current" : ""} ${checked ? "checked" : ""} ${t.availability !== "available" ? "unavailable" : ""}`}
+      tabIndex={-1}
+      onContextMenu={(event) => { event.preventDefault(); openMenu(event.clientX, event.clientY, event.currentTarget); }}
+      onKeyDown={(event) => {
+        if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) {
+          event.preventDefault();
+          const origin = event.target as HTMLElement;
+          const rect = origin.getBoundingClientRect();
+          openMenu(rect.left, rect.bottom, origin);
+        }
+      }}
     >
       <td>
         <input
@@ -254,15 +323,24 @@ function TrackRow({
       </td>
       <td className="duration">{duration(t.durationMs)}</td>
       <td>
-        <IconButton
-          icon="plus"
-          label={tr("将 {0} 添加到歌单", { "0": t.displayName })}
-          onClick={add}
-        />
+        <div className="track-row-actions">
+          <IconButton icon="heart" label={tr(isFavorite ? "取消收藏 {0}" : "收藏 {0}", { 0: t.title || t.displayName })}
+            aria-pressed={isFavorite} className={isFavorite ? "is-favorite" : undefined}
+            disabled={favoriteDisabled} onClick={toggleFavorite} />
+          <IconButton icon="next" label={tr("将 {0} 设为下一首播放", { 0: t.title || t.displayName })}
+            disabled={t.availability !== "available"} onClick={playNext} />
+          <IconButton icon="plus" label={tr("将 {0} 添加到歌单", { "0": t.displayName })} onClick={add} />
+          <IconButton icon="more" label={tr("{0} 的更多操作", { 0: t.title || t.displayName })} aria-haspopup="menu"
+            onClick={(event) => {
+              const rect = event.currentTarget.getBoundingClientRect();
+              openMenu(rect.left, rect.bottom, event.currentTarget);
+            }} />
+        </div>
       </td>
     </tr>
     {expanded && versions.length > 1 && <tr className="track-versions"><td colSpan={9}>
       <TrackVersions tracks={versions} revision={matchingRevision} refresh={onMatchingChange}
+        openActions={openVersionMenu}
         recordingId={t.recordingId} defaultSourceTrackId={t.sourceTrackId} manualSourceTrackId={t.manualSourceTrackId} />
     </td></tr>}
     </Fragment>

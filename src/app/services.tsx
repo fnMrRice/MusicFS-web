@@ -31,6 +31,8 @@ import { LocalDSPEngine } from "../player/dsp/engine";
 import { MatchingApi } from "../api/matching";
 import { MatchingDecisions } from "../library/matching-decisions";
 import { volumePreferences } from "./volume-preferences";
+import { FavoritesApi } from "../api/favorites";
+import { FavoritesState } from "../library/favorites";
 
 interface AuthState {
   session: AuthSession | null;
@@ -69,6 +71,7 @@ export class Services {
   authApi = new AuthApi(this.client);
   profile = new PersonalProfileState(new ProfileApi(this.client));
   libraryApi = new LibraryApi(this.client);
+  favorites = new FavoritesState(new FavoritesApi(this.client));
   matchingDecisions = new MatchingDecisions(new MatchingApi(this.client), () => this.matchingChanged());
   content = new ContentApi(this.client);
   sourcePlaylists = new SourcePlaylistCatalog((instance, signal) => this.content.accountPlaylists(instance, null, signal));
@@ -176,6 +179,8 @@ export class Services {
     this.scans.setSession(this.auth.value.ready!.instanceId, session.user.id);
     this.configurationScans.setSession(this.auth.value.ready!.instanceId, session.user.id);
     this.matchingDecisions.setSession(this.auth.value.ready!.instanceId, session.user.id);
+    this.favorites.setSession(this.auth.value.ready!.instanceId, session.user.id);
+    void this.favorites.load();
     this.profile.setUser(session.user.id);
     this.localDSP.setSession(this.auth.value.ready!.instanceId, session.user.id);
     this.reloadSourceNames();
@@ -275,6 +280,7 @@ export class Services {
     }
   }
   clear(): void {
+    this.favorites.clear();
     this.matchingDecisions.clear();
     this.configurationScans.clear();
     this.scans.clear();
@@ -355,7 +361,12 @@ export class Services {
       this.playlists.set(items);
   }
   play(track: SourceTrack, items?: SourceTrack[]): void {
-    this.queue.replace(track, items);
+    if (track.availability !== "available") return;
+    if (items) this.queue.replace(track, items);
+    else {
+      this.queue.enqueue([track]);
+      this.queue.select(this.queue.value.items.length - 1);
+    }
     void this.player.select(track, this.playbackPreferences());
   }
   playQueueIndex(index: number): void {
@@ -372,6 +383,7 @@ export class Services {
   enqueue(items: SourceTrack[]): void {
     this.queue.enqueue(items);
   }
+  playNext(items: SourceTrack[]): void { this.queue.playNext(items); }
   setPlaybackMode(mode: PlaybackMode): void { this.queue.setMode(mode); }
   shuffleQueue(): void { this.queue.shuffle(); }
   canNext(direction: number): boolean { return this.queue.canAdvance(direction); }
