@@ -24,7 +24,7 @@ export const neteasePlugin: PluginIdentity = {
 };
 export const ncmPlugin: PluginIdentity = {
   id: "musicfs.plugin.decoder.ncm", name: "NCM Decoder",
-  localizedNames: { "zh-CN": "NCM 解密", "zh-TW": "NCM 解密" }, features: ["decode"],
+  localizedNames: { "zh-CN": "NCM 解密", "zh-TW": "NCM 解密" }, features: ["audio-codec"],
 };
 export const scraperPlugin: PluginIdentity = {
   id: "musicfs.scraper.local", name: "Local Metadata",

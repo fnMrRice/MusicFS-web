@@ -17,6 +17,7 @@ export default {
   "歌词": ["Lyrics", "歌詞", "歌詞"],
   "封面": ["Artwork", "封面", "カバーアート"],
   "音频处理": ["Audio processing", "音訊處理", "音声処理"],
+  "音频编解码": ["Audio codecs", "音訊編解碼", "音声コーデック"],
   "DSP": ["DSP", "DSP", "DSP"],
   "数据库": ["Database", "資料庫", "データベース"],
   "必需": ["Required", "必要", "必須"],

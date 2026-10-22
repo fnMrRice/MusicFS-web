@@ -5,6 +5,7 @@ type Plugin = PluginSnapshot["items"][number];
 
 const purposeLabels: Record<string, string> = {
   "music-source": "音乐源",
+  "audio-codec": "音频编解码",
   "audio-processing": "音频处理",
   "audio-dsp": "DSP",
   "audio-analysis": "音频分析",

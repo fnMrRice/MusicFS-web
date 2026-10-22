@@ -9,7 +9,13 @@ const origin = "http://127.0.0.1:18149";
 const longFeature = "a".repeat(64);
 const plugins = [
   localPlugin,
-  { ...ncmPlugin, features: ["audio-decryption"] },
+  ncmPlugin,
+  { id: "musicfs.plugin.decoder.ffmpeg", name: "FFmpeg Audio Codec", localizedNames: {
+    "zh-CN": "FFmpeg 音频编解码",
+  }, features: ["audio-codec"] },
+  { id: "musicfs.plugin.decoder.channelmix", name: "Audio Channel Conversion", localizedNames: {
+    "zh-CN": "音频声道转换",
+  }, features: ["audio-dsp"] },
   { ...scraperPlugin, features: ["lyrics", "artwork"] },
   { id: "example.hybrid.radio", name: "Hybrid Radio", localizedNames: {
     "zh-CN": "组合电台", "zh-TW": "複合電臺", ja: "複合ラジオ",
@@ -55,13 +61,14 @@ test("plugin list shows purposes and versions with empty type selection displayi
   const card = await openPlugins(page);
   await expect(card.getByRole("heading", { name: "插件列表", exact: true })).toBeVisible();
   const types = card.getByRole("group", { name: "插件类型", exact: true });
-  for (const label of ["音乐源", "音频解密", "歌词", "封面", "音频处理", "custom-feature", "constructor", longFeature, "未分类"]) {
+  for (const label of ["音乐源", "音频编解码", "DSP", "歌词", "封面", "音频处理", "custom-feature", "constructor", longFeature, "未分类"]) {
     await expect(types.getByRole("checkbox", { name: label, exact: true })).not.toBeChecked();
   }
   await expect(card.getByRole("searchbox", { name: "按 ID 或名称筛选插件", exact: true })).toHaveValue("");
   await expectVisiblePlugins(card, plugins.map(plugin => plugin.id));
   const purposes = [
-    [localPlugin.id, ["音乐源"]], [ncmPlugin.id, ["音频解密"]],
+    [localPlugin.id, ["音乐源"]], [ncmPlugin.id, ["音频编解码"]],
+    ["musicfs.plugin.decoder.ffmpeg", ["音频编解码"]], ["musicfs.plugin.decoder.channelmix", ["DSP"]],
     [scraperPlugin.id, ["歌词", "封面"]], ["example.hybrid.radio", ["音乐源", "歌词"]],
     ["example.processing", ["音频处理"]], ["example.custom", ["custom-feature", "constructor", longFeature]],
     ["example.unclassified", ["未分类"]],
@@ -86,6 +93,16 @@ test("type filters accept multiple types as alternatives and return to all plugi
   await expectVisiblePlugins(card, [scraperPlugin.id, "example.hybrid.radio"]);
   await lyrics.uncheck();
   await expectVisiblePlugins(card, plugins.map(plugin => plugin.id));
+
+  const codec = types.getByRole("checkbox", { name: "音频编解码", exact: true });
+  const dsp = types.getByRole("checkbox", { name: "DSP", exact: true });
+  await codec.check();
+  await expectVisiblePlugins(card, [ncmPlugin.id, "musicfs.plugin.decoder.ffmpeg"]);
+  await dsp.check();
+  await expectVisiblePlugins(card, [ncmPlugin.id, "musicfs.plugin.decoder.ffmpeg", "musicfs.plugin.decoder.channelmix"]);
+  await codec.uncheck();
+  await expectVisiblePlugins(card, ["musicfs.plugin.decoder.channelmix"]);
+  await dsp.uncheck();
 
   await types.getByRole("checkbox", { name: "未分类", exact: true }).check();
   await expectVisiblePlugins(card, ["example.unclassified"]);
@@ -145,10 +162,10 @@ test("refresh keeps active filters while updating matching plugin data", async (
   await expect(search).toHaveValue("local");
 });
 
-for (const [locale, group, all, lyrics, artwork, searchLabel, empty] of [
-  ["en", "Plugin types", "All", "Lyrics", "Artwork", "Filter plugins by ID or name", "No plugins match these filters."],
-  ["zh-TW", "外掛程式類型", "全部", "歌詞", "封面", "依 ID 或名稱篩選外掛程式", "沒有符合篩選條件的外掛程式。"],
-  ["ja", "プラグインの種類", "すべて", "歌詞", "カバーアート", "ID または名前でプラグインを絞り込み", "条件に一致するプラグインはありません。"],
+for (const [locale, group, all, lyrics, artwork, codec, searchLabel, empty] of [
+  ["en", "Plugin types", "All", "Lyrics", "Artwork", "Audio codecs", "Filter plugins by ID or name", "No plugins match these filters."],
+  ["zh-TW", "外掛程式類型", "全部", "歌詞", "封面", "音訊編解碼", "依 ID 或名稱篩選外掛程式", "沒有符合篩選條件的外掛程式。"],
+  ["ja", "プラグインの種類", "すべて", "歌詞", "カバーアート", "音声コーデック", "ID または名前でプラグインを絞り込み", "条件に一致するプラグインはありません。"],
 ] as const) {
   test(`plugin filter controls and purposes follow the ${locale} language preference`, async ({ page }) => {
     await page.addInitScript(language => localStorage.setItem("musicfs:language", language), locale);
@@ -157,6 +174,7 @@ for (const [locale, group, all, lyrics, artwork, searchLabel, empty] of [
     await expect(types.getByRole("button", { name: all, exact: true })).toBeVisible();
     await expect(types.getByRole("checkbox", { name: lyrics, exact: true })).toBeVisible();
     await expect(types.getByRole("checkbox", { name: artwork, exact: true })).toBeVisible();
+    await expect(types.getByRole("checkbox", { name: codec, exact: true })).toBeVisible();
     const purposes = entry(card, scraperPlugin.id).locator(".plugin-purposes");
     await expect(purposes.getByText(lyrics, { exact: true })).toBeVisible();
     await expect(purposes.getByText(artwork, { exact: true })).toBeVisible();
