@@ -38,9 +38,15 @@ export function PlayerBar() {
   const range = playback?.seekableRange;
   const timelineStart = range?.startMs ?? 0;
   const timelineEnd = range?.endMs || state.track?.durationMs || 1;
-  const timelinePosition = seek ?? state.positionMs;
+  const timelineStep = 100;
+  const timelineSteps = Math.max(0, Math.floor((timelineEnd - timelineStart) / timelineStep));
+  // 与原生滑块的步进取整一致，使填色终点始终贴合指示中心。
+  const timelinePosition = timelineStart + timelineStep * Math.min(
+    timelineSteps,
+    Math.max(0, Math.round(((seek ?? state.positionMs) - timelineStart) / timelineStep)),
+  );
   const progress = timelineEnd > timelineStart
-    ? Math.min(1, Math.max(0, (timelinePosition - timelineStart) / (timelineEnd - timelineStart)))
+    ? (timelinePosition - timelineStart) / (timelineEnd - timelineStart)
     : 0;
   const decrypted = playback?.effectiveProcessing.some(
     (p) =>
@@ -61,12 +67,12 @@ export function PlayerBar() {
     <section className="player" aria-label={tr("播放器")}>
       <input
         className="timeline"
-        style={{ "--timeline-progress": `${progress * 100}%` } as CSSProperties}
+        style={{ "--timeline-progress": progress } as CSSProperties}
         type="range"
         aria-label={tr("曲目进度")}
         min={timelineStart}
         max={timelineEnd}
-        step={100}
+        step={timelineStep}
         value={timelinePosition}
         disabled={!range || playback?.seekMode === "none"}
         onChange={(e) => setSeek(Number(e.target.value))}
