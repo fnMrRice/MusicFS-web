@@ -20,6 +20,24 @@ function fixture() {
 }
 
 describe("Per-directory music configuration", () => {
+  it.each([true, false])("preserves explicit lyrics import defaults and changes only the selected directory (%s)", async (importLyrics) => {
+    const { state, api, config } = fixture();
+    config.importOptions!.importDefaults = { ...defaults, importLyrics };
+    config.roots = config.roots.map(root => ({ ...root, importDefaults: { ...defaults, importLyrics } }));
+    await state.start();
+    expect(state.value.importDefaults.importLyrics).toBe(importLyrics);
+    expect(state.value.additionOptions.importLyrics).toBe(importLyrics);
+    state.editRoot("first", { importDefaults: { ...state.value.roots[0].importDefaults!, importLyrics: !importLyrics } });
+    state.toggleAddition(candidate);
+    state.editAdditions({ ...state.value.additionOptions, importLyrics: !importLyrics });
+    await state.save();
+    const [roots, options] = api.save.mock.calls[0];
+    expect(options.importLyrics).toBe(importLyrics);
+    expect(roots[0].importDefaults!.importLyrics).toBe(!importLyrics);
+    expect(roots[1]).toEqual({ id: "second", name: "Second" });
+    expect(roots[2].importDefaults!.importLyrics).toBe(!importLyrics);
+  });
+
   it("keeps saved directories selected during additions and only toggles new selections", async () => {
     const { state, api } = fixture();
     await state.start();

@@ -30,6 +30,8 @@ export default {
   "收起目录 {0}": ["Collapse folder {0}", "收合目錄 {0}", "フォルダー {0} を折りたたむ"],
   "查找设置": ["Search settings", "搜尋設定", "検索設定"],
   "递归查找子目录": ["Search subfolders recursively", "遞迴搜尋子目錄", "サブフォルダーを再帰的に検索"],
+  "导入歌词": ["Import lyrics", "匯入歌詞", "歌詞を取り込む"],
+  "扫描后导入内嵌或同目录同名的 LRC、TXT 歌词，补充缺失内容并保留手动选择。": ["After scanning, fill missing lyrics from embedded tags or same-name LRC and TXT files in the same folder, keeping manual selections.", "掃描後匯入內嵌或同目錄同名的 LRC、TXT 歌詞，補充缺失內容並保留手動選擇。", "スキャン後、埋め込みタグまたは同じフォルダー内の同名の LRC・TXT ファイルから不足する歌詞を取り込み、手動の選択を保持します。"],
   "限制递归深度": ["Limit recursion depth", "限制遞迴深度", "再帰の深さを制限"],
   "递归深度": ["Recursion depth", "遞迴深度", "再帰の深さ"],
   "0 表示全部递归": ["0 searches all subfolder levels", "0 表示全部遞迴", "0 はすべての階層を検索"],

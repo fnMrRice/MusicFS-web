@@ -47,7 +47,7 @@ test("builtin algorithms show configuration and purpose without fake instances",
   const items: ManagedPlugin[] = [
     ["analysis.chromaprint", "音频分析", "audio-analysis", "audio-analysis", false],
     ["tags.flac", "FLAC 标签", "metadata", "tag-format", false],
-    ["matching.standard", "录音匹配", "matching", "matching", true],
+    ["matching.standard", "标准录音匹配", "audio-analysis", "matching.candidates", true],
     ["transform.thumbnail", "封面缩略图", "metadata", "content-transform", true],
   ].map(([suffix, label, purpose, capability, configured]) => {
     const id = `musicfs.plugin.${suffix}`;
@@ -64,7 +64,15 @@ test("builtin algorithms show configuration and purpose without fake instances",
     await expect(item.getByText("暂无插件实例。", { exact: true })).toHaveCount(0);
     await expect(item.getByRole("button")).toHaveCount(0);
   }
-  await card.getByRole("group", { name: "插件类型", exact: true }).getByRole("checkbox", { name: "元数据", exact: true }).check();
+  const types = card.getByRole("group", { name: "插件类型", exact: true });
+  const audioAnalysis = types.getByRole("checkbox", { name: "音频分析", exact: true });
+  await expect(types.getByRole("checkbox", { name: "录音匹配", exact: true })).toHaveCount(0);
+  await audioAnalysis.check();
+  await expect(card.locator(".plugin-entry")).toHaveCount(2);
+  await expect(entry(card, "musicfs.plugin.analysis.chromaprint")).toBeVisible();
+  await expect(entry(card, "musicfs.plugin.matching.standard").locator("summary")).toContainText("标准录音匹配");
+  await audioAnalysis.uncheck();
+  await types.getByRole("checkbox", { name: "元数据", exact: true }).check();
   await expect(card.locator(".plugin-entry")).toHaveCount(2);
   await expect(entry(card, "musicfs.plugin.tags.flac")).toBeVisible();
   await expect(entry(card, "musicfs.plugin.transform.thumbnail")).toBeVisible();

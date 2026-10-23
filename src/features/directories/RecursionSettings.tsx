@@ -6,7 +6,7 @@ export function RecursionSettings({ value, disabled, change, advanced }: {
   value: ImportDefaults;
   disabled: boolean;
   change: (recursive: boolean, maxDepth: number) => void;
-  advanced: (options: Pick<ImportDefaults, "skipHidden" | "respectNoMedia" | "importArtwork">) => void;
+  advanced: (options: Partial<Pick<ImportDefaults, "skipHidden" | "respectNoMedia" | "importLyrics" | "importArtwork">>) => void;
 }) {
   const hint = useId();
   const [limited, setLimited] = useState(value.maxDepth > 0);
@@ -17,6 +17,10 @@ export function RecursionSettings({ value, disabled, change, advanced }: {
     <label className="check-label"><input type="checkbox" checked={value.recursive}
       onChange={(event) => { setLimited(false); change(event.target.checked, 0); }} />
       {tr("递归查找子目录")}</label>
+    <label className="check-label"><input type="checkbox" checked={value.importLyrics}
+      onChange={(event) => advanced({ importLyrics: event.target.checked })} />
+      {tr("导入歌词")}</label>
+    <p className="muted">{tr("扫描后导入内嵌或同目录同名的 LRC、TXT 歌词，补充缺失内容并保留手动选择。")}</p>
     <details className="directory-advanced">
       <summary>{tr("高级选项")}</summary>
       <div className="directory-depth">

@@ -17,7 +17,7 @@ interface State {
   rootImportDefaultsSupported: boolean;
 }
 interface PendingSave { roots: MusicRoot[]; importDefaults: ImportDefaults; revision: string; key: string }
-const defaultOptions = (): ImportDefaults => ({ recursive: true, maxDepth: 0, importLyrics: false, excludePatterns: [], skipHidden: true, respectNoMedia: true });
+const defaultOptions = (): ImportDefaults => ({ recursive: true, maxDepth: 0, importLyrics: true, excludePatterns: [], skipHidden: true, respectNoMedia: true });
 const settingsJSON = (roots: MusicRoot[], options: ImportDefaults) => JSON.stringify({ roots: [...roots].sort((a, b) => a.id.localeCompare(b.id)), options });
 export interface OperationStorage { get(): string | null; set(id: string | null): void }
 
@@ -66,7 +66,7 @@ export class DirectorySettingsState extends Store<State> {
     if (this.locked || !Number.isInteger(maxDepth) || maxDepth < 0 || maxDepth > 64) return;
     this.patch({ importDefaults: { ...this.value.importDefaults, recursive, maxDepth: recursive ? maxDepth : 0 }, saved: false, error: null });
   }
-  editAdvanced(options: Pick<ImportDefaults, "skipHidden" | "respectNoMedia" | "importArtwork">) {
+  editAdvanced(options: Partial<Pick<ImportDefaults, "skipHidden" | "respectNoMedia" | "importLyrics" | "importArtwork">>) {
     if (!this.locked) this.patch({ importDefaults: { ...this.value.importDefaults, ...options }, saved: false, error: null });
   }
   editRoot(id: string, changes: Partial<Pick<MusicRoot, "name" | "importDefaults">>) {

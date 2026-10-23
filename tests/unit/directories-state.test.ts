@@ -4,7 +4,7 @@ import { DirectoriesApi, type LocalConfiguration, type PluginOperation } from ".
 import { DirectorySettingsState } from "../../src/features/directories/state";
 
 const operation = (status: PluginOperation["status"]): PluginOperation => ({ operationId: "operation-1", status, errorCode: null });
-const defaultOptions = { recursive: true, maxDepth: 0, importLyrics: false, excludePatterns: [], skipHidden: true, respectNoMedia: true };
+const defaultOptions = { recursive: true, maxDepth: 0, importLyrics: true, excludePatterns: [], skipHidden: true, respectNoMedia: true };
 function fixture(savedId: string | null = null, operationAccepted?: (operation: PluginOperation) => void) {
   let id = savedId;
   const api = {

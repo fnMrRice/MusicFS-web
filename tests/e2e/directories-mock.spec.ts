@@ -271,3 +271,43 @@ for (const initial of [true, false, undefined]) {
     expect(saved!.musicRoots[0].importDefaults.importArtwork).toBe(false);
   });
 }
+
+for (const action of ['add', 'edit'] as const) {
+  for (const initial of [false, true]) {
+    test(`lyrics import can be changed when ${action}ing a directory without changing other defaults (${initial})`, async ({ page }) => {
+      let saved: { importDefaults: { importLyrics: boolean }; musicRoots: { id: string; importDefaults?: { importLyrics: boolean } }[] } | null = null;
+      const options = { recursive: true, maxDepth: 0, importLyrics: initial, importArtwork: true,
+        skipHidden: true, respectNoMedia: true, excludePatterns: [] };
+      await mockApi(page, async route => route.fulfill({ json: directoryPage(null, [rootItem]) }), 'admin', async route => {
+        if (route.request().method() === 'PUT') {
+          saved = route.request().postDataJSON();
+          return route.fulfill({ status: 412, json: { error: { code: 'REVISION_CONFLICT' } } });
+        }
+        return route.fulfill({ json: { revision: 'lyrics-revision', rootImportDefaultsSupported: true,
+          roots: [{ id: 'saved', name: 'Collection', pathConfigured: true, importDefaults: options },
+            { id: 'untouched', name: 'Other', pathConfigured: true, importDefaults: options }],
+          importOptions: { importDefaults: options, schemaRevision: 'local-import-v7' } } });
+      });
+      await page.goto(`${origin}/#/settings`);
+      await page.getByRole('button', { name: action === 'add' ? '添加本地目录' : '编辑目录 Collection', exact: true }).click();
+      const dialog = page.getByRole('dialog', { name: action === 'add' ? '添加本地目录' : '编辑目录配置', exact: true });
+      const lyrics = dialog.getByRole('checkbox', { name: '导入歌词', exact: true });
+      await expect(lyrics).toBeVisible();
+      if (initial) await expect(lyrics).toBeChecked(); else await expect(lyrics).not.toBeChecked();
+      await lyrics.setChecked(!initial);
+      await dialog.getByRole('checkbox', { name: '递归查找子目录', exact: true }).uncheck();
+      await dialog.getByText('高级选项', { exact: true }).click();
+      await dialog.getByRole('checkbox', { name: '包含隐藏文件和目录', exact: true }).check();
+      await expect(lyrics).toBeChecked({ checked: !initial });
+      if (action === 'add') await dialog.getByRole('checkbox', { name: '选择目录 Fixture Music', exact: true }).check();
+      await dialog.getByRole('button', { name: action === 'add' ? '添加所选目录' : '保存', exact: true }).click();
+      await expect(dialog.getByRole('alert')).toBeVisible();
+      expect(saved).not.toBeNull();
+      expect(saved!.importDefaults.importLyrics).toBe(initial);
+      expect(saved!.musicRoots.find(item => item.id === 'untouched')).toEqual({ id: 'untouched', name: 'Other' });
+      const changed = action === 'add' ? saved!.musicRoots[2] : saved!.musicRoots[0];
+      expect(changed.importDefaults?.importLyrics).toBe(!initial);
+      if (action === 'add') expect(saved!.musicRoots[0]).toEqual({ id: 'saved', name: 'Collection' });
+    });
+  }
+}

@@ -10,7 +10,6 @@ const purposeLabels: Record<string, string> = {
   "audio-dsp": "DSP",
   "audio-analysis": "音频分析",
   metadata: "元数据",
-  matching: "录音匹配",
   database: "数据库",
   "audio-decryption": "音频解密",
   decode: "音频解码",
