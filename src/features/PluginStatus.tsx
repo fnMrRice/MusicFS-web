@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useServices, useStore } from "../app/services";
 import { useResource } from "../components/query";
 import { ErrorNotice, Icon } from "../components/ui";
+import { Tooltip } from "../components/Tooltip";
 import { tr, useLocale } from "../i18n";
 import { Link } from "react-router-dom";
 import type { PluginDisplayCount, PluginSnapshot } from "../api/directories";
@@ -34,6 +35,8 @@ export function PluginStatus() {
   const [query, setQuery] = useState("");
   const [purposes, setPurposes] = useState<Set<string>>(() => new Set());
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
+  const typeLabelId = useId();
+  const typeHelp = tr("可多选；按住 Shift 点击可仅选择该类型；未选择时显示全部。");
   const showAllUsers = auth.session?.user.role === "admin" && allUsers;
   const plugins = useResource(`settings-plugins-${showAllUsers}`, (signal) =>
     s.client.request<PluginSnapshot>(`/admin/plugins${showAllUsers ? "?allUsers=true" : ""}`, { signal }),
@@ -43,8 +46,9 @@ export function PluginStatus() {
   const purposeOptions = [...new Set([...items.flatMap(pluginPurposes), ...purposes])];
   const filtered = items.filter((plugin) => matchesPlugin(plugin, purposes, query));
   function reload() { plugins.reload(); online.reload(); }
-  function togglePurpose(purpose: string) {
+  function togglePurpose(purpose: string, exclusive: boolean) {
     setPurposes((previous) => {
+      if (exclusive) return new Set([purpose]);
       const next = new Set(previous);
       if (next.has(purpose)) next.delete(purpose); else next.add(purpose);
       return next;
@@ -58,24 +62,29 @@ export function PluginStatus() {
           disabled={plugins.loading || online.loading} onClick={reload}>
           <Icon name="refresh" size={18} />
         </button>
-      </div>
-      <p className="muted">{tr("列表包含可选插件、数据库与 DSP；具体配置方式见各条目详情。")}</p>
-      <div className="plugin-filters">
         <input type="search" aria-label={tr("按 ID 或名称筛选插件")}
           placeholder={tr("按 ID 或名称筛选插件")} value={query}
           onChange={(event) => setQuery(event.target.value)} />
-        <fieldset className="plugin-type-filter">
-          <legend>{tr("插件类型")}</legend>
+      </div>
+      <div className="plugin-filters">
+        <fieldset className="plugin-type-filter" aria-labelledby={typeLabelId}>
+          <legend><span className="plugin-type-legend">
+            <span id={typeLabelId}>{tr("插件类型")}</span>
+            <Tooltip label={typeHelp}>
+              <button type="button" className="plugin-type-help" aria-label={tr("插件类型筛选说明")}
+                aria-description={typeHelp}><span aria-hidden="true">?</span></button>
+            </Tooltip>
+          </span></legend>
           <div className="plugin-type-options">
             <button type="button" aria-pressed={purposes.size === 0} onClick={() => setPurposes(new Set())}>
               {tr("全部")}
             </button>
             {purposeOptions.map((purpose) => <label className="check-label" key={purpose}>
-              <input type="checkbox" checked={purposes.has(purpose)} onChange={() => togglePurpose(purpose)} />
+              <input type="checkbox" checked={purposes.has(purpose)} onChange={(event) =>
+                togglePurpose(purpose, event.nativeEvent instanceof MouseEvent && event.nativeEvent.shiftKey)} />
               {pluginPurposeLabel(purpose)}
             </label>)}
           </div>
-          <p className="muted">{tr("类型可多选，未选择时显示全部。")}</p>
         </fieldset>
       </div>
       {auth.session?.user.role === "admin" && <label className="check-label plugin-scope">

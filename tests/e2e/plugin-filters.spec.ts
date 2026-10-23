@@ -129,6 +129,75 @@ test("search matches trimmed case-insensitive IDs and default or localized plugi
   await expectVisiblePlugins(card, plugins.map(plugin => plugin.id));
 });
 
+test("shift-click selects only the clicked type and ordinary clicks restore multiple selection", async ({ page }) => {
+  const card = await openPlugins(page);
+  const types = card.getByRole("group", { name: "插件类型", exact: true });
+  const music = types.getByRole("checkbox", { name: "音乐源", exact: true });
+  const metadata = types.getByRole("checkbox", { name: "元数据", exact: true });
+  const codec = types.getByRole("checkbox", { name: "音频编解码", exact: true });
+  const search = card.getByRole("searchbox", { name: "按 ID 或名称筛选插件", exact: true });
+  await search.fill("musicfs");
+  await music.check();
+  await codec.check();
+
+  async function expectOnly(selected: Locator) {
+    await expect(types.locator('input:checked')).toHaveCount(1);
+    await expect(selected).toBeChecked();
+    await expect(types.getByRole("button", { name: "全部", exact: true })).toHaveAttribute("aria-pressed", "false");
+    await expect(search).toHaveValue("musicfs");
+  }
+
+  await metadata.click({ modifiers: ["Shift"] });
+  await expectOnly(metadata);
+  await expectVisiblePlugins(card, [scraperPlugin.id]);
+  await music.check();
+  await metadata.click({ modifiers: ["Shift"] });
+  await expectOnly(metadata);
+  await metadata.click({ modifiers: ["Shift"] });
+  await expectOnly(metadata);
+
+  const musicLabel = types.locator("label").filter({ has: page.getByRole("checkbox", { name: "音乐源", exact: true }) });
+  const labelBox = await musicLabel.boundingBox();
+  expect(labelBox).not.toBeNull();
+  await musicLabel.click({ modifiers: ["Shift"], position: { x: labelBox!.width - 10, y: labelBox!.height / 2 } });
+  await expectOnly(music);
+  await expectVisiblePlugins(card, [localPlugin.id]);
+  await codec.click();
+  await expect(music).toBeChecked();
+  await expect(codec).toBeChecked();
+  await expect(types.locator('input:checked')).toHaveCount(2);
+  await expect(search).toHaveValue("musicfs");
+  await expectVisiblePlugins(card, [localPlugin.id, ncmPlugin.id, "musicfs.plugin.decoder.ffmpeg"]);
+});
+
+test("plugin type help appears on hover, keyboard focus and click and dismisses with Escape", async ({ page }) => {
+  const card = await openPlugins(page);
+  const types = card.getByRole("group", { name: "插件类型", exact: true });
+  const help = types.getByRole("button", { name: "插件类型筛选说明", exact: true });
+  const message = "可多选；按住 Shift 点击可仅选择该类型；未选择时显示全部。";
+  const tooltip = page.getByRole("tooltip", { name: message, exact: true });
+  await expect(help).toBeVisible();
+  await expect(help).toHaveAttribute("aria-description", message);
+  await expect(tooltip).toBeHidden();
+  await help.hover();
+  await expect(tooltip).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(tooltip).toBeHidden();
+
+  await card.getByRole("heading", { name: "插件列表", exact: true }).hover();
+  await help.focus();
+  await expect(tooltip).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(tooltip).toBeHidden();
+
+  await card.getByRole("searchbox", { name: "按 ID 或名称筛选插件", exact: true }).focus();
+  await help.click();
+  await expect(tooltip).toBeVisible();
+  await expect(types.locator('input:checked')).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await expect(tooltip).toBeHidden();
+});
+
 test("search combines with types and resetting types preserves the search query", async ({ page }) => {
   const card = await openPlugins(page);
   const search = card.getByRole("searchbox", { name: "按 ID 或名称筛选插件", exact: true });
