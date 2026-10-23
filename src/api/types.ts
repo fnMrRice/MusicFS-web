@@ -15,6 +15,7 @@ export interface SourceTrack {
   title: string | null; artists: string[] | null; durationMs: number | null;
   album?: string | null; genre?: string | null; coverObjectId?: string | null;
   codec: string | null; container: string | null; bitrateBps: number | null;
+  sampleRateHz?: number | null;
   availability: string; assetId: string | null; recordingId?: string | null;
   asset?: { fileSizeBytes?: number | null } | null;
   manualSourceTrackId?: string | null;

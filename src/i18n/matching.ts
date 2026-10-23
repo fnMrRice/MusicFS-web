@@ -40,7 +40,6 @@ export default {
   "歌曲关联已发生变化，请刷新列表后重新选择。": ["Song links have changed. Refresh the list and select again.", "歌曲關聯已發生變更，請重新整理列表後重新選擇。", "曲の関連付けが変更されました。一覧を更新して選び直してください。"],
   "刷新列表并重新选择": ["Refresh and select again", "重新整理列表並重新選擇", "更新して選び直す"],
   "来源版本": ["Source versions", "來源版本", "ソースのバージョン"],
-  "自动选择可用版本中码率最高的；码率相同时选择较大的文件。手动默认优先。": ["Automatically choose the available version with the highest bitrate, then the larger file when bitrates match. A manual default takes priority.", "自動選擇可用版本中位元率最高的；位元率相同時選擇較大的檔案。手動預設優先。", "利用できるバージョンのうちビットレートが最も高いものを自動で選び、同じ場合はファイルサイズが大きいものを選びます。手動の指定を優先します。"],
   "自动默认": ["Automatic default", "自動預設", "自動選択"],
   "手动默认": ["Manual default", "手動預設", "手動で指定"],
   "设为默认": ["Set as default", "設為預設", "既定にする"],

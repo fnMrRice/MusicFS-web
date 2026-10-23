@@ -9,6 +9,7 @@ import { AddToPlaylist } from "./playlists/AddToPlaylist";
 import { useSourceName } from "../components/use-source-name";
 import { MergeSongs } from "./matching/MergeSongs";
 import { TrackVersions } from "./matching/TrackVersions";
+import { RecordingCover } from "./matching/RecordingCover";
 import { useTrackCover } from "../components/use-track-cover";
 import "./matching/matching.css";
 
@@ -34,11 +35,12 @@ export function TrackTable({
   const favorites = useStore(s.favorites);
   const [selected, setSelected] = useState(new Set<string>());
   const [add, setAdd] = useState<SourceTrack[] | null>(null);
+  const [cover, setCover] = useState<SourceTrack | null>(null);
   const [merge, setMerge] = useState<{ tracks: SourceTrack[]; revision?: number } | null>(null);
   const [message, setMessage] = useState("");
   const [favoriteBusy, setFavoriteBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [menu, setMenu] = useState<{ tracks: SourceTrack[]; x: number; y: number; origin: HTMLElement } | null>(null);
+  const [menu, setMenu] = useState<{ tracks: SourceTrack[]; coverTrack?: SourceTrack; x: number; y: number; origin: HTMLElement } | null>(null);
   const feedbackKey = useRef(queryKey);
   feedbackKey.current = queryKey;
   const check = useRef<HTMLInputElement>(null);
@@ -47,6 +49,7 @@ export function TrackTable({
     setMessage("");
     setError(null);
     setMenu(null);
+    setCover(null);
   }, [queryKey]);
   useEffect(() => { void s.favorites.load(); }, [s]);
   const chosen = tracks.filter((t) => selected.has(t.sourceTrackId));
@@ -192,7 +195,10 @@ export function TrackTable({
                 favoriteDisabled={favoriteDisabled}
                 toggleFavorite={() => void favorite([t], !s.favorites.has(t.sourceTrackId))}
                 playNext={() => { s.playNext([t]); setMessage("已设为下一首播放"); }}
-                openMenu={(x, y, origin) => setMenu({ tracks: selected.has(t.sourceTrackId) ? chosen : [t], x, y, origin })}
+                openMenu={(x, y, origin) => {
+                  const menuTracks = selected.has(t.sourceTrackId) ? chosen : [t];
+                  setMenu({ tracks: menuTracks, coverTrack: menuTracks.length === 1 && t.recordingId ? t : undefined, x, y, origin });
+                }}
                 openVersionMenu={(track, x, y, origin) => setMenu({ tracks: [track], x, y, origin })}
                 matchingRevision={matchingRevision}
                 onMatchingChange={onMatchingChange}
@@ -213,7 +219,10 @@ export function TrackTable({
           { label: tr(menuFavorite ? "取消收藏" : "收藏"), icon: "heart", disabled: favoriteDisabled,
             run: () => void favorite(menu.tracks, !menuFavorite) },
           { label: tr("添加到歌单"), icon: "plus", run: () => setAdd(menu.tracks) },
+          ...(menu.coverTrack ? [{ label: tr("选择封面"), icon: "album", run: () => setCover(menu.coverTrack!) }] : []),
         ]} />}
+      {cover?.recordingId && <RecordingCover recordingId={cover.recordingId} tracks={cover.versions ?? [cover]} close={() => setCover(null)}
+        changed={(result) => s.recordingCoverChanged(result.recordingId, result.coverObjectId, result.candidates.map((candidate) => candidate.sourceTrackId))} />}
       {add && <AddToPlaylist tracks={add} close={() => setAdd(null)} />}
       {merge && onMatchingChange && <MergeSongs tracks={merge.tracks} revision={merge.revision}
         close={() => setMerge(null)} refresh={() => { setSelected(new Set()); onMatchingChange(); }} />}

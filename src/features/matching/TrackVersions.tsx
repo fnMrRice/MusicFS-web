@@ -9,7 +9,6 @@ import { useResource } from "../../components/query";
 import { tr, useLocale } from "../../i18n";
 import { useDecision } from "./useDecision";
 import { TrackDetails } from "./TrackDetails";
-import { RecordingCover } from "./RecordingCover";
 
 export function TrackVersions({ tracks, revision, refresh, recordingId, defaultSourceTrackId, manualSourceTrackId, openActions }: {
   tracks: SourceTrack[]; revision?: number; refresh?: () => void;
@@ -22,7 +21,6 @@ export function TrackVersions({ tracks, revision, refresh, recordingId, defaultS
   const sourceName = useSourceName();
   const [unlink, setUnlink] = useState<{ track: SourceTrack; revision?: number } | null>(null);
   const [details, setDetails] = useState<SourceTrack | null>(null);
-  const [cover, setCover] = useState(false);
   const canChooseDefault = !!recordingId && !!refresh;
   const current = useResource(`default-source-revision-${recordingId}-${revision}`, (signal) =>
     revision === undefined && canChooseDefault ? new MatchingApi(services.client).revision(signal) : Promise.resolve({ revision }));
@@ -38,8 +36,6 @@ export function TrackVersions({ tracks, revision, refresh, recordingId, defaultS
     });
   }
   return <div className="track-versions-list" aria-label={tr("来源版本")} aria-busy={decision.busy}>
-    <p className="muted track-version-policy">{tr("自动选择可用版本中码率最高的；码率相同时选择较大的文件。手动默认优先。")}</p>
-    {recordingId && <button onClick={() => setCover(true)}>{tr("选择封面")}</button>}
     {tracks.map((track) => <div className="track-version" key={track.sourceTrackId} tabIndex={openActions ? -1 : undefined}
       onContextMenu={openActions ? (event) => {
         event.preventDefault(); event.stopPropagation();
@@ -60,15 +56,15 @@ export function TrackVersions({ tracks, revision, refresh, recordingId, defaultS
       <span>{sourceName(track.providerInstanceId)}</span>
       <span className="format">{(track.container || track.codec)?.toUpperCase() || "—"}</span>
       <span className="track-version-quality" title={tr("文件大小：{0}", { 0: validSize(track.asset?.fileSizeBytes) ? `${track.asset!.fileSizeBytes} B` : tr("大小未知") })}>
-        {bitrate(track.bitrateBps)} · {fileSize(track.asset?.fileSizeBytes)}
+        {sampleRate(track.sampleRateHz)} · {bitrate(track.bitrateBps)} · {fileSize(track.asset?.fileSizeBytes)}
       </span>
       <span>{duration(track.durationMs)}</span>
       <div className="track-version-actions">
+        <button onClick={() => setDetails(track)} aria-label={tr("查看 {0} 的详情", { 0: track.displayName })}>{tr("详情")}</button>
         {canChooseDefault && (manualSourceTrackId === track.sourceTrackId ?
           <button disabled={blocked} onClick={() => chooseDefault(null)} aria-label={tr("取消默认版本")}>{tr("取消默认")}</button> :
           <button disabled={blocked} onClick={() => chooseDefault(track.sourceTrackId)}
             aria-label={tr("将 {0} 设为默认版本", { 0: track.displayName })}>{tr("设为默认")}</button>)}
-        <button onClick={() => setDetails(track)} aria-label={tr("查看 {0} 的详情", { 0: track.displayName })}>{tr("详情")}</button>
         <button disabled={track.availability !== "available"} onClick={() => services.play(track)}
           aria-label={tr("播放来源版本 {0}", { 0: track.displayName })}><Icon name="play" size={14} /> {tr("播放")}</button>
         {openActions && <IconButton icon="more" label={tr("{0} 的更多操作", { 0: track.displayName })} aria-haspopup="menu"
@@ -86,11 +82,12 @@ export function TrackVersions({ tracks, revision, refresh, recordingId, defaultS
     {details && <TrackDetails key={`${details.providerInstanceId}-${details.sourceTrackId}`}
       sourceTrackId={details.sourceTrackId} providerInstanceId={details.providerInstanceId} close={() => setDetails(null)} />}
     {unlink && refresh && <UnlinkSong track={unlink.track} revision={unlink.revision} refresh={refresh} close={() => setUnlink(null)} />}
-    {cover && recordingId && <RecordingCover recordingId={recordingId} tracks={tracks} close={() => setCover(false)}
-      changed={(result) => services.recordingCoverChanged(result.recordingId, result.coverObjectId, result.candidates.map((candidate) => candidate.sourceTrackId))} />}
   </div>;
 }
 
+function sampleRate(value: number | null | undefined): string {
+  return typeof value === "number" && Number.isInteger(value) && value > 0 ? `${value / 1000} kHz` : tr("采样率未知");
+}
 function bitrate(value: number | null): string {
   return value !== null && Number.isFinite(value) && value > 0 ? `${Math.round(value / 100) / 10} kbps` : tr("码率未知");
 }

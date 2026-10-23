@@ -18,7 +18,8 @@ test.afterAll(async () => { await new Promise<void>((resolve) => server?.httpSer
 
 const tracks: SourceTrack[] = ["Small", "Large", "Legacy"].map((name, index) => ({ sourceTrackId: name, providerInstanceId: index ? "archive" : "local",
   displayName: `${name}.wav`, title: "Song", artists: ["Artist"], album: "Album", coverObjectId: name.toLowerCase(), recordingId: "recording",
-  durationMs: 30000, codec: "pcm_s16le", container: "wav", bitrateBps: 128000, availability: "available", assetId: name }));
+  durationMs: 30000, codec: "pcm_s16le", container: "wav", bitrateBps: 128000, sampleRateHz: [44100, 48000, null][index],
+  availability: "available", assetId: name }));
 const initial = (): RecordingCover => ({ recordingId: "recording", revision: 3, coverObjectId: "large", manualObjectId: null,
   candidates: tracks.map((track, index) => ({ objectId: track.coverObjectId!, sourceTrackId: track.sourceTrackId,
     providerInstanceId: track.providerInstanceId, width: [600, 1200, 0][index], height: [600, 1200, 0][index] })) });
@@ -71,17 +72,18 @@ async function mockApi(page: Page, special?: (route: Route, state: ReturnType<ty
     await route.fulfill({ json });
   });
   await page.goto(`${origin}/#/library`);
-  await page.getByRole("button", { name: "展开 Song 的来源版本", exact: true }).click();
+  await expect(page.getByRole("button", { name: "展开 Song 的来源版本", exact: true })).toHaveAttribute("aria-expanded", "false");
   return { state, writes, plays, errors, reads: () => reads, pages: () => pages };
 }
 async function open(page: Page) {
-  await page.getByRole("button", { name: "选择封面", exact: true }).click();
+  await page.getByRole("button", { name: "Song 的更多操作", exact: true }).click();
+  await page.getByRole("menu").getByRole("menuitem", { name: "选择封面", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "选择封面", exact: true });
   await expect(dialog.getByRole("radio", { name: "自动选择最高分辨率", exact: true })).toBeVisible();
   return dialog;
 }
 
-test("manual and automatic artwork stay consistent in library and player without restarting playback", async ({ page }) => {
+test("manual and automatic artwork stay consistent in library and player without restarting playback", async ({ page }, info) => {
   const mock = await mockApi(page);
   const row = page.locator(".tracks tbody tr").first();
   await expect(row.locator(".cover img")).toHaveAttribute("src", "/api/v1/media/large");
@@ -111,6 +113,7 @@ test("manual and automatic artwork stay consistent in library and player without
   await expect(player.locator(".now-playing .cover img")).toHaveAttribute("src", "/api/v1/media/large");
   await player.getByRole("button", { name: "歌词", exact: true }).click();
   await expect(player.locator(".media-artwork")).toHaveAttribute("src", "/api/v1/media/large");
+  await player.getByRole("button", { name: "关闭面板", exact: true }).click();
   mock.state.coverObjectId = "legacy"; mock.state.revision++;
   await page.getByRole("button", { name: "刷新列表", exact: true }).click();
   await expect(row.locator(".cover img")).toHaveAttribute("src", "/api/v1/media/legacy");
@@ -120,6 +123,22 @@ test("manual and automatic artwork stay consistent in library and player without
   expect(mock.writes.map((write) => write.body)).toEqual([{ expectedRevision: 3, objectId: "small" }, { expectedRevision: 4, objectId: null }]);
   expect(mock.plays).toEqual(["Small"]);
   await expect(page.locator("audio")).toHaveAttribute("src", stream!);
+  await player.getByRole("button", { name: "关闭面板", exact: true }).click();
+  await page.getByRole("button", { name: "展开 Song 的来源版本", exact: true }).click();
+  const versions = page.locator(".track-versions-list");
+  await expect(versions).not.toContainText("自动选择可用版本中码率最高的");
+  await expect(versions.getByRole("button", { name: "选择封面", exact: true })).toHaveCount(0);
+  for (const [index, sampleRate] of ["44.1 kHz", "48 kHz", "采样率未知"].entries()) {
+    const version = versions.locator(".track-version").nth(index);
+    await expect(version.locator(".track-version-quality")).toContainText(sampleRate);
+    await expect(version.locator(".track-version-actions button").nth(0)).toHaveText("详情");
+    await expect(version.locator(".track-version-actions button").nth(1)).toHaveText("设为默认");
+  }
+  await versions.getByRole("button", { name: "Small.wav 的更多操作", exact: true }).click();
+  await expect(page.getByRole("menu")).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: "选择封面", exact: true })).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await versions.screenshot({ path: info.outputPath("source-versions.png") });
   expect(mock.errors).toEqual([]);
 });
 
@@ -148,12 +167,12 @@ test("changed candidates require refreshing before another write", async ({ page
 });
 
 test("uncertain saves retain the same idempotency key and choice on mobile", async ({ page }, info) => {
+  await page.setViewportSize({ width: 390, height: 844 });
   let failed = false;
   const mock = await mockApi(page, async (route) => {
     if (failed) return false;
     failed = true; await route.abort("failed"); return true;
   });
-  await page.setViewportSize({ width: 390, height: 844 });
   const dialog = await open(page);
   await dialog.getByRole("radio", { name: "选择 Small.wav 的封面", exact: true }).check();
   await dialog.getByRole("button", { name: "保存封面", exact: true }).click();
@@ -168,6 +187,8 @@ test("uncertain saves retain the same idempotency key and choice on mobile", asy
 
 test("source rows without a recording cannot select recording artwork", async ({ page }) => {
   const mock = await mockApi(page, undefined, false);
-  await expect(page.getByRole("button", { name: "选择封面", exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "Song 的更多操作", exact: true }).click();
+  await expect(page.getByRole("menu")).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: "选择封面", exact: true })).toHaveCount(0);
   expect(mock.reads()).toBe(0); expect(mock.writes).toHaveLength(0);
 });
