@@ -33,6 +33,8 @@ async function setup(page: Page) {
     if (path.endsWith('/stream')) return route.fulfill({ contentType: 'audio/wav', body: wav });
     const media = /\/media\/lyrics-(.+)$/.exec(path);
     if (media) return route.fulfill({ contentType: 'text/plain; charset=utf-8', body: `${media[1]} 第一行\n${media[1]} 第二行` });
+    if (/\/media\/artwork-.+$/.test(path)) return route.fulfill({ contentType: 'image/png',
+      body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/lVQAAAAASUVORK5CYII=', 'base64') });
     if (request.method() === 'DELETE') return route.fulfill({ status: 204 });
     let json: unknown = { items: [], nextCursor: null, nextAfter: null, libraryRevision: '1' };
     if (path.endsWith('/health/ready')) json = { product: 'MusicFS', ready: true, apiVersion: '1', instanceId: 'lyrics-panel' };
@@ -41,7 +43,10 @@ async function setup(page: Page) {
       ...track, sourceTrackId: name, assetId: name, displayName: `${name}.wav`, durationMs: 60000,
     })), nextCursor: null, libraryRevision: '1' };
     const selection = /\/source-tracks\/([^/]+)\/media-selection$/.exec(path);
-    if (selection) json = { bindings: [{ objectId: `lyrics-${selection[1]}`, field: 'lyrics', current: true, state: 'available' }] };
+    if (selection) json = { bindings: [
+      { objectId: `lyrics-${selection[1]}`, field: 'lyrics', current: true, state: 'available' },
+      { objectId: `artwork-${selection[1]}`, field: 'artwork', current: true, state: 'available' },
+    ] };
     if (path.endsWith('/playback/sessions') && request.method() === 'POST') {
       creates.push(request.postDataJSON().sourceTrackId);
       json = { ...playback(`attempt-${creates.length}`), seekableRange: { startMs: 0, endMs: 60000 } };
@@ -63,6 +68,10 @@ async function play(page: Page, name = 'Alpha'): Promise<void> {
 async function expectLyrics(page: Page, name = 'Alpha'): Promise<void> {
   await expect(panel(page).getByRole('heading', { name: '歌词', exact: true })).toBeVisible();
   await expect(panel(page).locator('.lyrics')).toHaveText(`${name} 第一行\n${name} 第二行`);
+  await expect(panel(page).locator('.media-artwork')).toHaveCount(0);
+  await expect(panel(page)).not.toContainText('暂无歌词');
+  await expect(panel(page)).not.toContainText('此曲目暂无可用歌词。');
+  await expect(panel(page)).not.toContainText('展示当前来源已选用的歌词；暂不进行逐句定位。');
   await expect(lyrics(page)).toHaveAttribute('aria-expanded', 'true');
 }
 async function openPinned(page: Page): Promise<void> {

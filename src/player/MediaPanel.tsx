@@ -69,6 +69,8 @@ export function MediaPanel({ track }: { track: SourceTrack | null }) {
       <ErrorNotice error={state.error} />
       {state.loading ? (
         <p>{tr("正在读取内容…")}</p>
+      ) : state.lyrics.trim() ? (
+        <pre className="lyrics">{state.lyrics}</pre>
       ) : (
         <>
           {artwork && (
@@ -79,14 +81,7 @@ export function MediaPanel({ track }: { track: SourceTrack | null }) {
               alt={tr("当前曲目封面")}
             />
           )}
-          {state.lyrics ? (
-            <pre className="lyrics">{state.lyrics}</pre>
-          ) : (
-            <p className="muted">{tr("此曲目暂无可用歌词。")}</p>
-          )}
-          <p className="muted">
-            {tr("展示当前来源已选用的歌词；暂不进行逐句定位。")}
-          </p>
+          <p className="muted">{tr("暂无歌词")}</p>
         </>
       )}
     </>

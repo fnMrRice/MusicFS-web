@@ -113,6 +113,11 @@ test("manual and automatic artwork stay consistent in library and player without
   await expect(player.locator(".now-playing .cover img")).toHaveAttribute("src", "/api/v1/media/large");
   await player.getByRole("button", { name: "歌词", exact: true }).click();
   await expect(player.locator(".media-artwork")).toHaveAttribute("src", "/api/v1/media/large");
+  const lyrics = player.getByRole("dialog", { name: "歌词", exact: true });
+  await expect(lyrics.getByText("暂无歌词", { exact: true })).toBeVisible();
+  await expect(lyrics).not.toContainText("此曲目暂无可用歌词。");
+  await expect(lyrics).not.toContainText("展示当前来源已选用的歌词；暂不进行逐句定位。");
+  await lyrics.screenshot({ path: info.outputPath("lyrics-empty.png") });
   await player.getByRole("button", { name: "关闭面板", exact: true }).click();
   mock.state.coverObjectId = "legacy"; mock.state.revision++;
   await page.getByRole("button", { name: "刷新列表", exact: true }).click();
@@ -120,6 +125,9 @@ test("manual and automatic artwork stay consistent in library and player without
   await expect(player.locator(".now-playing .cover img")).toHaveAttribute("src", "/api/v1/media/legacy");
   await player.getByRole("button", { name: "歌词", exact: true }).click();
   await expect(player.locator(".media-artwork")).toHaveAttribute("src", "/api/v1/media/legacy");
+  await expect(lyrics.getByText("暂无歌词", { exact: true })).toBeVisible();
+  await expect(lyrics).not.toContainText("此曲目暂无可用歌词。");
+  await expect(lyrics).not.toContainText("展示当前来源已选用的歌词；暂不进行逐句定位。");
   expect(mock.writes.map((write) => write.body)).toEqual([{ expectedRevision: 3, objectId: "small" }, { expectedRevision: 4, objectId: null }]);
   expect(mock.plays).toEqual(["Small"]);
   await expect(page.locator("audio")).toHaveAttribute("src", stream!);
