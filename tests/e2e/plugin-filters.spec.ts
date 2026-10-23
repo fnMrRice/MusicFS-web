@@ -180,6 +180,47 @@ test("shift-click selects only the clicked type and ordinary clicks restore mult
   await musicLabel.click({ modifiers: ["Shift"], position: { x: labelBox!.width - 20, y: labelBox!.height / 2 } });
   await expectOnly(music);
   expect(await page.evaluate(() => window.getSelection()?.toString() ?? "")).toBe("");
+
+  async function clickLabelText(label: Locator) {
+    const position = await label.evaluate(element => {
+      const text = [...element.childNodes].find(node => node.nodeType === Node.TEXT_NODE && node.textContent?.trim());
+      if (!text) throw new Error("Label text not found");
+      const range = document.createRange();
+      range.selectNodeContents(text);
+      const textBox = range.getBoundingClientRect();
+      const bounds = element.getBoundingClientRect();
+      return { x: textBox.x - bounds.x + textBox.width / 2, y: textBox.y - bounds.y + textBox.height / 2 };
+    });
+    await label.click({ position });
+  }
+
+  await codec.click();
+  await page.keyboard.down("Shift");
+  try {
+    await clickLabelText(codecLabel);
+    await expectOnly(codec);
+    await expect(codec).toBeFocused();
+    await clickLabelText(musicLabel);
+    await expectOnly(music);
+    await clickLabelText(musicLabel);
+    await expectOnly(music);
+    await codecLabel.click({ position: { x: codecBox!.width - 5, y: codecBox!.height / 2 } });
+    await expectOnly(codec);
+    await expect(codec).toBeFocused();
+    expect(await page.evaluate(() => window.getSelection()?.toString() ?? "")).toBe("");
+  } finally {
+    await page.keyboard.up("Shift");
+  }
+  await page.keyboard.press("Space");
+  await expect(types.locator('input:checked')).toHaveCount(0);
+  await expect(types.getByRole("button", { name: "全部", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await clickLabelText(musicLabel);
+  await expectOnly(music);
+  await clickLabelText(codecLabel);
+  await expect(music).toBeChecked();
+  await expect(codec).toBeChecked();
+  await expect(types.locator('input:checked')).toHaveCount(2);
+  await expect(search).toHaveValue("musicfs");
 });
 
 test("plugin type help appears on hover, keyboard focus and click and dismisses with Escape", async ({ page }) => {

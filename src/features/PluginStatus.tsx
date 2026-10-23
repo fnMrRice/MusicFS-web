@@ -79,7 +79,13 @@ export function PluginStatus() {
             <button type="button" aria-pressed={purposes.size === 0} onClick={() => setPurposes(new Set())}>
               {tr("全部")}
             </button>
-            {purposeOptions.map((purpose) => <label className="check-label" key={purpose}>
+            {purposeOptions.map((purpose) => <label className="check-label" key={purpose} onClick={(event) => {
+              if (!event.shiftKey || event.target === event.currentTarget.control) return;
+              // 直接处理标签上的快捷单选，避免依赖浏览器转发点击时保留修饰键。
+              event.preventDefault();
+              event.currentTarget.control?.focus();
+              togglePurpose(purpose, true);
+            }}>
               <input type="checkbox" checked={purposes.has(purpose)} onChange={(event) =>
                 togglePurpose(purpose, event.nativeEvent instanceof MouseEvent && event.nativeEvent.shiftKey)} />
               {pluginPurposeLabel(purpose)}
