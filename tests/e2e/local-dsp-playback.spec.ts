@@ -62,7 +62,7 @@ test('real browser output changes live without replacing the stream or requestin
   const baseline = await outputSignal(page);
   expect(baseline.rms).toBeGreaterThan(0.05);
   await page.getByRole('button', { name: '设置', exact: true }).click();
-  await page.getByRole('navigation', { name: '设置分类', exact: true }).getByRole('button', { name: 'DSP 配置', exact: true }).click();
+  await page.getByRole('navigation', { name: '设置分类', exact: true }).getByRole('button', { name: '音效与输出', exact: true }).click();
   await page.getByRole('button', { name: '添加效果', exact: true }).click();
   await page.getByRole('button', { name: '展开 增益', exact: true }).click();
   await page.getByRole('slider', { name: '调节 增益（dB）', exact: true }).fill('-12');
@@ -106,7 +106,7 @@ test('automatic volume balances real output live and preserves pause, mute and t
   const { creates, controls, errors } = await setup(page);
   const audio = await page.locator('audio').elementHandle();
   await page.getByRole('button', { name: '设置', exact: true }).click();
-  await page.getByRole('navigation', { name: '设置分类', exact: true }).getByRole('button', { name: 'DSP 配置', exact: true }).click();
+  await page.getByRole('navigation', { name: '设置分类', exact: true }).getByRole('button', { name: '音效与输出', exact: true }).click();
   await page.getByRole('button', { name: '添加效果', exact: true }).click();
   await page.getByRole('button', { name: '展开 增益', exact: true }).click();
   await page.getByRole('slider', { name: '调节 增益（dB）', exact: true }).fill('12');
@@ -160,7 +160,7 @@ test('output channels switch live with effects disabled and retain the stream, p
     return probe.context.destination.channelCount;
   });
   await page.getByRole('button', { name: '设置', exact: true }).click();
-  await page.getByRole('navigation', { name: '设置分类', exact: true }).getByRole('button', { name: 'DSP 配置', exact: true }).click();
+  await page.getByRole('navigation', { name: '设置分类', exact: true }).getByRole('button', { name: '音效与输出', exact: true }).click();
   await page.getByRole('checkbox', { name: '启用本地音效', exact: true }).uncheck();
   const layout = page.getByLabel('输出声道', { exact: true });
   await layout.selectOption('stereo');

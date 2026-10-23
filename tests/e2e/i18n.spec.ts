@@ -173,7 +173,7 @@ test("live language changes preserve search drafts, selections and metadata and 
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
     await page.goto(`${origin}/#/library`);
-    await settings.goto(`${origin}/#/settings?tab=other`);
+    await settings.goto(`${origin}/#/settings?tab=appearance`);
     await page
       .getByRole("checkbox", {
         name: `Select ${track.displayName}`,
@@ -226,7 +226,7 @@ test("live language changes preserve search drafts, selections and metadata and 
     await expect(page.getByRole("alert")).toContainText(
       "リクエスト ID：req-i18n",
     );
-    await settingsNavigation(page).getByRole("button").last().click();
+    await settingsNavigation(page).getByRole("button", { name: "ユーザー", exact: true }).click();
     await page.getByRole("button", { name: "ログアウト", exact: true }).click();
     await expect(page.locator(".login-page")).toBeVisible();
     await expect(selector(page)).toHaveValue("ja");
@@ -247,7 +247,7 @@ test("all four languages fit settings and search at narrow widths", async ({
     await mock(context);
     const page = await context.newPage();
     for (const language of ["en", "zh-CN", "zh-TW", "ja"]) {
-      await page.goto(`${origin}/#/settings?tab=other`);
+      await page.goto(`${origin}/#/settings?tab=appearance`);
       await selector(page).selectOption(language);
       await selector(page).scrollIntoViewIfNeeded();
       await expect(selector(page)).toBeInViewport();

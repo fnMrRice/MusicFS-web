@@ -41,8 +41,6 @@ export function MusicSources() {
   const sources = new Map(musicSources(providers.data ?? [], online.data ?? []).map((source) => [source.id, source]));
 
   return <div className="settings-card">
-    <h3>{tr("音乐来源")}</h3>
-    <p className="muted">{tr("公开匿名来源无需平台账号；其他来源按提示登录。登录不代表拥有会员或完整播放权限。")}</p>
     <ErrorNotice error={providers.error} retry={providers.reload} />
     <ErrorNotice error={online.error} retry={online.reload} />
     {admin && <ErrorNotice error={plugins.error} retry={plugins.reload} />}

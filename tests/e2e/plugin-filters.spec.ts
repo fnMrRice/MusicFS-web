@@ -59,7 +59,7 @@ async function expectVisiblePlugins(card: Locator, ids: string[]) {
 
 test("plugin list shows purposes and versions with empty type selection displaying every plugin", async ({ page }) => {
   const card = await openPlugins(page);
-  await expect(card.getByRole("heading", { name: "插件列表", exact: true })).toBeVisible();
+  await expect(card.getByRole("heading", { name: "插件列表", exact: true })).toHaveCount(0);
   const types = card.getByRole("group", { name: "插件类型", exact: true });
   for (const label of ["音乐源", "音频编解码", "DSP", "元数据", "音频处理", "custom-feature", "constructor", longFeature, "未分类"]) {
     await expect(types.getByRole("checkbox", { name: label, exact: true })).not.toBeChecked();
@@ -237,7 +237,7 @@ test("plugin type help appears on hover, keyboard focus and click and dismisses 
   await page.keyboard.press("Escape");
   await expect(tooltip).toBeHidden();
 
-  await card.getByRole("heading", { name: "插件列表", exact: true }).hover();
+  await card.getByRole("searchbox", { name: "按 ID 或名称筛选插件", exact: true }).hover();
   await help.focus();
   await expect(tooltip).toBeVisible();
   await page.keyboard.press("Escape");

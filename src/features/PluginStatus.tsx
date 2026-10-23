@@ -57,14 +57,14 @@ export function PluginStatus() {
   return (
     <div className="settings-card plugin-status">
       <div className="plugin-status-heading">
-        <h3>{tr("插件列表")}</h3>
-        <button className="icon-button" aria-label={tr("刷新插件列表")} title={tr("刷新插件列表")}
-          disabled={plugins.loading || online.loading} onClick={reload}>
-          <Icon name="refresh" size={18} />
-        </button>
         <input type="search" aria-label={tr("按 ID 或名称筛选插件")}
           placeholder={tr("按 ID 或名称筛选插件")} value={query}
           onChange={(event) => setQuery(event.target.value)} />
+        <button aria-label={tr("刷新插件列表")} title={tr("刷新插件列表")}
+          disabled={plugins.loading || online.loading} onClick={reload}>
+          <Icon name="refresh" size={18} />
+          <span>{tr("刷新")}</span>
+        </button>
       </div>
       <div className="plugin-filters">
         <fieldset className="plugin-type-filter" aria-labelledby={typeLabelId}>

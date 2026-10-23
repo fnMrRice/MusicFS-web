@@ -37,19 +37,21 @@ function pluginEntry(card: Locator, pluginId: string) {
   return card.locator(".plugin-entry").filter({ has: card.page().getByText(pluginId, { exact: true }) });
 }
 
-async function expectRefreshBesideHeading(card: Locator, label = "刷新插件列表") {
-  const heading = card.locator(".plugin-status-heading h3");
+async function expectRefreshBesideSearch(card: Locator, label = "刷新插件列表", text = "刷新") {
+  const search = card.locator(".plugin-status-heading").getByRole("searchbox");
   const refresh = card.locator(".plugin-status-heading").getByRole("button", { name: label, exact: true });
   await expect(refresh).toBeVisible();
-  const titleBox = await heading.boundingBox();
+  await expect(refresh).toHaveText(text);
+  await expect(card.locator(".plugin-status-heading h3")).toHaveCount(0);
+  const searchBox = await search.boundingBox();
   const buttonBox = await refresh.boundingBox();
-  expect(titleBox).not.toBeNull();
+  expect(searchBox).not.toBeNull();
   expect(buttonBox).not.toBeNull();
-  expect(buttonBox!.x).toBeGreaterThanOrEqual(titleBox!.x + titleBox!.width);
-  expect(Math.abs(buttonBox!.y + buttonBox!.height / 2 - titleBox!.y - titleBox!.height / 2)).toBeLessThan(8);
+  expect(buttonBox!.x).toBeGreaterThanOrEqual(searchBox!.x + searchBox!.width);
+  expect(Math.abs(buttonBox!.y + buttonBox!.height / 2 - searchBox!.y - searchBox!.height / 2)).toBeLessThan(8);
 }
 
-test("plugin groups show identity, separate rows and expandable instances with refresh beside the heading", async ({ page }, info) => {
+test("plugin groups show identity, separate rows and expandable instances with refresh beside the search", async ({ page }, info) => {
   let localState = "pending_configuration";
   let allowedDirectories = 4;
   await mockPlugins(page, () => ({ items: [
@@ -83,7 +85,7 @@ test("plugin groups show identity, separate rows and expandable instances with r
   await expect(local.locator(".plugin-count")).toHaveText("4 个允许访问的目录");
   await expect(ncm.locator(".plugin-count")).toHaveCount(0);
   await expect(scraper.locator(".plugin-count")).toHaveCount(0);
-  await expectRefreshBesideHeading(card);
+  await expectRefreshBesideSearch(card);
   expect(await card.locator(".plugin-entry").evaluateAll(entries => entries.slice(1).every((entry, index) =>
     parseFloat(getComputedStyle(entry).borderTopWidth) > 0 ||
     parseFloat(getComputedStyle(entries[index]!).borderBottomWidth) > 0,
@@ -276,10 +278,10 @@ test("malformed plugin counts never become instance-count fallbacks", async ({ p
   await expect(card.locator(".plugin-count")).toHaveCount(0);
 });
 
-for (const [locale, heading, name, version, refresh, count] of [
-  ["en", "Plugin list", "Local Music", "Unknown version", "Refresh plugin list", "3 sources"],
-  ["zh-TW", "外掛程式清單", "本地音樂", "未知版本", "重新整理外掛程式清單", "3 個來源"],
-  ["ja", "プラグイン一覧", "Local Music", "不明なバージョン", "プラグイン一覧を更新", "3 sources"],
+for (const [locale, name, version, refresh, refreshText, count] of [
+  ["en", "Local Music", "Unknown version", "Refresh plugin list", "Refresh", "3 sources"],
+  ["zh-TW", "本地音樂", "未知版本", "重新整理外掛程式清單", "重新整理", "3 個來源"],
+  ["ja", "Local Music", "不明なバージョン", "プラグイン一覧を更新", "更新", "3 sources"],
 ] as const) {
   test(`plugin group labels and controls follow the ${locale} language preference`, async ({ page }) => {
     await page.addInitScript(language => localStorage.setItem("musicfs:language", language), locale);
@@ -289,7 +291,7 @@ for (const [locale, heading, name, version, refresh, count] of [
     ] }));
     await page.goto(`${origin}/#/settings?tab=plugins`);
     const card = pluginCard(page);
-    await expect(card.getByRole("heading", { name: heading, exact: true })).toBeVisible();
+    await expectRefreshBesideSearch(card, refresh, refreshText);
     await expect(card.locator("summary").getByText(name, { exact: true })).toBeVisible();
     await expect(card.locator("summary")).toContainText(version);
     await expect(card.locator(".plugin-count")).toHaveText(count);
@@ -316,7 +318,7 @@ test("mobile plugin groups wrap long identifiers without horizontal overflow", a
   const card = pluginCard(page);
   const entry = pluginEntry(card, plugin.id);
   await expect(entry.locator("summary").getByText(plugin.id, { exact: true })).toBeVisible();
-  await expectRefreshBesideHeading(card);
+  await expectRefreshBesideSearch(card);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await entry.locator("summary").click();
   await expect(entry.locator(".plugin-instance")).toHaveCount(2);
@@ -331,7 +333,7 @@ test("mobile plugin groups wrap long identifiers without horizontal overflow", a
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.evaluate(() => localStorage.setItem("musicfs:language", "ja"));
   await page.reload();
-  await expectRefreshBesideHeading(pluginCard(page), "プラグイン一覧を更新");
+  await expectRefreshBesideSearch(pluginCard(page), "プラグイン一覧を更新", "更新");
   expect(await pluginCard(page).evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
 });
 

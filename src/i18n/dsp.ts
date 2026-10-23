@@ -7,6 +7,7 @@ export default {
   "保存后将跟随全局配置更新。取消勾选可编辑个人配置。": ["After saving, settings follow global updates. Uncheck to edit your own configuration.", "儲存後將跟隨全域設定更新。取消勾選可編輯個人設定。", "保存後は全体の設定の更新に従います。チェックを外すと個人設定を編集できます。"],
   "个人配置会覆盖全局默认，不受后续全局修改影响。": ["Personal settings override global defaults and are unaffected by later global changes.", "個人設定會覆寫全域預設，不受後續全域修改影響。", "個人設定は全体の既定値を上書きし、その後の全体の変更には影響されません。"],
   "DSP 配置": ["DSP settings", "DSP 設定", "DSP 設定"],
+  "音效与输出": ["Effects & output", "音效與輸出", "エフェクトと出力"],
   "DSP 处理配置": ["DSP processing settings", "DSP 處理設定", "DSP 処理設定"],
   "设置按账号保存在服务端，下一次播放生效，当前歌曲保持原配置。": ["Settings are saved to your account on the server and apply to the next playback. The current track keeps its original settings.", "設定依帳號儲存在伺服器，下次播放生效，目前歌曲保持原設定。", "設定はアカウントごとにサーバーへ保存され、次回の再生から適用されます。再生中の曲の設定は変わりません。"],
   "读取最新版本，保留草稿": ["Load latest version, keep draft", "讀取最新版本，保留草稿", "下書きを保持して最新版を取得"],

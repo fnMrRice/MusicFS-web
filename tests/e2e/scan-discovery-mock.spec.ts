@@ -1,6 +1,7 @@
-import { test, expect, type BrowserContext } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import { preview, type PreviewServer } from 'vite';
-import type { ScanJob } from '../../src/api/scans';
+import type { ScanJob, ScanRequest } from '../../src/api/scans';
+import { routeApi } from '../fixtures/control-mock';
 import { instanceIds, localPlugin } from '../fixtures/plugins';
 import { track } from '../fixtures/dto';
 
@@ -16,12 +17,13 @@ type Remote = { job: ScanJob | null; roots: { rootId: string; trackCount: number
 test.beforeAll(async () => { server = await preview({ preview: { host: '127.0.0.1', port: 18149, strictPort: true } }); });
 test.afterAll(async () => { await new Promise<void>((done) => server?.httpServer.close(() => done())); });
 
-async function mock(context: BrowserContext, remote: Remote) {
-  const requests = { posts: 0, statuses: 0, statistics: 0 };
-  await context.route('**/api/v1/**', async (route) => {
+async function mock(page: Page, remote: Remote) {
+  const requests = { posts: 0, statuses: 0, statistics: 0, submissions: [] as ScanRequest[] };
+  await routeApi(page, async (route) => {
     const path = new URL(route.request().url()).pathname;
-    if (path === scanPath) {
+    if (path === scanPath && route.request().method() === 'POST') {
       requests.posts++;
+      requests.submissions.push(route.request().postDataJSON());
       remote.job = job('running', 0, `new-job-${requests.posts}`);
       return route.fulfill({ status: 202, json: { jobId: remote.job.jobId, merged: false } });
     }
@@ -37,7 +39,7 @@ async function mock(context: BrowserContext, remote: Remote) {
         : route.fulfill({ json: { roots: remote.roots } });
     }
     let json: unknown = { items: [], nextCursor: null };
-    if (path.endsWith('/health/ready')) json = { product: 'MusicFS', apiVersion: '1', ready: true, instanceId: 'discovery-fixture' };
+    if (path.endsWith('/health/ready')) json = { product: 'MusicFS', apiVersion: '1', ready: true, instanceId: 'fixture' };
     if (path.endsWith('/auth/session')) json = { csrfToken: 'fixture', user: { id: 'admin', role: 'admin' } };
     if (path.endsWith('/provider-instances')) json = { items: [{ id: instanceIds.local, name: '本地音乐', plugin: localPlugin,
       availability: 'available', capabilities: ['library.scan'], scanState: 'idle', roots: [{ id: 'music', name: 'Music' }, { id: 'empty', name: 'Empty' }],
@@ -55,27 +57,28 @@ async function mock(context: BrowserContext, remote: Remote) {
 
 test('independent windows discover progress, reload and continue tracking without extra submissions', async ({ page, browser }) => {
   const remote: Remote = { job: null, roots: [{ rootId: 'music', trackCount: 2, sizeBytes: 1024 ** 3 }] };
-  const observer = await mock(page.context(), remote);
+  const observer = await mock(page, remote);
   const progress = page.locator('.local-scan-status').getByRole('status');
   const other = await browser.newContext({ locale: 'zh-CN' });
   try {
-    const initiator = await mock(other, remote);
     const second = await other.newPage();
+    const initiator = await mock(second, remote);
     await page.goto(`${origin}/#/library`);
     await expect(page.getByText('音乐库还很安静', { exact: true })).toBeVisible();
     await page.getByRole('button', { name: '设置', exact: true }).click();
-    await expect(page.getByRole('button', { name: '扫描音乐', exact: true })).toBeEnabled();
+    await expect(page.getByRole('button', { name: '刷新全部目录', exact: true })).toBeEnabled();
     await expect(page.locator('.directory-saved-stats').first()).toHaveText('2 首 · 1.0 GiB');
     await second.goto(`${origin}/#/settings`);
-    await second.getByRole('button', { name: '扫描音乐', exact: true }).click();
+    await second.getByRole('button', { name: '刷新目录 Music 的元数据', exact: true }).click();
     await expect(progress).toContainText('已发现 0 首');
-    await expect(page.getByRole('button', { name: '正在扫描…', exact: true })).toBeDisabled();
+    expect(initiator.submissions).toEqual([{ mode: 'full', schemaRevision: 'local-import-v5', rootIds: ['music'], options: { refreshMetadata: true } }]);
+    expect(observer.posts).toBe(0);
     remote.job = job('running', 200, remote.job!.jobId);
     await expect(progress).toContainText('已发现 200 首');
     await page.reload();
     await expect(progress).toContainText('已发现 200 首');
     expect(await page.evaluate(() => Object.keys(sessionStorage).filter((key) => key.includes(':scan:')))).toEqual([]);
-    await page.getByRole('navigation', { name: '设置分类', exact: true }).getByRole('button', { name: '其他配置', exact: true }).click();
+    await page.getByRole('navigation', { name: '设置分类', exact: true }).getByRole('button', { name: '外观与语言', exact: true }).click();
     remote.job = job('running', 400, remote.job!.jobId);
     await page.getByRole('navigation', { name: '设置分类', exact: true }).getByRole('button', { name: '音乐源', exact: true }).click();
     await expect(progress).toContainText('已发现 400 首');
@@ -104,7 +107,7 @@ test('statistics distinguish loading and errors from zero, retry and fit narrow 
   let release!: () => void;
   const remote: Remote = { job: null, roots: [{ rootId: 'music', trackCount: 946, sizeBytes: Math.round(12.3 * 1024 ** 3) }],
     holdStatistics: new Promise<void>((done) => { release = done; }), failStatistics: true };
-  const requests = await mock(page.context(), remote);
+  const requests = await mock(page, remote);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`${origin}/#/settings`);
   await expect(page.locator('.directory-saved-stats').first()).toHaveText('正在读取统计…');

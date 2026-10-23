@@ -20,7 +20,7 @@ export function AudioOutputSettings() {
   const { error } = useStore(services.localDSP);
   useEffect(() => { services.inspectAudioOutput(); }, [services]);
   const channels = (count: number | null) => count === null ? tr("播放后显示") : tr("{count} 声道", { count });
-  return <section className="settings-card dsp-settings audio-output-settings" aria-label={tr("输出设置")}>
+  return <section className="dsp-settings audio-output-settings" aria-label={tr("输出设置")}>
     <h3>{tr("输出设置")}</h3>
     {!status.supported && <p className="notice" role="status">{tr("此浏览器不支持输出调整，将使用默认播放输出。")}</p>}
     <ErrorNotice error={error} />

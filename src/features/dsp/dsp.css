@@ -1,5 +1,6 @@
-.dsp-settings-stack { display: grid; gap: 20px; }
-.dsp-settings-stack > .settings-card { min-width: 0; margin: 0; }
+.dsp-settings-stack { display: grid; gap: 28px; }
+.dsp-settings-stack > .dsp-settings { min-width: 0; }
+.dsp-settings-stack > .dsp-settings + .dsp-settings { padding-top: 28px; border-top: 1px solid var(--line); }
 .dsp-settings fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
 .dsp-output-controls, .dsp-parameters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .dsp-settings label { display: grid; gap: 7px; font-size: 13px; min-width: 0; margin: 0; }
@@ -29,6 +30,8 @@
 .local-dsp-parameter { display: grid; gap: 8px; min-width: 0; }
 .local-dsp-parameter-inputs { display: grid; grid-template-columns: minmax(0, 1fr) 96px; align-items: center; gap: 12px; }
 @media (max-width: 540px) {
+  .dsp-settings-stack { gap: 22px; }
+  .dsp-settings-stack > .dsp-settings + .dsp-settings { padding-top: 22px; }
   .dsp-output-controls, .dsp-parameters { grid-template-columns: 1fr; }
   .dsp-node { padding: 12px; }
 }

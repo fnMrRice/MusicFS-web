@@ -5,7 +5,7 @@ import { AudioOutputSettings } from "./AudioOutputSettings";
 
 export function DSPSettings() {
   useLocale();
-  return <div className="dsp-settings-stack">
+  return <div className="settings-card dsp-settings-stack">
     <LocalDSPSettings />
     <AudioOutputSettings />
   </div>;

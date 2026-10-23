@@ -71,7 +71,8 @@ async function mock(page: Page, availability = "available", supported = true, mo
 test("one music-source settings section uses arbitrary plugin translations and keeps aliases hidden", async ({ page }) => {
   const requests = await mock(page, "loginRequired");
   await page.goto(`${origin}/#/settings`);
-  await expect(page.getByRole("heading", { name: "音乐来源", exact: true })).toHaveCount(1);
+  await expect(page.getByRole("heading", { name: "音乐源", exact: true })).toHaveCount(1);
+  await expect(page.getByRole("heading", { name: "音乐来源", exact: true })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "音乐平台账号", exact: true })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "自定义节拍", exact: true })).toHaveCount(1);
   await expect(page.getByRole("heading", { name: "目录音乐", exact: true })).toHaveCount(1);
@@ -79,12 +80,12 @@ test("one music-source settings section uses arbitrary plugin translations and k
   await expect(page.getByRole("heading", { name: "Excluded decoder" })).toHaveCount(0);
   await expect(page.getByRole("region", { name: "音乐源", exact: true }).locator("h4")).toHaveCount(3);
   await expect(page.locator(".settings-page").getByText(/Private|Duplicate|qq-public/)).toHaveCount(0);
-  await page.getByRole("navigation", { name: "设置分类", exact: true }).getByRole("button", { name: "其他配置", exact: true }).click();
+  await page.getByRole("navigation", { name: "设置分类", exact: true }).getByRole("button", { name: "外观与语言", exact: true }).click();
   await page.locator(".language-select select").selectOption("zh-TW");
   await page.getByRole("navigation", { name: "設定分類", exact: true }).getByRole("button").first().click();
   await expect(page.getByRole("heading", { name: "自訂節拍", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "目錄音樂", exact: true })).toBeVisible();
-  await page.getByRole("navigation", { name: "設定分類", exact: true }).getByRole("button").last().click();
+  await page.getByRole("navigation", { name: "設定分類", exact: true }).getByRole("button", { name: "外觀與語言", exact: true }).click();
   await page.locator(".language-select select").selectOption("en");
   await page.getByRole("navigation", { name: "Settings categories", exact: true }).getByRole("button", { name: "Music sources", exact: true }).click();
   await expect(page.getByRole("heading", { name: "搜索", exact: true })).toBeVisible();

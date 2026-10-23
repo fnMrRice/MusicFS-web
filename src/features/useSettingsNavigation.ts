@@ -5,16 +5,19 @@ export const settingsSections = [
   { id: "sources", label: "音乐源" },
   { id: "plugins", label: "插件管理" },
   { id: "playback", label: "播放配置" },
-  { id: "dsp", label: "DSP 配置" },
-  { id: "other", label: "其他配置" },
+  { id: "dsp", label: "音效与输出" },
+  { id: "appearance", label: "外观与语言" },
+  { id: "user", label: "用户" },
+  { id: "about", label: "关于" },
 ] as const;
 type SectionId = (typeof settingsSections)[number]["id"];
 
 export function useSettingsNavigation() {
   const [query, setQuery] = useSearchParams();
   const location = useLocation();
+  const requested = query.get("tab") === "other" ? "appearance" : query.get("tab");
   const target = query.has("directories") ? "sources"
-    : settingsSections.find((section) => section.id === query.get("tab"))?.id ?? "sources";
+    : settingsSections.find((section) => section.id === requested)?.id ?? "sources";
   const [active, setActive] = useState<SectionId>(target);
   const page = useRef<HTMLElement>(null);
   const navigation = useRef<HTMLElement>(null);
@@ -85,7 +88,7 @@ export function useSettingsNavigation() {
         const element = page.current?.querySelector(`#settings-panel-${section.id}`);
         if (element && element.getBoundingClientRect().top <= line) current = section.id;
       }
-      if (root.scrollTop + root.clientHeight >= root.scrollHeight - 2) current = "other";
+      if (root.scrollTop + root.clientHeight >= root.scrollHeight - 2) current = "about";
       setActive(moving.current ?? current);
     }
     const schedule = () => { if (!frame) frame = requestAnimationFrame(update); };

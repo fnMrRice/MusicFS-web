@@ -49,27 +49,25 @@ export function Settings() {
           {tab.id === "plugins" && (
             auth.session?.user.role === "admin" ? <PluginStatus />
               : <div className="settings-card">
-                <h3>{tr("插件管理")}</h3>
                 <p className="muted">{tr("插件管理仅对管理员开放。")}</p>
               </div>
           )}
           {tab.id === "playback" && <PlaybackSettings />}
           {tab.id === "dsp" && <DSPSettings />}
-          {tab.id === "other" && <OtherSettings />}
+          {tab.id === "appearance" && <AppearanceSettings />}
+          {tab.id === "user" && <UserSettings />}
+          {tab.id === "about" && <AboutSettings />}
         </section>
       ))}
     </section>
   );
 }
 
-function OtherSettings() {
+function AppearanceSettings() {
   const s = useServices();
-  const auth = useStore(s.auth);
   const prefs = useStore(s.preferences);
   return (
-    <>
       <div className="settings-card appearance-language">
-        <h3>{tr("外观与语言")}</h3>
         <p className="muted">
           {tr("这些偏好仅保存在当前浏览器，按实例和账号区分。")}
         </p>
@@ -98,8 +96,14 @@ function OtherSettings() {
           {tr("语言偏好保存在当前浏览器，对登录页和所有账号生效。")}
         </p>
       </div>
+  );
+}
+
+function UserSettings() {
+  const s = useServices();
+  const auth = useStore(s.auth);
+  return (
       <div className="settings-card settings-user">
-        <h3>{tr("用户")}</h3>
         <dl>
           <div>
             <dt>{tr("当前账号")}</dt>
@@ -117,8 +121,14 @@ function OtherSettings() {
           {tr("退出登录")}
         </button>
       </div>
+  );
+}
+
+function AboutSettings() {
+  const s = useServices();
+  const auth = useStore(s.auth);
+  return (
       <div className="settings-card settings-about">
-        <h3>{tr("关于")}</h3>
         <dl>
           <div>
             <dt>{tr("音乐服务")}</dt>
@@ -134,7 +144,6 @@ function OtherSettings() {
           </div>
         </dl>
       </div>
-    </>
   );
 }
 

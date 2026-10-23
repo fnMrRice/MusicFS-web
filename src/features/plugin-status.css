@@ -1,18 +1,14 @@
 .plugin-status-heading {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 14px;
-}
-.plugin-status-heading h3 {
-  margin: 0;
-  flex-shrink: 0;
+  align-items: stretch;
+  gap: 10px;
 }
 .plugin-status-heading button {
   flex-shrink: 0;
+  white-space: nowrap;
 }
 .plugin-status-heading > input {
-  flex: 1 1 260px;
+  flex: 1 1 440px;
   min-width: 0;
   max-width: 440px;
 }

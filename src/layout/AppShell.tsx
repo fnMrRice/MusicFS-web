@@ -46,12 +46,15 @@ export function AppShell() {
     if (!root) return;
     const sameSettingsPage = location.pathname === "/settings" && previousScrollPath.current === location.pathname;
     previousScrollPath.current = location.pathname;
-    root.dataset.restoredScrollKey = !sameSettingsPage && positions.current.has(location.key) ? location.key : "";
+    const hasSavedPosition = !sameSettingsPage && positions.current.has(location.key);
+    root.dataset.restoredScrollKey = hasSavedPosition ? location.key : "";
     const target = sameSettingsPage ? root.scrollTop : positions.current.get(location.key) ?? 0;
     let position = target;
     let restored = false;
+    // 返回后异步内容仍会改变高度；用户操作前保持历史坐标，避免浏览器滚动锚定将其推移。
+    let keepSavedPosition = hasSavedPosition;
     const restore = () => {
-      if (restored) return;
+      if (restored && !keepSavedPosition) return;
       root.scrollTop = target;
       restored = root.scrollHeight - root.clientHeight >= target;
     };
@@ -60,16 +63,19 @@ export function AppShell() {
     if (content.current) observer.observe(content.current);
     const cancel = () => {
       restored = true;
+      keepSavedPosition = false;
     };
     // 路由卸载可能先缩短内容并截断 scrollTop，提前记录滚动位置供返回时恢复。
     const remember = () => { if (restored) position = root.scrollTop; };
     root.addEventListener("scroll", remember, { passive: true });
     root.addEventListener("wheel", cancel, { passive: true });
     root.addEventListener("pointerdown", cancel);
+    root.addEventListener("keydown", cancel);
     return () => {
       observer.disconnect();
       root.removeEventListener("wheel", cancel);
       root.removeEventListener("pointerdown", cancel);
+      root.removeEventListener("keydown", cancel);
       root.removeEventListener("scroll", remember);
       positions.current.set(location.key, position);
     };
