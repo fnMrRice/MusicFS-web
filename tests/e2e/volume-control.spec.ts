@@ -6,7 +6,7 @@ import { waitPlaying } from './helpers';
 
 let server: PreviewServer;
 let origin: string;
-const preferenceKey = 'musicfs:volume-controls:listener:preferences';
+const preferenceKey = 'musicfs:volume';
 test.beforeAll(async () => {
   server = await preview({ preview: { host: '127.0.0.1', port: 0 } });
   const address = server.httpServer.address();
@@ -28,6 +28,7 @@ function tone(): Buffer {
 
 async function setup(page: Page) {
   const creates: string[] = [], errors: string[] = [];
+  const backend = { instanceId: 'volume-controls' };
   page.on('pageerror', (error) => errors.push(error.message));
   await installAudioProbe(page);
   const sound = tone();
@@ -36,7 +37,7 @@ async function setup(page: Page) {
     if (path.endsWith('/stream')) return route.fulfill({ contentType: 'audio/wav', body: sound });
     if (request.method() === 'DELETE') return route.fulfill({ status: 204 });
     let json: unknown = { items: [], nextCursor: null, nextAfter: null, libraryRevision: '1' };
-    if (path.endsWith('/health/ready')) json = { product: 'MusicFS', ready: true, apiVersion: '1', instanceId: 'volume-controls' };
+    if (path.endsWith('/health/ready')) json = { product: 'MusicFS', ready: true, apiVersion: '1', instanceId: backend.instanceId };
     if (path.endsWith('/auth/session')) json = { csrfToken: 'fixture', user: { id: 'listener', role: 'user' } };
     if (path.endsWith('/source-tracks')) json = { items: [{ ...track, displayName: 'Volume.wav' }], nextCursor: null, libraryRevision: '1' };
     if (path.endsWith('/playback/sessions') && request.method() === 'POST') {
@@ -47,10 +48,10 @@ async function setup(page: Page) {
   });
   await page.goto(`${origin}/#/library`);
   await expect(page.getByRole('button', { name: '账号菜单', exact: true })).toBeVisible();
-  return { creates, errors };
+  return { creates, errors, backend };
 }
 
-const slider = (page: Page) => page.getByRole('slider', { name: '音量', exact: true });
+const slider = (page: Page) => page.getByRole('region', { name: '播放器', exact: true }).getByRole('slider', { name: '音量', exact: true });
 const mute = (page: Page) => page.getByRole('button', { name: '静音', exact: true });
 const unmute = (page: Page) => page.getByRole('button', { name: '取消静音', exact: true });
 const volumeValue = (page: Page) => slider(page).locator('..').locator('.volume-value');
@@ -91,8 +92,8 @@ test('volume defaults to 80 percent, updates real output without restarting and 
   expect(creates).toHaveLength(1); expect(errors).toEqual([]);
 });
 
-test('mute changes its icon and persists silence while remembering the previous volume', async ({ page }, info) => {
-  const { errors } = await setup(page);
+test('mute persists silence and remembers the previous volume after a server restart', async ({ page }, info) => {
+  const { errors, backend } = await setup(page);
   await slider(page).fill('0.37');
   const audibleIcon = await mute(page).locator('svg').innerHTML();
   await mute(page).click();
@@ -102,6 +103,7 @@ test('mute changes its icon and persists silence while remembering the previous 
   expect(mutedIcon).not.toBe(audibleIcon);
   await expect.poll(() => preferences(page)).toMatchObject({ volume: 0, lastVolume: 0.37 });
   await page.screenshot({ path: info.outputPath('volume-muted.png') });
+  backend.instanceId = 'volume-controls-restarted';
   await page.reload();
   await expect(unmute(page)).toHaveAttribute('aria-pressed', 'true');
   await expect(slider(page)).toHaveValue('0');
@@ -114,8 +116,8 @@ test('mute changes its icon and persists silence while remembering the previous 
   expect(errors).toEqual([]);
 });
 
-test('moving the slider to zero uses the muted state and restores the last positive selection', async ({ page }) => {
-  const { creates, errors } = await setup(page);
+test('player and settings volumes stay synchronized and survive a server restart', async ({ page }) => {
+  const { creates, errors, backend } = await setup(page);
   await slider(page).fill('0'); await percentage(page, '0%');
   await expect(unmute(page)).toHaveAttribute('aria-pressed', 'true');
   await unmute(page).click(); await expect(slider(page)).toHaveValue('0.8');
@@ -129,12 +131,17 @@ test('moving the slider to zero uses the muted state and restores the last posit
   await expect.poll(() => preferences(page)).toMatchObject({ volume: 0.53, lastVolume: 0.53 });
   await page.getByRole('button', { name: '设置', exact: true }).click();
   await page.getByRole('tab', { name: '播放配置', exact: true }).click();
-  const settingsVolume = page.getByRole('slider', { name: '默认音量', exact: true });
+  const settingsVolume = page.getByRole('tabpanel', { name: '播放配置', exact: true }).getByRole('slider', { name: '音量', exact: true });
   await expect(settingsVolume).toHaveValue('0.53');
   await settingsVolume.fill('0.29'); await settingsVolume.focus();
   await expect(settingsVolume).toHaveAttribute('aria-valuetext', '29%');
   await expect(settingsVolume.locator('..').locator('.volume-value')).toBeVisible();
   await expect(settingsVolume.locator('..').locator('.volume-value')).toHaveText('29%');
+  await expect(slider(page)).toHaveValue('0.29');
+  await expect.poll(() => preferences(page)).toMatchObject({ volume: 0.29, lastVolume: 0.29 });
+  backend.instanceId = 'volume-controls-restarted';
+  await page.reload();
+  await expect(settingsVolume).toHaveValue('0.29');
   await expect(slider(page)).toHaveValue('0.29');
   await expect.poll(() => preferences(page)).toMatchObject({ volume: 0.29, lastVolume: 0.29 });
   expect(creates).toEqual([]); expect(errors).toEqual([]);

@@ -64,7 +64,7 @@ test("settings group existing controls and preserve playback preferences across 
   await expect(page.getByLabel("淡出淡入时长（毫秒）", { exact: true })).toHaveValue("300");
   await page.getByLabel("淡出淡入时长（毫秒）", { exact: true }).fill("750");
   await page.getByLabel("自动音量平衡", { exact: true }).check();
-  await page.getByRole("slider", { name: "默认音量", exact: true }).fill("0.42");
+  await page.getByRole("tabpanel", { name: "播放配置", exact: true }).getByRole("slider", { name: "音量", exact: true }).fill("0.42");
   await tabs.getByRole("tab", { name: "其他配置", exact: true }).click();
   await expect(page.locator(".language-select select")).toBeVisible();
   await expect(page.getByRole("heading", { name: "外观", exact: true })).toBeVisible();
@@ -78,7 +78,7 @@ test("settings group existing controls and preserve playback preferences across 
   await expect(page.getByLabel("切歌淡出淡入", { exact: true })).toBeChecked();
   await expect(page.getByLabel("淡出淡入时长（毫秒）", { exact: true })).toHaveValue("750");
   await expect(page.getByLabel("自动音量平衡", { exact: true })).toBeChecked();
-  await expect(page.getByRole("slider", { name: "默认音量", exact: true })).toHaveValue("0.42");
+  await expect(page.getByRole("tabpanel", { name: "播放配置", exact: true }).getByRole("slider", { name: "音量", exact: true })).toHaveValue("0.42");
   await page.setViewportSize({ width: 390, height: 844 });
   await tabs.scrollIntoViewIfNeeded();
   for (const tab of await tabs.getByRole("tab").all()) await expect(tab).toBeInViewport();

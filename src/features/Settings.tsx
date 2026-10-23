@@ -212,7 +212,6 @@ function PlaybackSettings() {
         />
         {tr("切歌淡出淡入")}
       </label>
-      <p className="muted">{tr("切歌时先淡出当前曲目，再淡入新曲目。暂停、停止和定位立即响应。")}</p>
       {prefs.fadeEnabled && <>
         <label>
           {tr("淡出淡入时长（毫秒）")}{" "}
@@ -250,13 +249,10 @@ function PlaybackSettings() {
         />
         {tr("自动音量平衡")}
       </label>
-      <p className="muted">{tr("根据播放音量缓慢调整，减小曲目之间的音量差异；静音与安静段落不会被持续放大。")}</p>
-      <p className="muted">{tr("音量根据当前播放信号实时估计，刚开始播放时需要逐步调整。")}</p>
       {!supported && <p className="muted" role="status">{tr("此浏览器不支持淡出淡入和自动音量平衡，设置会保留。")}</p>}
-      <p className="muted">{tr("这些偏好仅保存在当前浏览器，按实例和账号区分。")}</p>
       <label>
-        {tr("默认音量")}{" "}
-        <VolumeSlider label={tr("默认音量")} />
+        {tr("音量")}{" "}
+        <VolumeSlider label={tr("音量")} />
       </label>
     </div>
   );

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Services } from "../../src/app/services";
 
 const preferencesKey = "musicfs:server%3Aa:user%3Ab:preferences";
+const volumeKey = "musicfs:volume";
 const saved = new Map<string, string>();
 const instances: Services[] = [];
 
@@ -20,10 +21,10 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-async function connect() {
+async function connect({ instanceId = "server:a" } = {}) {
   const services = new Services({} as HTMLElement);
   instances.push(services);
-  vi.spyOn(services.authApi, "ready").mockResolvedValue({ product: "MusicFS", instanceId: "server:a", apiVersion: "1", ready: true });
+  vi.spyOn(services.authApi, "ready").mockResolvedValue({ product: "MusicFS", instanceId, apiVersion: "1", ready: true });
   vi.spyOn(services.authApi, "restore").mockResolvedValue({ user: { id: "user:b", role: "owner" }, csrfToken: "csrf", expiresAt: "2099-01-01" });
   vi.spyOn(services.content, "online").mockResolvedValue([]);
   vi.spyOn(services.libraryApi, "providers").mockResolvedValue([]);
@@ -41,7 +42,8 @@ describe("persisted playback volume", () => {
     expect(first.services.preferences.value).toMatchObject({ volume: 0.8, lastVolume: 0.8 });
     expect(first.setVolume).toHaveBeenLastCalledWith(0.8);
     first.services.preference({ volume: 0.37, theme: "dark", mine: false });
-    expect(JSON.parse(saved.get(preferencesKey)!)).toMatchObject({ volume: 0.37, lastVolume: 0.37, theme: "dark", mine: false });
+    expect(JSON.parse(saved.get(volumeKey)!)).toEqual({ volume: 0.37, lastVolume: 0.37 });
+    expect(JSON.parse(saved.get(preferencesKey)!)).toMatchObject({ theme: "dark", mine: false });
     const restored = await connect();
     expect(restored.services.preferences.value).toMatchObject({ volume: 0.37, lastVolume: 0.37, theme: "dark", mine: false });
     expect(restored.setVolume).toHaveBeenLastCalledWith(0.37);
@@ -52,16 +54,30 @@ describe("persisted playback volume", () => {
     first.services.preference({ volume: 0.24 });
     first.services.toggleMute();
     expect(first.setVolume).toHaveBeenLastCalledWith(0);
-    expect(JSON.parse(saved.get(preferencesKey)!)).toMatchObject({ volume: 0, lastVolume: 0.24 });
+    expect(JSON.parse(saved.get(volumeKey)!)).toEqual({ volume: 0, lastVolume: 0.24 });
     const restored = await connect();
     expect(restored.services.preferences.value).toMatchObject({ volume: 0, lastVolume: 0.24 });
     expect(restored.setVolume).toHaveBeenLastCalledWith(0);
     restored.services.toggleMute();
     expect(restored.setVolume).toHaveBeenLastCalledWith(0.24);
-    expect(JSON.parse(saved.get(preferencesKey)!)).toMatchObject({ volume: 0.24, lastVolume: 0.24 });
+    expect(JSON.parse(saved.get(volumeKey)!)).toEqual({ volume: 0.24, lastVolume: 0.24 });
     restored.services.preference({ volume: 0.61 });
     restored.services.toggleMute(); restored.services.toggleMute();
     expect(restored.services.preferences.value).toMatchObject({ volume: 0.61, lastVolume: 0.61 });
+  });
+
+  it.each([false, true])("restores volume after the server process changes with muted=%s", async (muted) => {
+    const first = await connect();
+    first.services.preference({ volume: 0.37, theme: "dark", mine: false });
+    if (muted) first.services.toggleMute();
+
+    const restored = await connect({ instanceId: "server:restarted" });
+    expect(restored.services.preferences.value).toMatchObject({ volume: muted ? 0 : 0.37, lastVolume: 0.37, theme: "system", mine: true });
+    expect(restored.setVolume).toHaveBeenLastCalledWith(muted ? 0 : 0.37);
+    if (muted) {
+      restored.services.toggleMute();
+      expect(restored.setVolume).toHaveBeenLastCalledWith(0.37);
+    }
   });
 
   it("remembers the previous positive volume when the slider is set to zero", async () => {
@@ -69,7 +85,8 @@ describe("persisted playback volume", () => {
     services.preference({ volume: 0.46 });
     services.preference({ volume: 0 });
     services.preference({ theme: "light" });
-    expect(JSON.parse(saved.get(preferencesKey)!)).toMatchObject({ volume: 0, lastVolume: 0.46, theme: "light" });
+    expect(JSON.parse(saved.get(volumeKey)!)).toEqual({ volume: 0, lastVolume: 0.46 });
+    expect(JSON.parse(saved.get(preferencesKey)!)).toMatchObject({ theme: "light" });
     services.toggleMute();
     expect(services.preferences.value.volume).toBe(0.46);
   });
@@ -90,14 +107,14 @@ describe("persisted playback volume", () => {
     [{}, 0.8, 0.8],
     [null, 0.8, 0.8],
   ])("normalizes saved volume %j", async (value, volume, lastVolume) => {
-    saved.set(preferencesKey, JSON.stringify(value));
+    saved.set(volumeKey, JSON.stringify(value));
     const { services, setVolume } = await connect();
     expect(services.preferences.value).toMatchObject({ volume, lastVolume });
     expect(setVolume).toHaveBeenLastCalledWith(volume);
   });
 
   it("uses defaults for malformed saved JSON and keeps mute usable when storage is unavailable", async () => {
-    saved.set(preferencesKey, "not JSON");
+    saved.set(volumeKey, "not JSON");
     const { services } = await connect();
     expect(services.preferences.value).toMatchObject({ volume: 0.8, lastVolume: 0.8 });
     vi.stubGlobal("localStorage", { setItem: () => { throw new Error("Storage unavailable"); } });

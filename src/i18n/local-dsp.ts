@@ -60,10 +60,7 @@ export default {
   "本地音效暂不可用，请查看上方提示。": ["Local effects are currently unavailable. Check the message above.", "本機音效暫不可用，請查看上方提示。", "ローカルエフェクトは現在利用できません。上のメッセージを確認してください。"],
   "切歌淡出淡入": ["Fade out and in between tracks", "切歌淡出淡入", "曲切替時のフェードアウトとフェードイン"],
   "淡出淡入时长（毫秒）": ["Fade duration (milliseconds)", "淡出淡入時長（毫秒）", "フェード時間（ミリ秒）"],
-  "切歌时先淡出当前曲目，再淡入新曲目。暂停、停止和定位立即响应。": ["Fade out the current track, then fade in the next track. Pause, stop, and seeking respond immediately.", "切歌時先淡出目前曲目，再淡入新曲目。暫停、停止和定位立即回應。", "現在の曲をフェードアウトしてから、次の曲をフェードインします。一時停止、停止、シークは即時に反映されます。"],
   "100–2000 毫秒，默认 300 毫秒。此时长分别用于淡出和淡入。": ["100–2000 milliseconds; the default is 300. This duration applies to each fade out and fade in.", "100–2000 毫秒，預設 300 毫秒。此時長分別用於淡出和淡入。", "100～2000 ミリ秒、既定値は 300 です。フェードアウトとフェードインにそれぞれ適用されます。"],
   "自动音量平衡": ["Automatic volume leveling", "自動音量平衡", "自動音量調整"],
-  "根据播放音量缓慢调整，减小曲目之间的音量差异；静音与安静段落不会被持续放大。": ["Adjust gradually based on playback volume to reduce differences between tracks. Silence and quiet passages are not continuously amplified.", "根據播放音量緩慢調整，減小曲目之間的音量差異；靜音與安靜段落不會被持續放大。", "再生音量に基づいて緩やかに調整し、曲間の音量差を抑えます。無音や静かな部分を継続して増幅することはありません。"],
-  "音量根据当前播放信号实时估计，刚开始播放时需要逐步调整。": ["Volume is estimated from the current audio signal in real time, so adjustment is gradual when playback starts.", "音量根據目前播放訊號即時估計，剛開始播放時需要逐步調整。", "音量は現在の再生信号からリアルタイムに推定されるため、再生開始時は徐々に調整されます。"],
   "此浏览器不支持淡出淡入和自动音量平衡，设置会保留。": ["This browser does not support fades or automatic volume leveling. Your settings are kept.", "此瀏覽器不支援淡出淡入和自動音量平衡，設定會保留。", "このブラウザーはフェードと自動音量調整に対応していません。設定は保持されます。"],
 } satisfies Record<string, readonly [string, string, string]>;

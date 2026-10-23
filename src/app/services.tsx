@@ -31,7 +31,7 @@ import { AudioOutputSettingsStore } from "./audio-output-settings";
 import { LocalDSPEngine } from "../player/dsp/engine";
 import { MatchingApi } from "../api/matching";
 import { MatchingDecisions } from "../library/matching-decisions";
-import { volumePreferences } from "./volume-preferences";
+import { loadVolumePreferences, saveVolumePreferences, volumePreferences } from "./volume-preferences";
 import { RecordingCovers } from "./recording-covers";
 import { FavoritesApi } from "../api/favorites";
 import { FavoritesState } from "../library/favorites";
@@ -223,7 +223,7 @@ export class Services {
         saved?.theme === "system"
           ? saved.theme
           : defaults.theme,
-      ...volumePreferences(saved),
+      ...loadVolumePreferences(),
       lyricsPinned: saved?.lyricsPinned === true,
       queuePinned: saved?.queuePinned === true,
       mine: saved?.mine !== false,
@@ -342,6 +342,7 @@ export class Services {
     const volume = volumePreferences({ ...this.preferences.value, ...patch });
     if (patch.volume !== undefined && volume.volume > 0) volume.lastVolume = volume.volume;
     this.preferences.set({ ...this.preferences.value, ...patch, ...volume });
+    if (patch.volume !== undefined || patch.lastVolume !== undefined) saveVolumePreferences(volume);
     this.player.setVolume(this.preferences.value.volume);
     this.player.setTransitions(this.preferences.value.fadeEnabled, this.preferences.value.fadeDurationMs);
     this.dsp.setAutoVolume(this.preferences.value.autoVolume);
