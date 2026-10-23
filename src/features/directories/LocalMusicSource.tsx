@@ -27,7 +27,7 @@ export function LocalMusicSource({ instance, name, manage }: {
     <div className="directory-actions"><h4>{name}</h4>
       <button type="button" disabled={scan.busy || scan.pending || !config.data || !!unavailable}
         title={unavailable ? tr(unavailable) : undefined} onClick={() => void state.start()}>
-        {tr(scan.pending || scan.busy ? scan.job ? "正在扫描…" : "正在提交扫描…" : "扫描音乐")}</button>
+        {tr(!scan.refreshing && (scan.pending || scan.busy) ? scan.job ? "正在扫描…" : "正在提交扫描…" : "扫描音乐")}</button>
       <button onClick={() => manage({ type: "add" })}>{tr("添加本地目录")}</button></div>
     <LocalScanStatus value={scan} state={state} unavailable={unavailable} />
     <ErrorNotice error={config.error} retry={config.reload} />
@@ -41,6 +41,9 @@ export function LocalMusicSource({ instance, name, manage }: {
               onClick={() => manage({ type: "remove", rootId: root.id })}>−</button>
             <button type="button" aria-label={tr("编辑目录 {0}", { 0: root.name })}
               onClick={() => manage({ type: "edit", rootId: root.id })}>{tr("编辑")}</button>
+            <button type="button" aria-label={tr("刷新目录 {0} 的元数据", { 0: root.name })}
+              title={tr(unavailable ?? "重新读取歌曲信息、封面和歌词，保留手动选定的内容。")}
+              disabled={scan.busy || scan.pending || !!unavailable} onClick={() => void state.refresh(root.id)}>{tr("刷新")}</button>
           </div>
         </li>)}
       </ul> : <p className="muted">{tr("暂无已添加目录")}</p>)}

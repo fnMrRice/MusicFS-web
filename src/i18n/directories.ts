@@ -1,4 +1,7 @@
 export default {
+  "刷新": ["Refresh", "重新整理", "更新"],
+  "刷新目录 {0} 的元数据": ["Refresh metadata for folder {0}", "重新整理目錄 {0} 的中繼資料", "フォルダー {0} のメタデータを更新"],
+  "重新读取歌曲信息、封面和歌词，保留手动选定的内容。": ["Reload track information, artwork, and lyrics, keeping manual selections.", "重新讀取歌曲資訊、封面和歌詞，保留手動選定的內容。", "曲情報・カバー・歌詞を再読み込みし、手動で選択した内容を保持します。"],
   "已添加": ["Added", "已新增", "追加済み"],
   "已添加的目录": ["Added folders", "已新增的目錄", "追加済みフォルダー"],
   "暂无已添加目录": ["No folders added", "暫無已新增目錄", "追加済みフォルダーはありません"],

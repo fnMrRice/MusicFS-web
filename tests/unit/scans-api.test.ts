@@ -15,6 +15,13 @@ function fixture() {
 }
 
 describe("Scan API", () => {
+  it("refreshes only the selected saved root without changing its configuration", async () => {
+    const { api, fetcher } = fixture();
+    expect(await api.prepare(provider.id, undefined, "two")).toEqual({ ...body, rootIds: ["two"], options: { refreshMetadata: true } });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    await expect(api.prepare(provider.id, undefined, "removed")).rejects.toMatchObject({ code: "RESOURCE_CHANGED" });
+    expect(fetcher.mock.calls.every(([, options]) => options?.method === "GET")).toBe(true);
+  });
   it("uses the latest provider schema and every root without overriding directory options", async () => {
     const { api, fetcher } = fixture();
     expect(await api.prepare(provider.id)).toEqual(body);

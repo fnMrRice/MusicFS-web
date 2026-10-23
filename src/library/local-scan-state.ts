@@ -2,11 +2,15 @@ import { ApiError } from "../api/client";
 import { ScansApi, pendingScanStatuses, type ScanJob, type ScanRequest } from "../api/scans";
 import { Store } from "../app/store";
 import { scanError } from "./scan-errors";
+import type { ScanMetadataSummary } from "../api/scan-metadata";
 
 interface PendingScan { request: ScanRequest; key: string; jobId: string | null }
 interface SavedScan { pending: PendingScan | null; automatic: boolean }
 export interface ScanStorage { get(): string | null; set(value: string | null): void }
-export interface LocalScanSnapshot { busy: boolean; pending: boolean; automaticQueued: boolean; job: ScanJob | null; error: string | null }
+export interface LocalScanSnapshot {
+  busy: boolean; pending: boolean; automaticQueued: boolean; job: ScanJob | null; error: string | null;
+  refreshing: boolean; metadata: ScanMetadataSummary | null;
+}
 
 function restore(storage: ScanStorage): SavedScan {
   try {
@@ -18,7 +22,8 @@ function restore(storage: ScanStorage): SavedScan {
       && saved.request?.mode === "full" && typeof saved.request.schemaRevision === "string"
       && Array.isArray(saved.request.rootIds) && saved.request.rootIds.length > 0
       && saved.request.rootIds.every((id) => typeof id === "string")
-      && saved.request.options && Object.keys(saved.request.options).length === 0) return { pending: saved, automatic };
+      && saved.request.options && Object.entries(saved.request.options).every(([key, value]) => key === "refreshMetadata" && value === true))
+      return { pending: saved, automatic };
   } catch { /* 损坏或不可用的存储不影响新的扫描。 */ }
   return { pending: null, automatic: false };
 }
@@ -35,7 +40,8 @@ export class LocalScanState extends Store<LocalScanSnapshot> {
   constructor(private api: ScansApi, private instance: string, private storage: ScanStorage,
     private finished: (succeeded: boolean) => void) {
     const saved = restore(storage);
-    super({ busy: false, pending: saved.pending !== null || saved.automatic, automaticQueued: saved.automatic, job: null, error: null });
+    super({ busy: false, pending: saved.pending !== null || saved.automatic, automaticQueued: saved.automatic, job: null, error: null,
+      refreshing: saved.pending?.request.options.refreshMetadata === true, metadata: null });
     this.pending = saved.pending;
     this.automatic = saved.automatic;
   }
@@ -62,6 +68,10 @@ export class LocalScanState extends Store<LocalScanSnapshot> {
     if (this.value.busy || this.value.pending) return;
     await this.run(true);
   }
+  async refresh(rootId: string): Promise<void> {
+    if (this.value.busy || this.value.pending) return;
+    await this.run(true, rootId);
+  }
   requestAutomatic(): void {
     this.automatic = true;
     ++this.automaticRevision;
@@ -73,7 +83,7 @@ export class LocalScanState extends Store<LocalScanSnapshot> {
     if (this.value.busy || !this.value.pending) return;
     await this.run(!this.pending);
   }
-  private async run(fresh: boolean): Promise<void> {
+  private async run(fresh: boolean, rootId?: string): Promise<void> {
     if (this.timer) clearTimeout(this.timer);
     this.timer = null;
     const generation = ++this.generation;
@@ -83,11 +93,12 @@ export class LocalScanState extends Store<LocalScanSnapshot> {
     const automaticRevision = this.automaticRevision;
     let waitForReady = false;
     let continueAutomatic = false;
-    this.patch({ busy: true, error: null, ...(fresh ? { job: null } : {}) });
+    this.patch({ busy: true, error: null, ...(fresh ? { job: null, metadata: null, refreshing: rootId !== undefined } : {}) });
     let stage: "prepare" | "submit" | "poll" = fresh ? "prepare" : this.pending?.jobId ? "poll" : "submit";
     try {
       if (fresh) {
-        const request = await this.api.prepare(this.instance, controller.signal);
+        const request = rootId === undefined ? await this.api.prepare(this.instance, controller.signal)
+          : await this.api.prepare(this.instance, controller.signal, rootId);
         if (!current()) return;
         if (automaticRevision === this.automaticRevision) this.automatic = false;
         this.readinessAttempts = 0;
@@ -106,9 +117,16 @@ export class LocalScanState extends Store<LocalScanSnapshot> {
       if (!current()) return;
       this.patch({ job });
       if (!pendingScanStatuses.includes(job.status)) {
+        const succeeded = job.status === "succeeded" && job.complete;
+        if (succeeded && this.pending?.request.options.refreshMetadata) {
+          const metadata = await this.api.metadataResults(job.jobId, controller.signal);
+          if (!current()) return;
+          this.patch({ metadata });
+          if (metadata.pending) return;
+          if (metadata.failed) this.patch({ error: "部分曲目的元数据刷新失败，请检查插件状态后重试。" });
+        }
         this.persist(null);
         continueAutomatic = this.automatic;
-        const succeeded = job.status === "succeeded" && job.complete;
         const messages = {
           failed: "扫描失败；请检查音乐目录和插件状态后重新扫描。",
           cancelled: "扫描已取消，可重新发起扫描。",

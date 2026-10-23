@@ -1,11 +1,12 @@
 import { ApiClient, ApiError } from "./client";
 import { LibraryApi } from "./library";
+import { scanMetadataResults } from "./scan-metadata";
 
 export interface ScanRequest {
   mode: "full";
   schemaRevision: string;
   rootIds: string[];
-  options: Record<string, never>;
+  options: { refreshMetadata?: boolean };
 }
 export interface ScanJob {
   jobId: string;
@@ -20,16 +21,20 @@ const statuses = [...pendingScanStatuses, "succeeded", "failed", "cancelled", "p
 
 export class ScansApi {
   constructor(private client: ApiClient, private library: LibraryApi) {}
-  async prepare(instance: string, signal?: AbortSignal): Promise<ScanRequest> {
+  async prepare(instance: string, signal?: AbortSignal, rootId?: string): Promise<ScanRequest> {
     const provider = (await this.library.providers(signal)).find((item) => item.id === instance);
     if (!provider || !["available", "online"].includes(provider.availability))
       throw new ApiError("SOURCE_UNAVAILABLE", "Source is not ready");
     if (!provider.capabilities?.includes("library.scan")) throw new ApiError("UNSUPPORTED", "Source cannot scan music");
     if (!provider.roots?.length) throw new ApiError("SCAN_NO_ROOTS", "No music folders configured");
     if (!provider.configuration?.schemaRevision) throw new ApiError("UNSUPPORTED", "Scan configuration is unavailable");
+    if (rootId !== undefined && !provider.roots.some((root) => root.id === rootId))
+      throw new ApiError("RESOURCE_CHANGED", "Music folder is no longer available");
     return { mode: "full", schemaRevision: provider.configuration.schemaRevision,
-      rootIds: provider.roots.map((root) => root.id), options: {} };
+      rootIds: rootId === undefined ? provider.roots.map((root) => root.id) : [rootId],
+      options: rootId === undefined ? {} : { refreshMetadata: true } };
   }
+  metadataResults(id: string, signal?: AbortSignal) { return scanMetadataResults(this.client, id, signal); }
   async submit(instance: string, body: ScanRequest, key: string, signal?: AbortSignal) {
     const result = await this.client.request<{ jobId: string; merged: boolean }>(
       `/provider-instances/${encodeURIComponent(instance)}/scan-jobs`,

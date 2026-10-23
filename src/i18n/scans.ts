@@ -1,4 +1,9 @@
 export default {
+  "正在刷新封面和歌词，已处理 {0}/{1} 首曲目…": ["Refreshing artwork and lyrics; {0}/{1} tracks processed…", "正在重新整理封面和歌詞，已處理 {0}/{1} 首曲目…", "カバーと歌詞を更新中：{0}/{1} 曲処理済み…"],
+  "元数据刷新已结束，{0} 首曲目处理失败。": ["Metadata refresh finished; {0} tracks failed.", "中繼資料重新整理已結束，{0} 首曲目處理失敗。", "メタデータの更新が終了しました。{0} 曲の処理に失敗しました。"],
+  "元数据刷新完成，共处理 {0} 首曲目。": ["Metadata refresh complete; {0} tracks processed.", "中繼資料重新整理完成，共處理 {0} 首曲目。", "メタデータの更新完了：{0} 曲処理済み。"],
+  "封面和歌词：已更新 {0} 项，跳过 {1} 项。": ["Artwork and lyrics: {0} updated, {1} skipped.", "封面和歌詞：已更新 {0} 項，略過 {1} 項。", "カバーと歌詞：{0} 件更新、{1} 件スキップ。"],
+  "部分曲目的元数据刷新失败，请检查插件状态后重试。": ["Metadata refresh failed for some tracks. Check plugin status and retry.", "部分曲目的中繼資料重新整理失敗，請檢查外掛程式狀態後重試。", "一部の曲のメタデータ更新に失敗しました。プラグインの状態を確認して再試行してください。"],
   "扫描音乐": ["Scan music", "掃描音樂", "音楽をスキャン"],
   "目录已保存，正在等待自动扫描…": ["Folders saved; waiting to scan automatically…", "目錄已儲存，正在等待自動掃描…", "フォルダーを保存しました。自動スキャンを待っています…"],
   "正在扫描…": ["Scanning…", "正在掃描…", "スキャン中…"],
