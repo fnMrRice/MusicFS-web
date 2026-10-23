@@ -1,3 +1,4 @@
+import { routeApi } from "../fixtures/control-mock";
 import { test, expect, type Page } from '@playwright/test';
 import { preview, type PreviewServer } from 'vite';
 import { playback, track } from '../fixtures/dto';
@@ -31,7 +32,7 @@ async function setup(page: Page, antiphase = false) {
   const creates: { preferences: unknown }[] = [];
   const controls: string[] = [];
   const sound = tone(antiphase);
-  await page.route('**/api/v1/**', async (route) => {
+  await routeApi(page, async (route) => {
     const request = route.request(), path = new URL(request.url()).pathname;
     if (path.endsWith('/stream')) return route.fulfill({ contentType: 'audio/wav', body: sound });
     if (path.includes('/dsp/settings') || path.endsWith('/seek') || path.endsWith('/recover')) controls.push(path);
@@ -86,7 +87,7 @@ test('real browser output changes live without replacing the stream or requestin
   await page.getByRole('slider', { name: '曲目进度', exact: true }).dispatchEvent('pointerup');
   await waitPlaying(page);
   await expect.poll(async () => (await outputSignal(page)).rms).toBeGreaterThan(0.005);
-  await page.getByRole('slider', { name: '音量', exact: true }).fill('0');
+  await page.getByRole('region', { name: '播放器', exact: true }).getByRole('slider', { name: '音量', exact: true }).fill('0');
   await expect.poll(async () => (await outputSignal(page)).rms).toBeLessThan(0.00001);
   expect(await original!.evaluate((element) => element === document.querySelector('audio'))).toBe(true);
   expect(await audio.getAttribute('src')).toBe(url);
@@ -121,11 +122,11 @@ test('automatic volume balances real output live and preserves pause, mute and t
   await page.getByRole('button', { name: '播放', exact: true }).click();
   await waitPlaying(page);
   await expect.poll(async () => (await outputSignal(page)).rms).toBeGreaterThan(0.09);
-  await page.getByRole('slider', { name: '音量', exact: true }).fill('0');
+  await page.getByRole('region', { name: '播放器', exact: true }).getByRole('slider', { name: '音量', exact: true }).fill('0');
   await expect.poll(async () => (await outputSignal(page)).rms).toBeLessThan(0.00001);
   await page.getByLabel('自动音量平衡', { exact: true }).uncheck();
   await expect.poll(async () => (await outputSignal(page)).rms).toBeLessThan(0.00001);
-  await page.getByRole('slider', { name: '音量', exact: true }).fill('0.8');
+  await page.getByRole('region', { name: '播放器', exact: true }).getByRole('slider', { name: '音量', exact: true }).fill('0.8');
   await expect.poll(async () => (await outputSignal(page)).rms / loud.rms).toBeGreaterThan(0.95);
   expect(await audio!.evaluate((element) => element === document.querySelector('audio'))).toBe(true);
   expect(creates).toHaveLength(1);
@@ -185,7 +186,7 @@ test('output channels switch live with effects disabled and retain the stream, p
   await page.getByRole('button', { name: '播放', exact: true }).click();
   await waitPlaying(page);
   await expect.poll(async () => (await outputSignal(page)).rms).toBeGreaterThan(0.01);
-  await page.getByRole('slider', { name: '音量', exact: true }).fill('0');
+  await page.getByRole('region', { name: '播放器', exact: true }).getByRole('slider', { name: '音量', exact: true }).fill('0');
   for (const value of ['mono', 'stereo']) {
     await layout.selectOption(value);
     await expect.poll(outputChannels).toBe(value === 'mono' ? 1 : 2);

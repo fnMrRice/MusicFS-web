@@ -52,6 +52,7 @@ export default {
   "退出登录": ["Sign out", "登出", "ログアウト"],
   "返回": ["Back", "返回", "戻る"],
   "已连接": ["Connected", "已連線", "接続済み"],
+  "音乐服务连接在线，业务就绪状态尚未确认。": ["The music service connection is online; readiness has not been confirmed.", "音樂服務連線正常，業務就緒狀態尚未確認。", "音楽サービスに接続していますが、準備状態はまだ確認されていません。"],
   "换肤": ["Appearance", "外觀", "外観"],
   "选择主题": ["Choose a theme", "選擇主題", "テーマを選択"],
   "为音乐换个心情": ["Set the mood", "為音樂換個心情", "音楽に合わせて気分を変える"],

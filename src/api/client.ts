@@ -20,14 +20,26 @@ export interface RequestOptions {
   bearer?: string;
   timeoutMs?: number;
   keepalive?: boolean;
+  onLateSuccess?: (value: unknown) => void;
+}
+
+export interface ControlTransport {
+  request<T>(path: string, options?: RequestOptions): Promise<T>;
 }
 
 export class ApiClient {
   csrfToken: string | null = null;
   onUnauthorized: (() => void) | null = null;
+  controlTransport: ControlTransport | null = null;
   constructor(private fetcher: typeof fetch = (...args) => fetch(...args)) {}
 
   url(path: string): string { return `/api/v1${path}`; }
+
+  control<T>(path: string, options: RequestOptions = {}): Promise<T> {
+    if (!this.controlTransport)
+      return Promise.reject(new ApiError("NETWORK_ERROR", "Control channel is unavailable"));
+    return this.controlTransport.request<T>(path, options);
+  }
 
   async request<T>(path: string, options: RequestOptions = {}): Promise<T> {
     const csrfToken = this.csrfToken;

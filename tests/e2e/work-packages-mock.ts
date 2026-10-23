@@ -1,3 +1,4 @@
+import { routeApi } from "../fixtures/control-mock";
 import type { Page } from "@playwright/test";
 import type { PackagePreview, PackageSelection, WorkPackage } from "../../src/api/work-packages";
 import { packageFixture, packagePNG, packageText, previewFixture } from "../fixtures/work-packages";
@@ -7,7 +8,7 @@ export async function mockPackages(page: Page) {
     writes: [] as { body: unknown; key: string }[], replies: new Map<string, WorkPackage>(), attachments: [] as string[],
     failure: null as "network" | "gateway" | "invalid" | "conflict" | null, gate: null as Promise<void> | null,
     play: [] as Record<string, unknown>[], failPreview: false };
-  await page.route("**/api/v1/**", async (route) => {
+  await routeApi(page, async (route) => {
     const request = route.request(), url = new URL(request.url()), path = url.pathname.replace("/api/v1", "");
     if (path === "/health/ready") return route.fulfill({ json: { product: "MusicFS", ready: true, apiVersion: "1", instanceId: "package-test" } });
     if (path === "/auth/session") return route.fulfill({ json: { csrfToken: "csrf", user: { id: "listener", role: "user" } } });

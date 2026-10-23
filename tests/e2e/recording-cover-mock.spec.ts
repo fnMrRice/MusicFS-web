@@ -1,3 +1,4 @@
+import { routeApi } from "../fixtures/control-mock";
 import { expect, test, type Page, type Route } from "@playwright/test";
 import { preview, type PreviewServer } from "vite";
 import type { RecordingCover } from "../../src/api/recording-cover";
@@ -35,7 +36,7 @@ async function mockApi(page: Page, special?: (route: Route, state: ReturnType<ty
   let reads = 0, pages = 0;
   const sound = silence();
   page.on("pageerror", (error) => errors.push(error.message));
-  await page.route("**/api/v1/**", async (route) => {
+  await routeApi(page, async (route) => {
     const request = route.request(), path = new URL(request.url()).pathname;
     if (path.endsWith("/recordings/recording/cover")) {
       if (request.method() === "PUT") {

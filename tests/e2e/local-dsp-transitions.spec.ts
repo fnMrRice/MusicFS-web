@@ -1,3 +1,4 @@
+import { routeApi } from "../fixtures/control-mock";
 import { test, expect, type Page } from '@playwright/test';
 import { preview, type PreviewServer } from 'vite';
 import { playback, track } from '../fixtures/dto';
@@ -51,15 +52,6 @@ async function recordOutput(page: Page): Promise<void> {
       const button = (event.target as Element).closest('button');
       if (button) recording.events.push({ type: 'click', at: performance.now(), label: button.getAttribute('aria-label') ?? button.textContent ?? '' });
     }, true);
-    const fetch = window.fetch.bind(window);
-    window.fetch = (input, options) => {
-      const url = input instanceof Request ? input.url : String(input);
-      const method = options?.method ?? (input instanceof Request ? input.method : 'GET');
-      if (method === 'POST' && new URL(url, location.href).pathname.endsWith('/playback/sessions')) {
-        recording.events.push({ type: 'create', at: performance.now() });
-      }
-      return fetch(input, options);
-    };
   });
 }
 
@@ -80,7 +72,7 @@ test('switching waits for audible fade-out, fades in after delayed playing and l
   let secondStreamRequested = false;
   let releaseSecondStream!: () => void;
   const secondStream = new Promise<void>((resolve) => { releaseSecondStream = resolve; });
-  await page.route('**/api/v1/**', async (route) => {
+  await routeApi(page, async (route) => {
     const request = route.request(), path = new URL(request.url()).pathname;
     if (path.endsWith('/stream')) {
       const second = path.includes('/attempt-2/');
@@ -95,6 +87,9 @@ test('switching waits for audible fade-out, fades in after delayed playing and l
       { ...track, sourceTrackId: 'track-2', assetId: 'asset-2', displayName: 'tone-b.wav', durationMs: 30000 },
     ], nextCursor: null, libraryRevision: '1' };
     if (path.endsWith('/playback/sessions') && request.method() === 'POST') {
+      await page.evaluate(() => {
+        (window as unknown as ProbeWindow).musicfsTransitionRecording.events.push({ type: 'create', at: performance.now() });
+      });
       creates.push(request.postDataJSON()); const count = creates.length;
       json = {
         ...playback(`attempt-${count}`), sessionId: `session-${count}`,

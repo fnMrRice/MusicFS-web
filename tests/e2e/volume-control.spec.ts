@@ -1,3 +1,4 @@
+import { routeApi } from "../fixtures/control-mock";
 import { expect, test, type Page } from '@playwright/test';
 import { preview, type PreviewServer } from 'vite';
 import { playback, track } from '../fixtures/dto';
@@ -32,7 +33,7 @@ async function setup(page: Page) {
   page.on('pageerror', (error) => errors.push(error.message));
   await installAudioProbe(page);
   const sound = tone();
-  await page.route('**/api/v1/**', async (route) => {
+  await routeApi(page, async (route) => {
     const request = route.request(), path = new URL(request.url()).pathname;
     if (path.endsWith('/stream')) return route.fulfill({ contentType: 'audio/wav', body: sound });
     if (request.method() === 'DELETE') return route.fulfill({ status: 204 });

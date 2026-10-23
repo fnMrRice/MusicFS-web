@@ -1,3 +1,4 @@
+import { routeApi } from "../fixtures/control-mock";
 import { expect, test, type Page } from '@playwright/test';
 import { preview, type PreviewServer } from 'vite';
 import type { Binding, Playlist } from '../../src/api/content';
@@ -38,7 +39,7 @@ async function setup(page: Page, missingLast = false) {
   let revision = 1;
   page.on('pageerror', (error) => errors.push(error.message));
   const sound = tone();
-  await page.route('**/api/v1/**', async (route) => {
+  await routeApi(page, async (route) => {
     const request = route.request(), path = new URL(request.url()).pathname, method = request.method();
     if (path.endsWith('/stream')) {
       const range = /^bytes=(\d+)-(\d*)$/.exec(request.headers().range ?? '');

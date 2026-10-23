@@ -1,3 +1,4 @@
+import { routeApi } from "../fixtures/control-mock";
 import { expect, test, type Page } from "@playwright/test";
 import { preview, type PreviewServer } from "vite";
 import { audioFixture } from "../fixtures/audio";
@@ -19,7 +20,7 @@ const ordinary = { ...track, sourceTrackId: "ordinary", displayName: "普通音�
 async function playerMock(page: Page) {
   const audio = audioFixture();
   const writes: unknown[] = [], deletes: string[] = [];
-  await page.route("**/api/v1/playback/**", async (route) => {
+  await routeApi(page, async (route) => {
     const request = route.request(), path = new URL(request.url()).pathname;
     if (path.endsWith("/stream")) return route.fulfill({ contentType: "audio/wav", body: audio });
     if (request.method() === "POST") {
@@ -28,7 +29,7 @@ async function playerMock(page: Page) {
     }
     if (request.method() === "DELETE") { deletes.push(path); return route.fulfill({ status: 204 }); }
     return route.fallback();
-  });
+  }, "**/api/v1/playback/**");
   return { writes, deletes };
 }
 const playRow = (page: Page, name: string) => page.locator(".tracks").getByRole("button", { name: `播放 ${name}`, exact: true });

@@ -1,4 +1,5 @@
 import { instanceIds, localPlugin } from "../fixtures/plugins";
+import { routeApi } from "../fixtures/control-mock";
 import { expect, test, type Page } from "@playwright/test";
 import { preview, type PreviewServer } from "vite";
 
@@ -18,7 +19,7 @@ test.afterAll(async () => { await new Promise<void>((resolve) => server?.httpSer
 
 async function mock(page: Page, role = "admin") {
   const requests: string[] = [];
-  await page.route("**/api/v1/**", (route) => {
+  await routeApi(page, (route) => {
     const path = new URL(route.request().url()).pathname;
     requests.push(path);
     let json: unknown = { items: [], nextCursor: null, nextAfter: null, libraryRevision: "1" };

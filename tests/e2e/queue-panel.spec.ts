@@ -1,3 +1,4 @@
+import { routeApi } from "../fixtures/control-mock";
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
 import { preview, type PreviewServer } from 'vite';
 import { playback, track } from '../fixtures/dto';
@@ -27,7 +28,7 @@ async function setup(page: Page, count = 2) {
   page.on('pageerror', (error) => errors.push(error.message));
   const wav = sound();
   const names = Array.from({ length: count }, (_, index) => index === 0 ? 'Alpha' : index === 1 ? 'Beta' : `Track ${index + 1}`);
-  await page.route('**/api/v1/**', async (route) => {
+  await routeApi(page, async (route) => {
     const request = route.request(), path = new URL(request.url()).pathname;
     if (path.endsWith('/stream')) return route.fulfill({ contentType: 'audio/wav', body: wav });
     if (path.endsWith('/media/lyrics-Alpha')) return route.fulfill({ contentType: 'text/plain; charset=utf-8', body: 'Alpha 第一行\nAlpha 第二行' });

@@ -29,7 +29,10 @@ function setup(overrides: Partial<Playback> = {}) {
     current = { ...current, attemptId: `controlled-${requests.length}`, positionOriginMs: body.positionMs };
     return Response.json(current);
   });
-  const api = new PlaybackApi(new ApiClient(fetcher));
+  const client = new ApiClient(fetcher);
+  // 此测试显式注入命令边界，生产环境不允许 HTTP 回退。
+  client.controlTransport = { request: client.request.bind(client) };
+  const api = new PlaybackApi(client);
   const audio: AudioPort = { play: vi.fn().mockResolvedValue(undefined), pause: vi.fn(), destroy: vi.fn(),
     seek: vi.fn(), seconds: 0, seekable: [{ start: 0, end: 300 }] };
   const controller = new PlayerController(api, (_url, observe) => {
@@ -44,7 +47,7 @@ function setup(overrides: Partial<Playback> = {}) {
 
 afterEach(() => vi.useRealTimers());
 
-describe('Playback controls through the HTTP boundary', () => {
+describe('Playback controls through the injected command boundary', () => {
   it.each([
     { deliveryMode: 'direct' as const, positionOriginMs: 0, seconds: 151.438367, expected: 151438 },
     { deliveryMode: 'processed' as const, positionOriginMs: 120000, seconds: 31.438867, expected: 151439 },

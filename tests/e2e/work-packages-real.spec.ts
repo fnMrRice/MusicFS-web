@@ -1,3 +1,4 @@
+import { waitControlResponse } from "../fixtures/control-probe";
 import { expect, test, type Page } from "@playwright/test";
 import { copyFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
@@ -80,7 +81,7 @@ test("real package import preserves nested tracks and attachment bytes through r
   await page.getByRole("button", { name: "目录 WAV 加入队列", exact: true }).click();
   await expect(page.getByRole("status").filter({ hasText: "已将 2 条音轨加入队列。" })).toBeVisible();
   const [playback] = await Promise.all([
-    page.waitForResponse((item) => item.url().endsWith("/playback/sessions") && item.request().method() === "POST"),
+    waitControlResponse(page, (item) => item.url().endsWith("/playback/sessions") && item.request().method() === "POST"),
     page.getByRole("button", { name: "播放目录 WAV", exact: true }).click(),
   ]);
   expect(playback.status(), await playback.text()).toBe(201);

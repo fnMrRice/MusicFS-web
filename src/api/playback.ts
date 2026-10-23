@@ -17,18 +17,24 @@ export function validatePlayback(value: Playback): Playback {
 export class PlaybackApi {
   constructor(private client: ApiClient) {}
   async create(sourceTrackId: string, capabilities: Capabilities, preferences: Preferences, key: string, signal?: AbortSignal): Promise<Playback> {
-    return validatePlayback(await this.client.request('/playback/sessions', { method: 'POST', body: { sourceTrackId, capabilities, preferences }, idempotencyKey: key, signal }));
+    return validatePlayback(await this.client.control('/playback/sessions', {
+      method: 'POST', body: { sourceTrackId, capabilities, preferences }, idempotencyKey: key, signal,
+      onLateSuccess: (value) => {
+        try { void this.close(validatePlayback(value as Playback).sessionId).catch(() => {}); }
+        catch { /* 无效描述不能触发资源删除。 */ }
+      },
+    }));
   }
   async control(sessionId: string, kind: 'seek' | 'recover', attemptId: string, positionMs: number, key: string, observedError?: ObservedError, signal?: AbortSignal): Promise<Playback> {
     // 协议接收整数毫秒；浏览器 currentTime 可能包含亚毫秒精度。
     const integerPositionMs = Math.round(positionMs);
     if (positionMs < 0 || !Number.isSafeInteger(integerPositionMs))
       throw new ApiError('INVALID_ARGUMENT', 'Playback position must be finite, nonnegative and safely representable');
-    return validatePlayback(await this.client.request(`/playback/sessions/${encodeURIComponent(sessionId)}/${kind}`, {
+    return validatePlayback(await this.client.control(`/playback/sessions/${encodeURIComponent(sessionId)}/${kind}`, {
       method: 'POST', body: { attemptId, positionMs: integerPositionMs, ...(observedError ? { observedError } : {}) }, idempotencyKey: key, signal,
     }));
   }
   async close(sessionId: string): Promise<void> {
-    await this.client.request(`/playback/sessions/${encodeURIComponent(sessionId)}`, { method: 'DELETE', keepalive: true });
+    await this.client.control(`/playback/sessions/${encodeURIComponent(sessionId)}`, { method: 'DELETE' });
   }
 }

@@ -1,3 +1,4 @@
+import { waitControlResponse, onControlResponse } from "../fixtures/control-probe";
 import { instanceIds } from "../fixtures/plugins";
 import { test, expect, request, type Page } from '@playwright/test';
 import { renameSync, writeFileSync } from 'node:fs';
@@ -76,13 +77,13 @@ test('unsupported AIFF becomes streaming processed MP3 and timeRestart preserves
   expect(rawError).toBe(4);
   await setProcessing(page, true); await showAll(page);
   const [created] = await Promise.all([
-    page.waitForResponse((response) => response.url().endsWith('/playback/sessions') && response.request().method() === 'POST'),
+    waitControlResponse(page, (response) => response.url().endsWith('/playback/sessions') && response.request().method() === 'POST'),
     page.getByRole('button', { name: '播放 processing.aiff', exact: true }).click(),
   ]);
   const initial = await created.json(); expect(initial.deliveryMode).toBe('processed'); expect(initial.outputProfile.mime).toContain('audio/mpeg');
   await waitPlaying(page); expect(await decodedEnergy(page)).toBeGreaterThan(.01);
   const attempts: Record<string, unknown>[] = [];
-  page.on('response', async (response) => { if (response.url().endsWith('/seek') && response.ok()) attempts.push(await response.json()); });
+  onControlResponse(page, async (response) => { if (response.url().endsWith('/seek') && response.ok()) attempts.push(await response.json()); });
   await seekTo(page, 2);
   await seekTo(page, 4);
   await expect.poll(() => attempts.length).toBeGreaterThanOrEqual(1);

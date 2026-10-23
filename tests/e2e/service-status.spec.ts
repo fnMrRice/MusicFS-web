@@ -1,3 +1,4 @@
+import { routeApi } from "../fixtures/control-mock";
 import { expect, test, type Page } from "@playwright/test";
 import { preview, type PreviewServer } from "vite";
 
@@ -20,7 +21,7 @@ async function mock(page: Page) {
     sessionChanges: 0,
     pending: null as Promise<void> | null,
   };
-  await page.route("**/api/v1/**", async (route) => {
+  const control = await routeApi(page, async (route) => {
     const path = new URL(route.request().url()).pathname;
     if (path.endsWith("/health/ready")) {
       state.healthReads += 1;
@@ -37,7 +38,8 @@ async function mock(page: Page) {
     } });
     return route.fulfill({ json: { items: [], nextCursor: null, nextAfter: null, libraryRevision: "1" } });
   });
-  return state;
+  control.lifecycle = "ready";
+  return Object.assign(state, { control });
 }
 
 async function openStatus(page: Page) {
@@ -109,31 +111,30 @@ test("manual checks distinguish unavailable and unreachable services and recover
   expect(state.sessionChanges).toBe(0);
 });
 
-test("automatic checks refresh after thirty seconds and when connectivity or page focus returns", async ({ page }) => {
+test("lifecycle and heartbeat updates replace periodic HTTP polling", async ({ page }) => {
   const state = await mock(page);
-  await page.clock.install();
-  await page.goto(`${origin}/#/library`);
+  await page.clock.install(); await page.goto(`${origin}/#/library`);
   const panel = await openStatus(page);
   await expect(panel.getByText("运行正常", { exact: true })).toBeVisible();
-  await expect.poll(() => state.healthReads).toBeGreaterThanOrEqual(2);
   const reads = state.healthReads;
-  state.health = { status: 503, json: { error: { code: "SERVICE_UNAVAILABLE" } }, abort: false };
-  await page.clock.fastForward(30_001);
-  await expect.poll(() => state.healthReads).toBeGreaterThan(reads);
+  state.control.event("lifecycle.changed", { instanceId: "fixture", state: "draining" });
   await expect(panel.getByText("服务未就绪", { exact: true })).toBeVisible();
-
-  for (const event of ["online", "focus", "visibilitychange"]) {
-    const previous = state.healthReads;
-    state.health = { status: 200, json: ready, abort: false };
-    await page.evaluate((name) => {
-      (name === "visibilitychange" ? document : window).dispatchEvent(new Event(name));
-    }, event);
-    await expect.poll(() => state.healthReads).toBeGreaterThan(previous);
-    await expect(panel.getByText("运行正常", { exact: true })).toBeVisible();
-    await expect(panel.getByRole("button", { name: "重新检查", exact: true })).toBeEnabled();
-  }
+  state.control.event("lifecycle.changed", { instanceId: "fixture", state: "ready" });
+  await expect(panel.getByText("运行正常", { exact: true })).toBeVisible();
+  await page.clock.runFor(20_001);
+  await expect.poll(() => state.control.pings).toBeGreaterThanOrEqual(2);
+  expect(state.healthReads).toBe(reads);
+  state.control.disconnect();
+  await expect(panel.getByText("无法连接", { exact: true })).toBeVisible();
 });
 
+test("a remote control connection does not imply business readiness", async ({ page }) => {
+  const state = await mock(page); state.control.lifecycle = null;
+  await page.goto(`${origin}/#/library`);
+  const panel = await openStatus(page);
+  await expect(panel.getByText("已连接", { exact: true })).toBeVisible();
+  await expect(panel.getByText("运行正常", { exact: true })).toHaveCount(0);
+});
 test("incompatible, malformed and replaced services never report a healthy session", async ({ page }) => {
   const state = await mock(page);
   await page.goto(`${origin}/#/library`);

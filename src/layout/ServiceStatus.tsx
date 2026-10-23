@@ -8,6 +8,7 @@ import styles from "./ServiceStatus.module.css";
 const messages: Record<ServicePhase, [string, string]> = {
   checking: ["正在检查…", "正在检查音乐服务是否可用。"],
   ready: ["运行正常", "音乐服务已就绪，可以接收请求。"],
+  online: ["已连接", "音乐服务连接在线，业务就绪状态尚未确认。"],
   "not-ready": ["服务未就绪", "音乐服务暂不可用，请稍后重新检查。"],
   unreachable: ["无法连接", "无法连接音乐服务，请检查网络或稍后重试。"],
   incompatible: ["服务不兼容", "音乐服务返回的数据或协议不兼容。"],
@@ -23,7 +24,7 @@ export function ServiceStatus() {
   const id = useId();
   const location = useLocation();
   const [label, description] = messages[status.phase];
-  const tone = status.phase === "ready" ? "healthy"
+  const tone = status.phase === "ready" || status.phase === "online" ? "healthy"
     : status.phase === "checking" ? "checking"
       : ["not-ready", "changed", "incompatible"].includes(status.phase) ? "warning" : "failed";
 

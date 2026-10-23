@@ -1,3 +1,4 @@
+import { observeControl } from "../fixtures/control-probe";
 import { instanceIds } from "../fixtures/plugins";
 import { expect, type Page, type APIRequestContext } from '@playwright/test';
 import type { TestServer } from './server';
@@ -5,6 +6,7 @@ import { scanFailureMessage, waitForScanJob } from '../fixtures/scan-job';
 import { installAudioProbe, outputSignal } from '../fixtures/audio-probe';
 
 export async function login(page: Page, server: TestServer): Promise<void> {
+  observeControl(page);
   await installAudioProbe(page);
   console.log('Opening page for real session login');
   await page.goto(server.origin); await page.getByLabel('管理员登录令牌').fill(server.token);
@@ -23,6 +25,8 @@ export async function setProcessing(page: Page, enabled: boolean): Promise<void>
   await page.getByRole('button', { name: '设置', exact: true }).click();
   await page.getByRole('tab', { name: '播放配置', exact: true }).click();
   await page.getByLabel('强制服务端转码（下一首生效）').setChecked(enabled);
+  const expand = page.getByRole('button', { name: '展开作品库', exact: true });
+  if (await expand.isVisible()) await expand.click();
   await page.getByRole('link', { name: '曲目列表', exact: true }).click();
 }
 export async function scan(request: APIRequestContext, origin: string): Promise<void> {

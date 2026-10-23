@@ -85,7 +85,10 @@ export class Services {
       if (this.auth.value.session) this.reloadSourceNames();
     },
     (signal) => this.client.request("/auth/session", { signal }),
+    () => this.clear(),
+    () => { this.player.stop(); void this.connect(); },
   );
+  controlStatus = this.capabilityEvents.channel.status;
   auth = new Store<AuthState>({
     session: null,
     ready: null,
@@ -144,6 +147,7 @@ export class Services {
     return this.libraries.get(provider)!;
   }
   constructor(root: HTMLElement) {
+    this.client.controlTransport = this.capabilityEvents.channel;
     let config = this.localDSP.value.config;
     this.localDSP.subscribe(() => {
       if (config === this.localDSP.value.config) return;
@@ -287,8 +291,8 @@ export class Services {
   }
   async logout(): Promise<void> {
     const generation = ++this.generation;
-    this.capabilityEvents.stop();
     this.player.stop();
+    this.capabilityEvents.stop();
     this.auth.set({ ...this.auth.value, busy: true, error: null });
     try {
       await this.authApi.logout();

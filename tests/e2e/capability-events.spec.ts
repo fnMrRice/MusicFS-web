@@ -24,21 +24,24 @@ test.beforeAll(async () => {
   proxy = await eventProxy(server.origin);
   stopDev = await startDevServer(proxy.origin);
 });
-test.afterAll(async () => { await stopDev?.(); await proxy?.stop(); await server?.stop(); });
+test.afterAll(async () => { await Promise.all([stopDev?.(), proxy?.stop(), server?.stop()]); });
 
 test("StrictMode uses one real event stream and refreshes authorized capabilities after changes and reconnect", async ({ page }) => {
   await page.addInitScript(() => {
-    const NativeEventSource = window.EventSource;
+    const NativeWebSocket = window.WebSocket;
     const probe = window.capabilityStreamProbe = { created: 0, closed: 0, opened: 0, changed: 0, errors: 0 };
-    window.EventSource = class extends NativeEventSource {
-      constructor(url: string | URL, options?: EventSourceInit) {
-        super(url, options);
+    window.WebSocket = class extends NativeWebSocket {
+      private controlled = false;
+      constructor(url: string | URL, protocols?: string | string[]) {
+        super(url, protocols);
+        if (new URL(String(url), window.location.href).pathname !== "/api/v1/control") return;
+        this.controlled = true;
         ++probe.created;
         this.addEventListener("open", () => ++probe.opened);
-        this.addEventListener("capabilities.changed", () => ++probe.changed);
-        this.addEventListener("error", () => ++probe.errors);
+        this.addEventListener("message", (event) => { const frame = JSON.parse(event.data); if (frame.type === "event" && frame.event === "capabilities.changed") ++probe.changed; });
+        this.addEventListener("close", () => ++probe.errors);
       }
-      override close(): void { ++probe.closed; super.close(); }
+      override close(code?: number, reason?: string): void { if (this.controlled) ++probe.closed; super.close(code, reason); }
     };
   });
   let providerReads = 0;
@@ -48,7 +51,7 @@ test("StrictMode uses one real event stream and refreshes authorized capabilitie
     if (path === "/api/v1/provider-instances") ++providerReads;
     if (path === "/api/v1/online-instances") ++onlineReads;
   });
-  // The development build exercises React StrictMode's effect replay.
+  // 开发构建覆盖 React StrictMode 重放副作用。
   const origin = "http://127.0.0.1:5173";
   await login(page, { ...server, origin });
   await expect.poll(() => page.evaluate(() => window.capabilityStreamProbe.changed)).toBeGreaterThan(0);
@@ -86,9 +89,9 @@ test("StrictMode uses one real event stream and refreshes authorized capabilitie
   await expect.poll(() => page.evaluate(() => window.capabilityStreamProbe.errors)).toBeGreaterThan(0);
   await expect.poll(() => page.evaluate(() => window.capabilityStreamProbe.opened)).toBeGreaterThan(1);
   await expect.poll(() => onlineReads).toBeGreaterThan(beforeReconnect);
-  expect(await page.evaluate(() => window.capabilityStreamProbe.created)).toBe(1);
+  expect(await page.evaluate(() => window.capabilityStreamProbe.created)).toBe(2);
 
   await logout(page);
   await expect(page.getByLabel("管理员登录令牌")).toBeVisible();
-  expect(await page.evaluate(() => window.capabilityStreamProbe.closed)).toBe(1);
+  expect(await page.evaluate(() => window.capabilityStreamProbe.closed)).toBe(2);
 });

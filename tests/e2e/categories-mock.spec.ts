@@ -1,3 +1,4 @@
+import { routeApi } from "../fixtures/control-mock";
 import { test, expect, type Page, type Route } from "@playwright/test";
 import { preview, type PreviewServer } from "vite";
 import type { Category, CategoryKind } from "../../src/api/categories";
@@ -37,7 +38,7 @@ function catalogPage(url: URL, items: unknown[], overrides = {}) {
 async function mockApi(page: Page, special?: (route: Route, url: URL) => Promise<boolean>) {
   const requests: URL[] = [];
   const released: string[] = [];
-  await page.route("**/api/v1/**", async (route) => {
+  await routeApi(page, async (route) => {
     const url = new URL(route.request().url()); const path = url.pathname; requests.push(url);
     if (special && await special(route, url)) return;
     if (route.request().method() === "DELETE" && path.includes("/library/queries/")) {

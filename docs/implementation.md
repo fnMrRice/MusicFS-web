@@ -113,10 +113,10 @@ P1 的页面外壳可与 Server 基础并行；P2 接入真实扫描后才能验
 | `DELETE /auth/session` | 撤销登录会话，清理页面数据、停止音频 |
 | `GET /provider-instances` | 读取当前用户可见的来源实例、能力与状态，用于选择列表来源 |
 | `GET /source-tracks?providerInstanceId=…&cursor=…&limit=100` | 获取 `items/nextCursor/libraryRevision`；游标固定同一库修订 |
-| `POST /playback/sessions` | 提交 `sourceTrackId`、实际浏览器能力及偏好，获取会话和当前播放描述 |
-| `POST /playback/sessions/{id}/seek` | 仅在 timeRestart 需要时提交当前 `attemptId` 和曲目 `positionMs`，接受新描述 |
-| `POST /playback/sessions/{id}/recover` | 提交当前尝试、可观察故障及曲目位置，接受 Server 恢复决定 |
-| `DELETE /playback/sessions/{id}` | 停止或离开当前曲目时释放会话；服务端还需有超时兜底 |
+| WS `POST /playback/sessions` | 提交 `sourceTrackId`、实际浏览器能力及偏好，获取会话和当前播放描述 |
+| WS `POST /playback/sessions/{id}/seek` | 仅在 timeRestart 需要时提交当前 `attemptId` 和曲目 `positionMs`，接受新描述 |
+| WS `POST /playback/sessions/{id}/recover` | 提交当前尝试、可观察故障及曲目位置，接受 Server 恢复决定 |
+| WS `DELETE /playback/sessions/{id}` | 停止或离开当前曲目时释放会话；服务端还需有超时兜底 |
 | `GET streamUrl` | 媒体元素按返回地址读取固定输出；不拼接路径、不追加 owner token |
 
 列表条目至少包含 `sourceTrackId/providerInstanceId/displayName/availability`，以及 `title/artists/durationMs/codec/container/bitrateBps/assetId`；元信息或资产尚未探测完成时允许相应值为 null，`recordingId` 为可选且可空字段。文件名称只作展示，播放使用来源曲目 ID；不接收 Server 绝对磁盘路径作为公开播放地址。未知时长/码率显示“未知”，不能默认为零或阻止播放。

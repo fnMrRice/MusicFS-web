@@ -1,3 +1,4 @@
+import { waitControlRequest } from "../fixtures/control-probe";
 import { test, expect, type Page } from '@playwright/test';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -35,7 +36,7 @@ async function grouped(page: Page): Promise<SourceTrack> {
 
 async function playDefault(page: Page, expected: SourceTrack) {
   const [request] = await Promise.all([
-    page.waitForRequest(request => request.url().endsWith('/playback/sessions') && request.method() === 'POST'),
+    waitControlRequest(page, request => request.url().endsWith('/playback/sessions') && request.method() === 'POST'),
     page.getByRole('button', { name: `播放 ${expected.displayName}`, exact: true }).click(),
   ]);
   expect(request.postDataJSON().sourceTrackId).toBe(expected.sourceTrackId);

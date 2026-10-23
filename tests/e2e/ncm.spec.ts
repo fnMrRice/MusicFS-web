@@ -1,3 +1,4 @@
+import { waitControlRequest, waitControlResponse } from "../fixtures/control-probe";
 import { instanceIds } from "../fixtures/plugins";
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
 import { createHash } from 'node:crypto';
@@ -18,7 +19,7 @@ test.beforeEach(async ({ page }) => {
 
 async function choose(page: Page, filename: string): Promise<Playback> {
   const [response] = await Promise.all([
-    page.waitForResponse((response) => response.url().endsWith('/playback/sessions') && response.request().method() === 'POST'),
+    waitControlResponse(page, (response) => response.url().endsWith('/playback/sessions') && response.request().method() === 'POST'),
     page.getByRole('button', { name: `播放 ${filename}`, exact: true }).click(),
   ]);
   expect(response.ok()).toBeTruthy(); return response.json();
@@ -57,7 +58,7 @@ test('NCM MP3 decrypts to exact Range bytes and native browser audio without DSP
 
 test('NCM FLAC uses browser capabilities to deliver exact FLAC bytes and native seeking', async ({ page, browser }, info) => {
   const [request, descriptor] = await Promise.all([
-    page.waitForRequest((request) => request.url().endsWith('/playback/sessions') && request.method() === 'POST'),
+    waitControlRequest(page, (request) => request.url().endsWith('/playback/sessions') && request.method() === 'POST'),
     choose(page, 'synthetic-flac.ncm'),
   ]);
   const formats = request.postDataJSON().capabilities.formats;
@@ -96,7 +97,7 @@ test('unsupported FLAC converts at the nearest MP3 bitrate and timeRestart reach
   });
   await page.reload();
   const [request, descriptor] = await Promise.all([
-    page.waitForRequest((request) => request.url().endsWith('/playback/sessions') && request.method() === 'POST'),
+    waitControlRequest(page, (request) => request.url().endsWith('/playback/sessions') && request.method() === 'POST'),
     choose(page, 'synthetic-flac.ncm'),
   ]);
   const formats = request.postDataJSON().capabilities.formats;
@@ -108,7 +109,7 @@ test('unsupported FLAC converts at the nearest MP3 bitrate and timeRestart reach
   await expect(page.locator('.player-status')).toHaveAttribute('title', /来源码率：116.2 kbps\n发送码率：112 kbps/);
   await waitPlaying(page);
   const [response] = await Promise.all([
-    page.waitForResponse((response) => response.url().endsWith('/seek') && response.ok()),
+    waitControlResponse(page, (response) => response.url().endsWith('/seek') && response.ok()),
     (async () => { await seekTo(page, 4); })(),
   ]);
   const located: Playback = await response.json();

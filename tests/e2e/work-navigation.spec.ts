@@ -1,3 +1,4 @@
+import { routeApi } from "../fixtures/control-mock";
 import { expect, test, type Page } from "@playwright/test";
 import { preview, type PreviewServer } from "vite";
 import type { ContentType, Work } from "../../src/api/works";
@@ -32,7 +33,7 @@ async function mockNavigation(page: Page) {
     if (!localStorage.getItem(key)) localStorage.setItem(key, JSON.stringify({ theme: "dark" }));
   });
   const audio = audioFixture();
-  await page.route("**/api/v1/**", async (route) => {
+  await routeApi(page, async (route) => {
     const request = route.request(), url = new URL(request.url());
     const path = url.pathname.replace("/api/v1", "");
     if (path.endsWith("/stream")) return route.fulfill({ contentType: "audio/wav", body: audio });

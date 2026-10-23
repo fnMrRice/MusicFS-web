@@ -1,3 +1,4 @@
+import { routeApi } from "../fixtures/control-mock";
 import { expect, test, type Page } from '@playwright/test';
 import { preview, type PreviewServer } from 'vite';
 import { playback, track } from '../fixtures/dto';
@@ -31,7 +32,7 @@ async function setup(page: Page, count = 3, failPlayback = false) {
   // 固定随机源，让队列重排与随机切歌的断言可重复。
   await page.addInitScript(() => { Math.random = () => 0; });
   const sound = tone();
-  await page.route('**/api/v1/**', async (route) => {
+  await routeApi(page, async (route) => {
     const request = route.request(), path = new URL(request.url()).pathname;
     if (path.endsWith('/stream')) {
       const range = /^bytes=(\d+)-(\d*)$/.exec(request.headers().range ?? '');
