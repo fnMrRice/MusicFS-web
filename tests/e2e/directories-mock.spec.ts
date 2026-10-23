@@ -27,6 +27,8 @@ async function mockApi(page: Page, directories: (route: Route, url: URL) => Prom
     if (path.endsWith('/directories')) return directories(route, url);
     if (path.endsWith('/configuration') && configure) return configure(route);
     let json: unknown = { items: [], nextCursor: null };
+    if (path.endsWith('/scan-status')) json = { job: null };
+    if (path.endsWith('/root-statistics')) json = { roots: [] };
     if (path.endsWith('/health/ready')) json = { product: 'MusicFS', apiVersion: '1', ready: true, instanceId: 'mock-directories' };
     if (path.endsWith('/auth/session')) json = { csrfToken: 'test', user: { id: role, role } };
     if (path.endsWith('/provider-instances')) json = { items: [{

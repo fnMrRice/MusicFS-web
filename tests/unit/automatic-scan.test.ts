@@ -10,6 +10,7 @@ function fixture(saved: string | null = null) {
   let stored = saved;
   const storage = { get: () => stored, set: (value: string | null) => { stored = value; } };
   const api = { prepare: vi.fn<ScansApi["prepare"]>(async () => request),
+    status: vi.fn<ScansApi["status"]>(async () => null),
     submit: vi.fn<ScansApi["submit"]>(async () => ({ jobId: "job-1", merged: false })),
     job: vi.fn<ScansApi["job"]>(async () => job("running")) };
   const state = new LocalScanState(api as unknown as ScansApi, "local", storage, vi.fn());
@@ -53,6 +54,7 @@ describe("Automatic scans after applying directory settings", () => {
     vi.useFakeTimers();
     const { state, api } = fixture();
     const detach = state.attach();
+    await vi.advanceTimersByTimeAsync(0);
     let resolve!: (request: ScanRequest) => void;
     api.prepare.mockImplementationOnce(() => new Promise((done) => { resolve = done; }));
     state.requestAutomatic();

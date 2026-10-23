@@ -15,6 +15,25 @@ function fixture() {
 }
 
 describe("Scan API", () => {
+  it("discovers a current or latest job without submitting and accepts an empty history", async () => {
+    const { api, fetcher } = fixture();
+    fetcher.mockResolvedValueOnce(Response.json({ job }));
+    expect(await api.status(provider.id)).toEqual(job);
+    const [url, options] = fetcher.mock.calls[0];
+    expect(url).toBe('/api/v1/provider-instances/local%20%2F1/scan-status');
+    expect(options?.method).toBe('GET');
+    expect(options?.body).toBeUndefined();
+    fetcher.mockResolvedValueOnce(Response.json({ job: null }));
+    expect(await api.status(provider.id)).toBeNull();
+  });
+  it.each([null, {}, { job: { ...job, providerInstanceId: 'another-provider' } },
+    { job: { ...job, jobId: '' } }, { job: { ...job, progress: { observed: -1 } } }])(
+    'rejects malformed or cross-provider discovered status', async (value) => {
+      const { api, fetcher } = fixture();
+      fetcher.mockResolvedValueOnce(Response.json(value));
+      await expect(api.status(provider.id)).rejects.toMatchObject({ code: 'INVALID_RESPONSE' });
+    },
+  );
   it("refreshes only the selected saved root without changing its configuration", async () => {
     const { api, fetcher } = fixture();
     expect(await api.prepare(provider.id, undefined, "two")).toEqual({ ...body, rootIds: ["two"], options: { refreshMetadata: true } });

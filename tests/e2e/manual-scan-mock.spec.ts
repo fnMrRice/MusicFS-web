@@ -10,11 +10,14 @@ const options = { recursive: true, maxDepth: 0, importLyrics: false, excludePatt
 test.beforeAll(async () => { server = await preview({ preview: { host: '127.0.0.1', port: 18147, strictPort: true } }); });
 test.afterAll(async () => { await new Promise<void>(resolve => server?.httpServer.close(() => resolve())); });
 
-async function mockApi(page: Page, scan: (route: Route, path: string) => Promise<void>, state = 'ready', published = () => false) {
+async function mockApi(page: Page, scan: (route: Route, path: string) => Promise<void>, state = 'ready', published = () => false,
+  latest: () => unknown = () => null) {
   await page.route('**/api/v1/**', async route => {
     const path = new URL(route.request().url()).pathname;
     if (path === scanPath || path.includes('/scan-jobs/')) return scan(route, path);
     let json: unknown = { items: [], nextCursor: null };
+    if (path.endsWith('/scan-status')) json = { job: latest() };
+    if (path.endsWith('/root-statistics')) json = { roots: [] };
     if (path.endsWith('/health/ready')) json = { product: 'MusicFS', apiVersion: '1', ready: true, instanceId: 'manual-scan-fixture' };
     if (path.endsWith('/auth/session')) json = { csrfToken: 'fixture', user: { id: 'admin', role: 'admin' } };
     if (path.endsWith('/provider-instances')) json = { items: [{ id: instanceIds.local, name: '本地音乐', plugin: localPlugin,
@@ -46,7 +49,7 @@ test('manual scan keeps one job across reload and shows progress without a fake 
     }
     reads++;
     await route.fulfill({ json: done ? job('succeeded', 12, true) : job('running', 7) });
-  });
+  }, 'ready', () => false, () => posts ? done ? job('succeeded', 12, true) : job('running', 7) : null);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`${origin}/#/settings`);
   await page.getByRole('button', { name: '扫描音乐', exact: true }).click();
@@ -112,6 +115,7 @@ test('leaving settings while scanning still refreshes an open cached library', a
   await page.getByRole('button', { name: '设置', exact: true }).click();
   await page.getByRole('button', { name: '扫描音乐', exact: true }).click();
   await expect(page.getByRole('button', { name: '正在扫描…', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: '展开作品库', exact: true }).click();
   await page.getByRole('link', { name: '曲目列表', exact: true }).click();
   await expect(page.getByText('音乐库还很安静', { exact: true })).toBeVisible();
   done = true;

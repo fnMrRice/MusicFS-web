@@ -10,6 +10,7 @@ function fixture(saved: string | null = null) {
   let stored = saved;
   const storage = { get: () => stored, set: (value: string | null) => { stored = value; } };
   const api = { prepare: vi.fn<ScansApi["prepare"]>(async () => request),
+    status: vi.fn<ScansApi["status"]>(async () => null),
     submit: vi.fn<ScansApi["submit"]>(async () => ({ jobId: "job-1", merged: false })),
     job: vi.fn<ScansApi["job"]>(async () => job),
     metadataResults: vi.fn<ScansApi["metadataResults"]>(async () => ({ ...completed, completed: 1, pending: true })) };
@@ -20,6 +21,20 @@ function fixture(saved: string | null = null) {
 afterEach(() => vi.useRealTimers());
 
 describe("Folder metadata refresh", () => {
+  it("keeps a finished metadata summary during read-only discovery and clears it for a different job", async () => {
+    const { state, api, finished } = fixture();
+    api.metadataResults.mockResolvedValueOnce({ ...completed, failed: 1 });
+    await state.refresh("one");
+    api.status.mockResolvedValueOnce(job);
+    await state.refreshStatus();
+    expect(state.value).toMatchObject({ refreshing: true, pending: false, metadata: { failed: 1 } });
+    expect(state.value.error).toContain("刷新失败");
+    expect(finished).toHaveBeenCalledExactlyOnceWith(true);
+    api.status.mockResolvedValueOnce({ ...job, jobId: "another", status: "running", complete: false });
+    await state.refreshStatus();
+    expect(state.value).toMatchObject({ refreshing: false, pending: true, metadata: null, job: { jobId: "another" } });
+    expect(api.submit).toHaveBeenCalledTimes(1);
+  });
   it("keeps the folder busy after scanning until artwork and lyrics finish", async () => {
     vi.useFakeTimers();
     const { state, api, finished } = fixture();

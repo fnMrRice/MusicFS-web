@@ -14,6 +14,7 @@ function fixture(entries: [string, string][] = []) {
     removeItem: (key: string) => { stored.delete(key); },
   };
   const api = { prepare: vi.fn<ScansApi["prepare"]>(async () => request),
+    status: vi.fn<ScansApi["status"]>(async () => null),
     submit: vi.fn<ScansApi["submit"]>(async () => ({ jobId: "job-1", merged: false })),
     job: vi.fn<ScansApi["job"]>(async () => job("running")) };
   const finished = vi.fn();
@@ -23,6 +24,27 @@ function fixture(entries: [string, string][] = []) {
 afterEach(() => vi.useRealTimers());
 
 describe("Session-owned local scans", () => {
+  it.each([['server', 'other-user'], ['other-server', 'user']])(
+    'does not publish a late discovered job into a different session', async (server, user) => {
+      vi.useFakeTimers();
+      const { scans, api, finished } = fixture();
+      let resolve!: (value: ScanJob | null) => void;
+      api.status.mockImplementationOnce(() => new Promise((done) => { resolve = done; }));
+      scans.setSession('server', 'user');
+      const previous = scans.get('local');
+      const signal = api.status.mock.calls[0][1];
+      scans.setSession(server, user);
+      const current = scans.get('local');
+      resolve(job('succeeded'));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(signal?.aborted).toBe(true);
+      expect(previous.value.job).toBeNull();
+      expect(current.value.job).toBeNull();
+      expect(finished).not.toHaveBeenCalled();
+      expect(api.submit).not.toHaveBeenCalled();
+      scans.clear();
+    },
+  );
   it("continues polling and refreshes the library after the source view unsubscribes", async () => {
     vi.useFakeTimers();
     const { scans, api, finished } = fixture();

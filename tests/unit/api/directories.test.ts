@@ -4,6 +4,27 @@ import { ApiClient } from "../../../src/api/client";
 import { DirectoriesApi } from "../../../src/api/directories";
 
 describe("Administrator directory API", () => {
+  it("reads statistics from the provider endpoint without submitting or exposing paths", async () => {
+    const roots = [{ rootId: 'music', trackCount: 946, sizeBytes: 12 * 1024 ** 3 }];
+    const fetcher = vi.fn<typeof fetch>(async () => Response.json({ roots }));
+    const api = new DirectoriesApi(new ApiClient(fetcher), 'local /1');
+    expect(await api.rootStatistics()).toEqual(roots);
+    const [path, options] = fetcher.mock.calls[0];
+    expect(path).toBe('/api/v1/provider-instances/local%20%2F1/root-statistics');
+    expect(options?.method).toBe('GET');
+    expect(options?.body).toBeUndefined();
+    fetcher.mockResolvedValueOnce(Response.json({ roots: [] }));
+    expect(await api.rootStatistics()).toEqual([]);
+  });
+  it.each([{}, { roots: null }, { roots: [{ rootId: '', trackCount: 1, sizeBytes: 1 }] },
+    { roots: [{ rootId: 'music', trackCount: -1, sizeBytes: 1 }] },
+    { roots: [{ rootId: 'music', trackCount: 1, sizeBytes: Number.MAX_SAFE_INTEGER + 1 }] },
+    { roots: [{ rootId: 'music', trackCount: 1, sizeBytes: 1.5 }] },
+    { roots: [{ rootId: 'music', trackCount: 1, sizeBytes: 1 }, { rootId: 'music', trackCount: 1, sizeBytes: 1 }] },
+  ])('rejects invalid or duplicate root statistics', async (value) => {
+    const api = new DirectoriesApi(new ApiClient(async () => Response.json(value)), 'local');
+    await expect(api.rootStatistics()).rejects.toMatchObject({ code: 'INVALID_RESPONSE' });
+  });
   it("encodes Windows paths and pagination without exposing them outside the administrator endpoint", async () => {
     const fetcher = vi.fn(async () => new Response("{}"));
     const api = new DirectoriesApi(new ApiClient(fetcher), instanceIds.local);

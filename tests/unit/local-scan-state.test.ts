@@ -10,6 +10,7 @@ function fixture(saved: string | null = null) {
   let stored = saved;
   const storage = { get: () => stored, set: vi.fn((value: string | null) => { stored = value; }) };
   const api = { prepare: vi.fn<ScansApi["prepare"]>(async () => request), submit: vi.fn<ScansApi["submit"]>(async () => ({ jobId: "job-1", merged: false })),
+    status: vi.fn<ScansApi["status"]>(async () => null),
     job: vi.fn<ScansApi["job"]>(async () => job("queued")) };
   const finished = vi.fn();
   const state = new LocalScanState(api as unknown as ScansApi, "local", storage, finished);

@@ -19,6 +19,15 @@ export interface ScanJob {
 export const pendingScanStatuses = ["queued", "running", "retry_wait"];
 const statuses = [...pendingScanStatuses, "succeeded", "failed", "cancelled", "paused"];
 
+function validJob(job: ScanJob, instance: string, id?: string): ScanJob {
+  if (!job || typeof job.jobId !== "string" || !job.jobId || id !== undefined && job.jobId !== id
+    || job.providerInstanceId !== instance || !statuses.includes(job.status)
+    || typeof job.complete !== "boolean" || !job.progress || !Number.isInteger(job.progress.observed)
+    || job.progress.observed < 0 || (job.progress.total != null && (!Number.isInteger(job.progress.total) || job.progress.total < 0)))
+    throw new ApiError("INVALID_RESPONSE", "Invalid scan job");
+  return job;
+}
+
 export class ScansApi {
   constructor(private client: ApiClient, private library: LibraryApi) {}
   async prepare(instance: string, signal?: AbortSignal, rootId?: string): Promise<ScanRequest> {
@@ -46,10 +55,14 @@ export class ScansApi {
   }
   async job(id: string, instance: string, signal?: AbortSignal): Promise<ScanJob> {
     const job = await this.client.request<ScanJob>(`/scan-jobs/${encodeURIComponent(id)}`, { signal });
-    if (!job || job.jobId !== id || job.providerInstanceId !== instance || !statuses.includes(job.status)
-      || typeof job.complete !== "boolean" || !job.progress || !Number.isInteger(job.progress.observed)
-      || job.progress.observed < 0 || (job.progress.total != null && (!Number.isInteger(job.progress.total) || job.progress.total < 0)))
-      throw new ApiError("INVALID_RESPONSE", "Invalid scan job");
-    return job;
+    return validJob(job, instance, id);
+  }
+  async status(instance: string, signal?: AbortSignal): Promise<ScanJob | null> {
+    const result = await this.client.request<{ job: ScanJob | null }>(
+      `/provider-instances/${encodeURIComponent(instance)}/scan-status`, { signal },
+    );
+    if (!result || typeof result !== "object" || !("job" in result))
+      throw new ApiError("INVALID_RESPONSE", "Invalid scan status");
+    return result.job === null ? null : validJob(result.job, instance);
   }
 }

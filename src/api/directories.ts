@@ -1,7 +1,8 @@
-import { ApiClient } from "./client";
+import { ApiClient, ApiError } from "./client";
 import type { PluginIdentity } from "./types";
 
 export interface MusicRoot { id: string; name: string; path?: string; importDefaults?: ImportDefaults }
+export interface RootStatistic { rootId: string; trackCount: number; sizeBytes: number }
 export interface ImportDefaults {
   recursive: boolean;
   maxDepth: number;
@@ -87,6 +88,20 @@ export class DirectoriesApi {
   }
   configuration(signal?: AbortSignal) {
     return this.client.request<LocalConfiguration>(`${this.path}/configuration`, { signal });
+  }
+  async rootStatistics(signal?: AbortSignal): Promise<RootStatistic[]> {
+    const result = await this.client.request<{ roots: RootStatistic[] }>(
+      `/provider-instances/${encodeURIComponent(this.instanceId)}/root-statistics`, { signal },
+    );
+    const seen = new Set<string>();
+    if (!result || !Array.isArray(result.roots) || result.roots.some((root) => {
+      if (!root || typeof root.rootId !== "string" || !root.rootId || seen.has(root.rootId)
+        || !Number.isSafeInteger(root.trackCount) || root.trackCount < 0
+        || !Number.isSafeInteger(root.sizeBytes) || root.sizeBytes < 0) return true;
+      seen.add(root.rootId);
+      return false;
+    })) throw new ApiError("INVALID_RESPONSE", "Invalid root statistics");
+    return result.roots;
   }
   browse(path: string | null, cursor: string | null, signal?: AbortSignal) {
     const query = new URLSearchParams();

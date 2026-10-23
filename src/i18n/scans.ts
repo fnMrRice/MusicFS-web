@@ -1,4 +1,5 @@
 export default {
+  "正在检查扫描状态…": ["Checking scan status…", "正在檢查掃描狀態…", "スキャン状態を確認中…"],
   "正在刷新封面和歌词，已处理 {0}/{1} 首曲目…": ["Refreshing artwork and lyrics; {0}/{1} tracks processed…", "正在重新整理封面和歌詞，已處理 {0}/{1} 首曲目…", "カバーと歌詞を更新中：{0}/{1} 曲処理済み…"],
   "元数据刷新已结束，{0} 首曲目处理失败。": ["Metadata refresh finished; {0} tracks failed.", "中繼資料重新整理已結束，{0} 首曲目處理失敗。", "メタデータの更新が終了しました。{0} 曲の処理に失敗しました。"],
   "元数据刷新完成，共处理 {0} 首曲目。": ["Metadata refresh complete; {0} tracks processed.", "中繼資料重新整理完成，共處理 {0} 首曲目。", "メタデータの更新完了：{0} 曲処理済み。"],

@@ -22,6 +22,8 @@ async function mock(page: Page, role = "admin") {
     const path = new URL(route.request().url()).pathname;
     requests.push(path);
     let json: unknown = { items: [], nextCursor: null, nextAfter: null, libraryRevision: "1" };
+    if (path.endsWith('/scan-status')) json = { job: null };
+    if (path.endsWith('/root-statistics')) json = { roots: [] };
     if (path.endsWith("/health/ready")) json = { product: "MusicFS", ready: true, apiVersion: "1", instanceId: "settings-test" };
     if (path.endsWith("/auth/session")) json = { csrfToken: "fixture", user: { id: "listener", role } };
     if (path.endsWith("/provider-instances")) json = { items: [local] };

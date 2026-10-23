@@ -5,6 +5,8 @@
 .directory-saved-list li { display: flex; align-items: center; gap: 14px; padding: 10px 0; overflow-wrap: anywhere; }
 .directory-saved-list li + li { border-top: 1px solid var(--line); }
 .directory-saved-name { flex: 1; min-width: 0; }
+.directory-saved-details { display: flex; align-items: center; flex: 1; min-width: 0; flex-wrap: wrap; gap: 6px 14px; }
+.directory-saved-stats { color: var(--muted); font-size: 13px; white-space: nowrap; }
 .directory-row-actions { display: flex; align-items: center; flex-shrink: 0; gap: 8px; }
 .directory-row-actions button { min-width: 34px; }
 .directory-manager { display: block; }
@@ -41,6 +43,7 @@
 .directory-advanced summary { cursor: pointer; color: var(--muted); font-size: 13px; }
 .directory-advanced > .check-label { margin-top: 16px; }
 @media (max-width: 700px) {
+  .directory-saved-details { flex-direction: column; align-items: flex-start; }
   .directory-tree { padding: 4px; }
   .directory-tree-branch [role="group"] { padding-left: 17px; }
 }
