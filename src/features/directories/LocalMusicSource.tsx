@@ -8,6 +8,7 @@ import type { DirectoryAction } from "./LocalDirectories";
 import { LocalScanStatus } from "./LocalScanStatus";
 import { useRootStatistics } from "./use-root-statistics";
 import { directorySize } from "../../library/root-statistics";
+import { RefreshSubmissions } from "../../tasks/RefreshSubmissions";
 import "./directories.css";
 
 export function LocalMusicSource({ instance, name, manage }: {
@@ -20,6 +21,11 @@ export function LocalMusicSource({ instance, name, manage }: {
   const provider = useStore(s.libraryApi.providerInstances).find((item) => item.id === instance.instanceId);
   const state = useMemo(() => s.localScan(instance.instanceId), [s, instance.instanceId, auth.ready?.instanceId, auth.session?.user.id]);
   const scan = useStore(state);
+  const tasks = useStore(s.tasks);
+  const refreshJob = scan.job && tasks.items.some(task => task.id === scan.job!.jobId);
+  const submissions = useStore(s.refreshSubmissions);
+  const preparing = s.refreshSubmissions.isPreparing(instance.instanceId);
+  const pending = submissions.pending.some(item => item.provider === instance.instanceId);
   const statistics = useRootStatistics(s.client, instance.instanceId,
     JSON.stringify([auth.ready?.instanceId, auth.session?.user.id]), scan.job);
   useEffect(() => {
@@ -39,11 +45,11 @@ export function LocalMusicSource({ instance, name, manage }: {
     : config.data?.roots.length === 0 ? "请先添加本地音乐目录。" : null;
   return <section className="local-music-source" aria-label={name}>
     <div className="directory-actions"><h4>{name}</h4>
-      <button type="button" disabled={scan.checking || scan.busy || scan.pending || !config.data || !!unavailable}
-        title={unavailable ? tr(unavailable) : undefined} onClick={() => void state.start()}>
-        {tr(scan.checking ? "正在检查扫描状态…" : !scan.refreshing && (scan.pending || scan.busy) ? scan.job ? "正在扫描…" : "正在提交扫描…" : "扫描音乐")}</button>
+      <button type="button" disabled={preparing || pending || !config.data || !!unavailable} aria-label={tr("刷新全部目录")}
+        title={tr(unavailable ?? "刷新全部目录")} onClick={() => void s.refreshSubmissions.start(instance.instanceId)}>{tr("刷新")}</button>
       <button onClick={() => manage({ type: "add" })}>{tr("添加本地目录")}</button></div>
-    <LocalScanStatus value={scan} state={state} unavailable={unavailable} />
+    {!refreshJob && <LocalScanStatus value={scan} state={state} unavailable={unavailable} />}
+    <RefreshSubmissions provider={instance.instanceId} />
     <ErrorNotice error={config.error} retry={config.reload} />
     <div className="directory-statistics-error"><ErrorNotice error={statistics.error} retry={statistics.reload} /></div>
     {config.loading && <p className="muted">{tr("正在读取目录…")}</p>}
@@ -64,7 +70,8 @@ export function LocalMusicSource({ instance, name, manage }: {
               onClick={() => manage({ type: "edit", rootId: root.id })}>{tr("编辑")}</button>
             <button type="button" aria-label={tr("刷新目录 {0} 的元数据", { 0: root.name })}
               title={tr(unavailable ?? "重新读取歌曲信息、封面和歌词，保留手动选定的内容。")}
-              disabled={scan.checking || scan.busy || scan.pending || !!unavailable} onClick={() => void state.refresh(root.id)}>{tr("刷新")}</button>
+              disabled={preparing || s.refreshSubmissions.isPending(instance.instanceId, root.id) || !!unavailable}
+              onClick={() => void s.refreshSubmissions.start(instance.instanceId, root.id)}>{tr("刷新")}</button>
           </div>
         </li>)}
       </ul> : <p className="muted">{tr("暂无已添加目录")}</p>)}

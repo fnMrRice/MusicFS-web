@@ -9,6 +9,7 @@ import { ErrorBoundary } from "../app/ErrorBoundary";
 import { useMusicSources, useSourceName } from "../components/use-source-name";
 import { NicknameEditor } from "../features/profile/NicknameEditor";
 import { ServiceStatus } from "./ServiceStatus";
+import { TaskQueue } from "./TaskQueue";
 import { LibraryNavigation } from "./LibraryNavigation";
 import { workSectionTitle } from "../features/works/navigation";
 
@@ -212,6 +213,7 @@ export function AppShell() {
           <h1>{tr(title)}</h1>
           <div className={styles.tools}>
             <ServiceStatus />
+            <TaskQueue />
             <IconButton
               icon="settings"
               label={tr("设置")}

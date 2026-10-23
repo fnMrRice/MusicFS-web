@@ -30,7 +30,7 @@ function validJob(job: ScanJob, instance: string, id?: string): ScanJob {
 
 export class ScansApi {
   constructor(private client: ApiClient, private library: LibraryApi) {}
-  async prepare(instance: string, signal?: AbortSignal, rootId?: string): Promise<ScanRequest> {
+  private async source(instance: string, signal?: AbortSignal, rootId?: string) {
     const provider = (await this.library.providers(signal)).find((item) => item.id === instance);
     if (!provider || !["available", "online"].includes(provider.availability))
       throw new ApiError("SOURCE_UNAVAILABLE", "Source is not ready");
@@ -39,9 +39,20 @@ export class ScansApi {
     if (!provider.configuration?.schemaRevision) throw new ApiError("UNSUPPORTED", "Scan configuration is unavailable");
     if (rootId !== undefined && !provider.roots.some((root) => root.id === rootId))
       throw new ApiError("RESOURCE_CHANGED", "Music folder is no longer available");
-    return { mode: "full", schemaRevision: provider.configuration.schemaRevision,
-      rootIds: rootId === undefined ? provider.roots.map((root) => root.id) : [rootId],
+    return provider;
+  }
+  async prepare(instance: string, signal?: AbortSignal, rootId?: string): Promise<ScanRequest> {
+    const provider = await this.source(instance, signal, rootId);
+    return { mode: "full", schemaRevision: provider.configuration!.schemaRevision,
+      rootIds: rootId === undefined ? provider.roots!.map((root) => root.id) : [rootId],
       options: rootId === undefined ? {} : { refreshMetadata: true } };
+  }
+  async prepareRefresh(instance: string, signal?: AbortSignal, rootId?: string) {
+    const provider = await this.source(instance, signal, rootId);
+    return provider.roots!.filter(root => rootId === undefined || root.id === rootId).map(root => ({
+      name: root.name, request: { mode: "full", schemaRevision: provider.configuration!.schemaRevision,
+        rootIds: [root.id], options: { refreshMetadata: true } } as ScanRequest,
+    }));
   }
   metadataResults(id: string, signal?: AbortSignal) { return scanMetadataResults(this.client, id, signal); }
   async submit(instance: string, body: ScanRequest, key: string, signal?: AbortSignal) {

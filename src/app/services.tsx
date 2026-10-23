@@ -35,6 +35,9 @@ import { loadVolumePreferences, saveVolumePreferences, volumePreferences } from 
 import { RecordingCovers } from "./recording-covers";
 import { FavoritesApi } from "../api/favorites";
 import { FavoritesState } from "../library/favorites";
+import { TasksApi } from "../api/tasks";
+import { TaskQueueState } from "../tasks/task-queue-state";
+import { RefreshSubmission } from "../tasks/refresh-submission";
 
 interface AuthState {
   session: AuthSession | null;
@@ -116,6 +119,16 @@ export class Services {
     void this.libraryApi.providers().catch(() => {});
   });
   private configurationScans = new ConfigurationScans(this.client, (instance) => this.scans.get(instance).requestAutomatic());
+  tasks = new TaskQueueState(new TasksApi(this.client), (task) => {
+    for (const id of ["all", task.providerInstanceId]) void this.libraries.get(id)?.refresh();
+    capabilityResources.invalidate();
+    void this.libraryApi.providers().catch(() => {});
+    void this.scans.get(task.providerInstanceId).refreshStatus();
+  });
+  refreshSubmissions = new RefreshSubmission(new ScansApi(this.client, this.libraryApi), (instance) => {
+    void this.tasks.refresh();
+    void this.scans.get(instance).refreshStatus();
+  });
   localScan(instance: string): LocalScanState { return this.scans.get(instance); }
   scanMusicAfterDirectoryOperation(instance: string, operation: PluginOperation): void { this.configurationScans.watch(instance, operation); }
   matchingChanged(): void {
@@ -204,6 +217,8 @@ export class Services {
     this.libraryApi.clearProviderInstances();
     this.auth.set({ ...this.auth.value, session, busy: false, error: null });
     this.scans.setSession(this.auth.value.ready!.instanceId, session.user.id);
+    this.refreshSubmissions.setSession(new URL(this.client.url(""), window.location.href).href, session.user.id);
+    this.tasks.start(session.user.role === "admin");
     this.configurationScans.setSession(this.auth.value.ready!.instanceId, session.user.id);
     this.matchingDecisions.setSession(this.auth.value.ready!.instanceId, session.user.id);
     this.favorites.setSession(this.auth.value.ready!.instanceId, session.user.id);
@@ -310,6 +325,8 @@ export class Services {
     }
   }
   clear(): void {
+    this.tasks.clear();
+    this.refreshSubmissions.clear();
     this.favorites.clear();
     this.recordingCovers.clear();
     this.matchingDecisions.clear();

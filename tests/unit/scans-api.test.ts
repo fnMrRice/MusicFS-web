@@ -15,6 +15,12 @@ function fixture() {
 }
 
 describe("Scan API", () => {
+  it("prepares independent refresh tasks from one frozen provider response", async () => {
+    const { api, fetcher } = fixture();
+    expect(await api.prepareRefresh(provider.id)).toEqual(provider.roots.map(root => ({ name: root.name,
+      request: { ...body, rootIds: [root.id], options: { refreshMetadata: true } } })));
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
   it("discovers a current or latest job without submitting and accepts an empty history", async () => {
     const { api, fetcher } = fixture();
     fetcher.mockResolvedValueOnce(Response.json({ job }));

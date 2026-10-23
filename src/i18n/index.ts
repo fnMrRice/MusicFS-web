@@ -8,6 +8,7 @@ import notices from "./notices";
 import plugins from "./plugins";
 import directories from "./directories";
 import scans from "./scans";
+import tasks from "./tasks";
 import matching from "./matching";
 import pluginSettings from "./plugin-settings";
 import dsp from "./dsp";
@@ -29,6 +30,7 @@ const messages: Record<string, readonly string[]> = {
   ...plugins,
   ...directories,
   ...scans,
+  ...tasks,
   ...matching,
   ...pluginSettings,
   ...dsp,
