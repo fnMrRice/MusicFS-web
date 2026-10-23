@@ -1,0 +1,55 @@
+.settings-page .settings-navigation {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  margin: 0 0 28px;
+  padding-top: 4px;
+  background: var(--bg);
+  box-shadow: 0 -8px 0 var(--bg);
+  flex-wrap: nowrap;
+  scrollbar-width: thin;
+}
+.settings-section {
+  margin-bottom: 40px;
+  scroll-margin-top: 90px;
+}
+.settings-section:last-child {
+  margin-bottom: 0;
+  min-height: calc(var(--settings-viewport, 100dvh) - var(--settings-navigation-height, 60px) - 20px);
+}
+.settings-section-title {
+  margin: 0 0 16px;
+  font-size: 18px;
+  line-height: 1.5;
+}
+.settings-section :is(button, input, select, textarea, a) {
+  scroll-margin-top: calc(var(--settings-navigation-height, 60px) + 20px);
+}
+.settings-section > .settings-card {
+  margin-block: 0 16px;
+}
+.appearance-language .language-select {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+  justify-content: space-between;
+  font-size: 14px;
+}
+.appearance-language .language-select select {
+  min-width: min(180px, 100%);
+}
+.settings-user dl,
+.settings-about dl {
+  margin-bottom: 0;
+}
+.settings-user > button {
+  margin-top: 18px;
+}
+@media (max-width: 600px) {
+  .settings-page .settings-navigation {
+    gap: 16px;
+  }
+  .settings-section {
+    margin-bottom: 28px;
+  }
+}

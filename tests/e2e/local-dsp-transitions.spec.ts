@@ -103,7 +103,7 @@ test('switching waits for audible fade-out, fades in after delayed playing and l
   try {
     await page.goto(`${origin}/#/library`);
     await page.getByRole('button', { name: '设置', exact: true }).click();
-    await page.getByRole('tab', { name: '播放配置', exact: true }).click();
+    await page.getByRole('navigation', { name: '设置分类', exact: true }).getByRole('button', { name: '播放配置', exact: true }).click();
     await page.getByRole('checkbox', { name: '切歌淡出淡入', exact: true }).check();
     await page.getByLabel('淡出淡入时长（毫秒）', { exact: true }).fill(String(duration));
     await page.getByRole('checkbox', { name: '自动音量平衡', exact: true }).uncheck();

@@ -27,6 +27,7 @@ export function LocalDSPSettings() {
   const draggingNode = config.chain.find((node) => node.id === drag.drag?.id);
   const draggingName = localDSPCatalog.find((effect) => effect.kind === draggingNode?.kind)?.name;
   return <section className="settings-card dsp-settings local-dsp-settings" aria-label={tr("本地音效")}>
+    <h3>{tr("本地音效")}</h3>
     {!supported && <p className="notice" role="status">{tr("此浏览器不支持本地音效。仍可正常播放，音效设置会保留。")}</p>}
     <ErrorNotice error={error} />
     {storageError && <p className="notice" role="status">{tr(storageError)}</p>}

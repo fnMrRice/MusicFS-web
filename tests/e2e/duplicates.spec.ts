@@ -70,7 +70,7 @@ test('plugin settings drive duplicate recognition while candidates still require
   await disableAutomatic(page, server.origin);
   await verifyHashes(page, server.origin, fixture.tracks);
   await page.getByRole('button', { name: '设置', exact: true }).click();
-  await page.getByRole('tab', { name: '插件管理', exact: true }).click();
+  await page.getByRole('navigation', { name: '设置分类', exact: true }).getByRole('button', { name: '插件管理', exact: true }).click();
   const entry = page.locator('details.plugin-entry').filter({ hasText: plugin });
   await entry.locator('summary').click();
   const form = entry.locator('section');

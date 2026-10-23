@@ -37,6 +37,8 @@ export default {
   "服务端格式转换暂不可用，当前只能查看和编辑草稿。": ["Server format conversion is unavailable. You can still view and edit a draft.", "伺服器格式轉換暫不可用，目前只能檢視和編輯草稿。", "サーバーの形式変換は現在利用できません。設定の閲覧と下書きの編集は可能です。"],
   "格式转换设置已保存，下次播放时生效。": ["Format conversion settings saved. They apply to the next playback.", "格式轉換設定已儲存，下次播放時生效。", "形式変換設定を保存しました。次の再生から適用されます。"],
   "强制服务端转码（下一首生效）": ["Force server transcoding (next track)", "強制伺服器轉碼（下一首生效）", "サーバーでの変換を強制（次の曲から）"],
+  "强制服务端转码": ["Force server transcoding", "強制伺服器轉碼", "サーバーでの変換を強制"],
+  "下一首生效": ["From the next track", "下一首生效", "次の曲から適用"],
   "服务端负责格式转换、转码及必要的声道转换；音量与音效在浏览器中实时调整。": ["The server handles format conversion, transcoding, and required channel conversion. Volume and effects adjust in real time in your browser.", "伺服器負責格式轉換、轉碼及必要的聲道轉換；音量與音效在瀏覽器中即時調整。", "サーバーは形式変換、トランスコード、必要なチャンネル変換を担当します。音量とエフェクトはブラウザー内でリアルタイムに調整します。"],
   "参数均衡器": ["Parametric equalizer", "參數等化器", "パラメトリック EQ"],
   "动态压缩": ["Dynamic compression", "動態壓縮", "ダイナミックコンプレッサー"],

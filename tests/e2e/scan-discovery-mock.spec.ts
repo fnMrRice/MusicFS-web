@@ -75,9 +75,9 @@ test('independent windows discover progress, reload and continue tracking withou
     await page.reload();
     await expect(progress).toContainText('已发现 200 首');
     expect(await page.evaluate(() => Object.keys(sessionStorage).filter((key) => key.includes(':scan:')))).toEqual([]);
-    await page.getByRole('tab', { name: '其他配置', exact: true }).click();
+    await page.getByRole('navigation', { name: '设置分类', exact: true }).getByRole('button', { name: '其他配置', exact: true }).click();
     remote.job = job('running', 400, remote.job!.jobId);
-    await page.getByRole('tab', { name: '音乐源', exact: true }).click();
+    await page.getByRole('navigation', { name: '设置分类', exact: true }).getByRole('button', { name: '音乐源', exact: true }).click();
     await expect(progress).toContainText('已发现 400 首');
     await expect(page.locator('.directory-saved-stats').first()).toHaveText('2 首 · 1.0 GiB');
     remote.roots = [{ rootId: 'music', trackCount: 400, sizeBytes: 12 * 1024 ** 3 }];

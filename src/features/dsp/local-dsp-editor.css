@@ -1,5 +1,5 @@
 .local-dsp-settings { position: relative; }
-.local-dsp-toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px; position: sticky; top: 0; z-index: 3; padding-block: 10px; margin-block: -10px; background: var(--panel); }
+.local-dsp-toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px; }
 .local-dsp-toolbar .dsp-toggle { margin: 0; font-weight: 600; }
 .local-dsp-save { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
 .local-dsp-save [role="status"] { font-size: 12px; margin-right: 6px; }

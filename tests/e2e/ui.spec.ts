@@ -33,12 +33,12 @@ test('real shell, custom transport, themes and playlist writes survive route cha
   await page.getByRole('slider', { name: '音量', exact: true }).fill('0.35');
   await expect.poll(() => page.locator('audio').evaluate((a: HTMLAudioElement) => a.volume)).toBe(.35);
   await page.getByRole('button', { name: '设置', exact: true }).click();
-  await page.getByRole('tab', { name: '其他配置', exact: true }).click();
+  await page.getByRole('navigation', { name: '设置分类', exact: true }).getByRole('button', { name: '其他配置', exact: true }).click();
   const language = page.locator('.language-select select');
   await language.selectOption('en');
-  await expect(page.getByRole('heading', { name: 'Your listening preferences' })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Settings categories', exact: true })).toBeVisible();
   await language.selectOption('ja');
-  await expect(page.getByRole('heading', { name: 'リスニング設定' })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: '設定カテゴリー', exact: true })).toBeVisible();
   await expect(page.locator('audio')).toHaveCount(1);
   expect(await page.locator('audio').getAttribute('src')).toBe(source);
   await expect.poll(() => page.locator('audio').evaluate((a: HTMLAudioElement) => a.volume)).toBe(.35);

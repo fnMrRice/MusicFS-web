@@ -85,10 +85,10 @@ async function importedNames(api: APIRequestContext): Promise<string[]> {
 
 async function expectAllowedCount(page: Page) {
   expect((await localPlugin(page.request)).displayCount.value).toBe(2);
-  await page.getByRole('tab', { name: '插件管理', exact: true }).click();
+  await page.getByRole('navigation', { name: '设置分类', exact: true }).getByRole('button', { name: '插件管理', exact: true }).click();
   const entry = page.locator('.plugin-entry').filter({ has: page.getByText('musicfs.plugin.source.localfiles', { exact: true }) });
   await expect(entry.locator('.plugin-count')).toHaveText('2 个允许访问的目录');
-  await page.getByRole('tab', { name: '音乐源', exact: true }).click();
+  await page.getByRole('navigation', { name: '设置分类', exact: true }).getByRole('button', { name: '音乐源', exact: true }).click();
 }
 
 test('administrator tree exposes allowed directories independently of configured music directories', async ({ page, request }) => {

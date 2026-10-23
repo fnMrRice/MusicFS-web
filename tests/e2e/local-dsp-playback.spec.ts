@@ -62,7 +62,7 @@ test('real browser output changes live without replacing the stream or requestin
   const baseline = await outputSignal(page);
   expect(baseline.rms).toBeGreaterThan(0.05);
   await page.getByRole('button', { name: '设置', exact: true }).click();
-  await page.getByRole('tab', { name: 'DSP 配置', exact: true }).click();
+  await page.getByRole('navigation', { name: '设置分类', exact: true }).getByRole('button', { name: 'DSP 配置', exact: true }).click();
   await page.getByRole('button', { name: '添加效果', exact: true }).click();
   await page.getByRole('button', { name: '展开 增益', exact: true }).click();
   await page.getByRole('slider', { name: '调节 增益（dB）', exact: true }).fill('-12');
@@ -106,13 +106,13 @@ test('automatic volume balances real output live and preserves pause, mute and t
   const { creates, controls, errors } = await setup(page);
   const audio = await page.locator('audio').elementHandle();
   await page.getByRole('button', { name: '设置', exact: true }).click();
-  await page.getByRole('tab', { name: 'DSP 配置', exact: true }).click();
+  await page.getByRole('navigation', { name: '设置分类', exact: true }).getByRole('button', { name: 'DSP 配置', exact: true }).click();
   await page.getByRole('button', { name: '添加效果', exact: true }).click();
   await page.getByRole('button', { name: '展开 增益', exact: true }).click();
   await page.getByRole('slider', { name: '调节 增益（dB）', exact: true }).fill('12');
   const loud = await outputSignal(page);
   expect(loud.rms).toBeGreaterThan(0.4);
-  await page.getByRole('tab', { name: '播放配置', exact: true }).click();
+  await page.getByRole('navigation', { name: '设置分类', exact: true }).getByRole('button', { name: '播放配置', exact: true }).click();
   await page.getByLabel('自动音量平衡', { exact: true }).check();
   await expect.poll(async () => (await outputSignal(page)).rms).toBeLessThan(0.12);
   const balanced = await outputSignal(page);
@@ -142,7 +142,7 @@ test('automatic volume measures stereo channels before phase cancellation', asyn
   const baseline = await outputSignal(page);
   expect(baseline.rms).toBeGreaterThan(0.02);
   await page.getByRole('button', { name: '设置', exact: true }).click();
-  await page.getByRole('tab', { name: '播放配置', exact: true }).click();
+  await page.getByRole('navigation', { name: '设置分类', exact: true }).getByRole('button', { name: '播放配置', exact: true }).click();
   await page.getByLabel('自动音量平衡', { exact: true }).check();
   // 最终探针是单声道，因此用同一信号的前后比值验证反相信号仍被正确降低。
   await expect.poll(async () => (await outputSignal(page)).rms / baseline.rms).toBeLessThan(0.3);
@@ -160,9 +160,8 @@ test('output channels switch live with effects disabled and retain the stream, p
     return probe.context.destination.channelCount;
   });
   await page.getByRole('button', { name: '设置', exact: true }).click();
-  await page.getByRole('tab', { name: 'DSP 配置', exact: true }).click();
+  await page.getByRole('navigation', { name: '设置分类', exact: true }).getByRole('button', { name: 'DSP 配置', exact: true }).click();
   await page.getByRole('checkbox', { name: '启用本地音效', exact: true }).uncheck();
-  await page.getByRole('button', { name: '输出设置', exact: true }).click();
   const layout = page.getByLabel('输出声道', { exact: true });
   await layout.selectOption('stereo');
   await expect.poll(outputChannels).toBe(2);

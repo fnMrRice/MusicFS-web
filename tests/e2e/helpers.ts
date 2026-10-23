@@ -14,7 +14,7 @@ export async function login(page: Page, server: TestServer): Promise<void> {
 }
 export async function logout(page: Page): Promise<void> {
   await page.getByRole('button', { name: '账号菜单' }).click();
-  await page.getByRole('button', { name: '退出登录', exact: true }).click();
+  await page.getByRole('region', { name: '账号操作', exact: true }).getByRole('button', { name: '退出登录', exact: true }).click();
 }
 export async function seekTo(page: Page, seconds: number): Promise<void> {
   const slider = page.getByRole('slider', { name: '曲目进度', exact: true });
@@ -23,7 +23,7 @@ export async function seekTo(page: Page, seconds: number): Promise<void> {
 }
 export async function setProcessing(page: Page, enabled: boolean): Promise<void> {
   await page.getByRole('button', { name: '设置', exact: true }).click();
-  await page.getByRole('tab', { name: '播放配置', exact: true }).click();
+  await page.getByRole('navigation', { name: '设置分类', exact: true }).getByRole('button', { name: '播放配置', exact: true }).click();
   await page.getByLabel('强制服务端转码（下一首生效）').setChecked(enabled);
   const expand = page.getByRole('button', { name: '展开作品库', exact: true });
   if (await expand.isVisible()) await expand.click();

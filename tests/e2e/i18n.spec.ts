@@ -75,6 +75,9 @@ async function mock(context: BrowserContext, authenticated = true) {
   });
 }
 const selector = (page: Page) => page.locator(".language-select select");
+const settingsNavigation = (page: Page) => page.getByRole("navigation", {
+  name: /^(Settings categories|设置分类|設定分類|設定カテゴリー)$/,
+});
 
 test("browser language chooses English, Simplified Chinese, Traditional Chinese and Japanese before login", async ({
   browser,
@@ -223,7 +226,7 @@ test("live language changes preserve search drafts, selections and metadata and 
     await expect(page.getByRole("alert")).toContainText(
       "リクエスト ID：req-i18n",
     );
-    await page.getByRole("tab").last().click();
+    await settingsNavigation(page).getByRole("button").last().click();
     await page.getByRole("button", { name: "ログアウト", exact: true }).click();
     await expect(page.locator(".login-page")).toBeVisible();
     await expect(selector(page)).toHaveValue("ja");
@@ -256,10 +259,11 @@ test("all four languages fit settings and search at narrow widths", async ({
       await page.screenshot({
         path: info.outputPath(`settings-${language}.png`),
       });
-      for (const tab of await page.getByRole("tab").all()) {
-        await tab.click();
-        await expect(tab).toBeInViewport();
-        await expect(page.getByRole("tabpanel")).toBeVisible();
+      for (const category of await settingsNavigation(page).getByRole("button").all()) {
+        await category.click();
+        await expect(category).toBeInViewport();
+        const name = (await category.textContent())!.trim();
+        await expect(page.getByRole("region", { name, exact: true })).toBeVisible();
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
       }
       await page.goto(`${origin}/#/search`);

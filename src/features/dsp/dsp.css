@@ -1,4 +1,5 @@
-.settings-page .settings-tabs { flex-wrap: wrap; }
+.dsp-settings-stack { display: grid; gap: 20px; }
+.dsp-settings-stack > .settings-card { min-width: 0; margin: 0; }
 .dsp-settings fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
 .dsp-output-controls, .dsp-parameters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .dsp-settings label { display: grid; gap: 7px; font-size: 13px; min-width: 0; margin: 0; }
@@ -21,8 +22,6 @@
 .dsp-preview { margin-block: 16px; }
 .dsp-preview p { margin: 4px 0; }
 .dsp-actions { margin-top: 18px; }
-.dsp-scope { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
-.dsp-scope [aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
 .dsp-settings .dsp-inherit { display: flex; flex-direction: row; align-items: center; justify-content: flex-start; gap: 9px; margin-block: 16px; }
 .dsp-settings .dsp-inherit input { width: auto; }
 .dsp-settings .dsp-toggle { display: flex; align-items: center; gap: 9px; margin-block: 16px; }

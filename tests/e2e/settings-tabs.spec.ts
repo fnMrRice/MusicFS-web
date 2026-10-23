@@ -5,7 +5,7 @@ import { preview, type PreviewServer } from "vite";
 
 let server: PreviewServer;
 const origin = "http://127.0.0.1:18145";
-const tabNames = ["音乐源", "插件管理", "播放配置", "DSP 配置", "其他配置"];
+const sectionNames = ["音乐源", "插件管理", "播放配置", "DSP 配置", "其他配置"];
 const processingLabel = "强制服务端转码（下一首生效）";
 const local = {
   id: instanceIds.local, name: "Fixture library", availability: "available", capabilities: [],
@@ -43,55 +43,178 @@ async function mock(page: Page, role = "admin") {
   return requests;
 }
 
-test("settings group existing controls and preserve playback preferences across tabs and refresh", async ({ page }, info) => {
+function navigation(page: Page) {
+  return page.getByRole("navigation", { name: "设置分类", exact: true });
+}
+
+function section(page: Page, name: string) {
+  return page.getByRole("region", { name, exact: true });
+}
+
+async function expectAnchor(page: Page, name: string) {
+  const nav = navigation(page);
+  await expect(nav.getByRole("button", { name, exact: true })).toHaveAttribute("aria-current", "location");
+  await expect(nav).toBeInViewport();
+  await expect.poll(async () => {
+    const [navBox, sectionBox] = await Promise.all([nav.boundingBox(), section(page, name).boundingBox()]);
+    return !!navBox && !!sectionBox && sectionBox.y >= navBox.y + navBox.height - 2
+      && sectionBox.y <= navBox.y + navBox.height + 48;
+  }).toBe(true);
+}
+
+async function navigate(page: Page, name: string) {
+  await navigation(page).getByRole("button", { name, exact: true }).click();
+  await expectAnchor(page, name);
+}
+
+test("settings keep every section mounted and preserve playback preferences after scrolling and refresh", async ({ page }, info) => {
   await mock(page);
   await page.goto(`${origin}/#/settings`);
-  const tabs = page.getByRole("tablist", { name: "设置分类", exact: true });
-  await expect(tabs.getByRole("tab")).toHaveText(tabNames);
-  await expect(tabs.getByRole("tab", { name: "音乐源", exact: true })).toHaveAttribute("aria-selected", "true");
+  const nav = navigation(page);
+  await expect(nav.getByRole("button")).toHaveText(sectionNames);
+  await expect(nav.getByRole("button", { name: "音乐源", exact: true })).toHaveAttribute("aria-current", "location");
+  for (const name of sectionNames) await expect(section(page, name)).toBeVisible();
   await expect(page.getByRole("heading", { name: "本地音乐", exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "插件列表", exact: true })).toHaveCount(0);
-  await expect(page.getByLabel(processingLabel)).toHaveCount(0);
-  await expect(page.locator(".language-select select")).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "插件列表", exact: true })).toBeVisible();
+  await expect(page.getByLabel(processingLabel)).toHaveCount(1);
+  await expect(page.locator(".language-select select")).toHaveCount(1);
+  await expect(page.getByRole("heading", { name: "你的聆听偏好", exact: true })).toHaveCount(0);
+  await expect(page.getByText("MAKE YOURSELF AT HOME", { exact: true })).toHaveCount(0);
   await page.screenshot({ path: info.outputPath("settings-sources-desktop.png") });
 
-  await tabs.getByRole("tab", { name: "插件管理", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "插件列表", exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "本地音乐", exact: true })).toHaveCount(0);
-  await tabs.getByRole("tab", { name: "播放配置", exact: true }).click();
+  await navigate(page, "插件管理");
+  await navigate(page, "播放配置");
+  const playback = section(page, "播放配置");
+  const volume = playback.getByRole("slider", { name: "音量", exact: true });
+  const processing = playback.getByRole("checkbox", { name: processingLabel, exact: true });
+  expect(await volume.evaluate((element) => !!(element.compareDocumentPosition(document.querySelector(".playback-switch")!) & Node.DOCUMENT_POSITION_FOLLOWING))).toBe(true);
+  await expect(page.getByText("服务端负责格式转换与转码；音效和输出声道在浏览器中实时调整。", { exact: true })).toHaveCount(0);
   await expect(page.getByLabel("切歌淡出淡入", { exact: true })).not.toBeChecked();
   await expect(page.getByLabel("自动音量平衡", { exact: true })).not.toBeChecked();
   await expect(page.getByLabel("淡出淡入时长（毫秒）", { exact: true })).toHaveCount(0);
-  await page.getByLabel(processingLabel).check();
+  await processing.check();
   await page.getByLabel("切歌淡出淡入", { exact: true }).check();
   await expect(page.getByLabel("淡出淡入时长（毫秒）", { exact: true })).toHaveValue("300");
   await page.getByLabel("淡出淡入时长（毫秒）", { exact: true }).fill("750");
   await page.getByLabel("自动音量平衡", { exact: true }).check();
-  await page.getByRole("tabpanel", { name: "播放配置", exact: true }).getByRole("slider", { name: "音量", exact: true }).fill("0.42");
-  await tabs.getByRole("tab", { name: "其他配置", exact: true }).click();
+  await volume.fill("0.42");
+  await navigate(page, "其他配置");
   await expect(page.locator(".language-select select")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "外观", exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "连接与账号", exact: true })).toBeVisible();
-  await expect(page.getByLabel(processingLabel)).toHaveCount(0);
+  await expect(section(page, "其他配置").getByRole("heading", { level: 3 })).toHaveText(["外观与语言", "用户", "关于"]);
+  await expect(page.getByRole("button", { name: "退出登录", exact: true })).toBeVisible();
+  expect(await section(page, "其他配置").evaluate((element) => {
+    const appearance = element.querySelector(".theme-choices");
+    const language = element.querySelector(".language-select");
+    return !!appearance && !!language && !!(appearance.compareDocumentPosition(language) & Node.DOCUMENT_POSITION_FOLLOWING);
+  })).toBe(true);
+  await expect(processing).toBeChecked();
+  await section(page, "其他配置").getByRole("button", { name: "晨光 · 浅色", exact: true }).click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
 
-  await tabs.getByRole("tab", { name: "播放配置", exact: true }).click();
+  await navigate(page, "播放配置");
   await page.reload();
   await expect(page).toHaveURL(/\/settings\?tab=playback$/);
-  await expect(page.getByLabel(processingLabel)).toBeChecked();
+  await expectAnchor(page, "播放配置");
+  await expect(processing).toBeChecked();
   await expect(page.getByLabel("切歌淡出淡入", { exact: true })).toBeChecked();
   await expect(page.getByLabel("淡出淡入时长（毫秒）", { exact: true })).toHaveValue("750");
   await expect(page.getByLabel("自动音量平衡", { exact: true })).toBeChecked();
-  await expect(page.getByRole("tabpanel", { name: "播放配置", exact: true }).getByRole("slider", { name: "音量", exact: true })).toHaveValue("0.42");
+  await expect(volume).toHaveValue("0.42");
+  await page.screenshot({ path: info.outputPath("settings-playback-desktop.png") });
+
   await page.setViewportSize({ width: 390, height: 844 });
-  await tabs.scrollIntoViewIfNeeded();
-  for (const tab of await tabs.getByRole("tab").all()) await expect(tab).toBeInViewport();
+  await navigate(page, "播放配置");
+  await expect(nav.getByRole("button", { name: "播放配置", exact: true })).toBeInViewport();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: info.outputPath("settings-playback-mobile.png") });
+  await navigate(page, "其他配置");
+  await expect(page.locator(".language-select select")).toBeInViewport();
+  await section(page, "其他配置").getByRole("button", { name: "深夜 · 深色", exact: true }).click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await page.setViewportSize({ width: 1200, height: 900 });
+  await navigate(page, "播放配置");
+  await page.screenshot({ path: info.outputPath("settings-playback-desktop-dark.png") });
+});
+
+test("manual scrolling updates the current section while the section navigation stays visible", async ({ page }) => {
+  await mock(page);
+  await page.goto(`${origin}/#/settings`);
+  await expect(page.getByRole("heading", { name: "本地音乐", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "插件列表", exact: true })).toBeVisible();
+  for (const name of ["播放配置", "DSP 配置", "其他配置", "音乐源"]) {
+    const navBox = (await navigation(page).boundingBox())!;
+    const targetBox = (await section(page, name).boundingBox())!;
+    await page.mouse.move(navBox.x + navBox.width / 2, navBox.y + navBox.height + 80);
+    await page.mouse.wheel(0, targetBox.y - navBox.y - navBox.height - 16);
+    await expectAnchor(page, name);
+    await expect(navigation(page).locator('[aria-current="location"]')).toHaveCount(1);
+  }
+});
+
+test("history restores the manual scroll position instead of the section in the deep link", async ({ page }) => {
+  await mock(page);
+  await page.goto(`${origin}/#/settings?tab=dsp`);
+  await expectAnchor(page, "DSP 配置");
+  const scrollRoot = page.locator("#page-scroll");
+  const deepLinkScroll = await scrollRoot.evaluate((element) => element.scrollTop);
+  const navBox = (await navigation(page).boundingBox())!;
+  const otherBox = (await section(page, "其他配置").boundingBox())!;
+  const delta = otherBox.y - navBox.y - navBox.height + 120;
+  const target = await scrollRoot.evaluate((element, offset) =>
+    Math.min(element.scrollHeight - element.clientHeight, element.scrollTop + offset), delta);
+  await page.mouse.move(navBox.x + navBox.width / 2, navBox.y + navBox.height + 80);
+  await page.mouse.wheel(0, delta);
+  await expect.poll(async () => Math.abs(await scrollRoot.evaluate((element) => element.scrollTop) - target)).toBeLessThanOrEqual(2);
+  await expect(navigation(page).getByRole("button", { name: "其他配置", exact: true })).toHaveAttribute("aria-current", "location");
+  await expect(page).toHaveURL(/\/settings\?tab=dsp$/);
+  const savedScroll = await scrollRoot.evaluate((element) => element.scrollTop);
+  expect(savedScroll).toBeGreaterThan(deepLinkScroll + 100);
+
+  await page.getByRole("navigation", { name: "主导航", exact: true }).getByRole("link", { name: "搜索", exact: true }).click();
+  await expect(page).toHaveURL(/\/search$/);
+  await page.goBack();
+  await expect(page).toHaveURL(/\/settings\?tab=dsp$/);
+  await expect.poll(async () => Math.abs(await scrollRoot.evaluate((element) => element.scrollTop) - savedScroll)).toBeLessThanOrEqual(2);
+  await expect(navigation(page).getByRole("button", { name: "其他配置", exact: true })).toHaveAttribute("aria-current", "location");
+});
+
+test("DSP shows both cards and keeps unsaved effects and editor state while navigating", async ({ page }, info) => {
+  await mock(page);
+  await page.goto(`${origin}/#/settings?tab=dsp`);
+  await expectAnchor(page, "DSP 配置");
+  const dsp = section(page, "DSP 配置");
+  const localEffects = dsp.getByRole("region", { name: "本地音效", exact: true });
+  const output = dsp.getByRole("region", { name: "输出设置", exact: true });
+  await expect(localEffects).toBeVisible();
+  await expect(output).toBeVisible();
+  await expect(dsp.getByRole("tab")).toHaveCount(0);
+  await expect(dsp.getByRole("button", { name: "本地音效", exact: true })).toHaveCount(0);
+  const [localBox, outputBox] = await Promise.all([localEffects.boundingBox(), output.boundingBox()]);
+  expect(outputBox!.y).toBeGreaterThanOrEqual(localBox!.y + localBox!.height);
+  await page.screenshot({ path: info.outputPath("settings-dsp-desktop.png") });
+
+  await localEffects.getByRole("button", { name: "添加效果", exact: true }).click();
+  await localEffects.getByRole("button", { name: "展开 增益", exact: true }).click();
+  await localEffects.getByRole("spinbutton", { name: "增益（dB）", exact: true }).fill("4.5");
+  await localEffects.getByLabel("选择效果", { exact: true }).selectOption("reverb");
+  await expect(localEffects.getByText("有未保存的更改", { exact: true })).toBeVisible();
+  await navigate(page, "其他配置");
+  await navigate(page, "DSP 配置");
+  await expect(localEffects.getByRole("button", { name: "收起 增益", exact: true })).toHaveAttribute("aria-expanded", "true");
+  await expect(localEffects.getByRole("spinbutton", { name: "增益（dB）", exact: true })).toHaveValue("4.5");
+  await expect(localEffects.getByLabel("选择效果", { exact: true })).toHaveValue("reverb");
+  await expect(localEffects.getByText("有未保存的更改", { exact: true })).toBeVisible();
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await navigate(page, "DSP 配置");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: info.outputPath("settings-dsp-mobile.png") });
 });
 
 test("playback fades clamp duration and retain the preference while disabled", async ({ page }) => {
   const requests = await mock(page);
   await page.goto(`${origin}/#/settings?tab=playback`);
+  await expectAnchor(page, "播放配置");
   await page.getByLabel("切歌淡出淡入", { exact: true }).check();
   const duration = page.getByLabel("淡出淡入时长（毫秒）", { exact: true });
   await duration.fill("50");
@@ -109,84 +232,84 @@ test("playback fades clamp duration and retain the preference while disabled", a
   expect(requests.filter((path) => path.includes("/dsp/settings") || path.includes("/playback/sessions"))).toEqual([]);
 });
 
-test("tab navigation replaces history and unknown tab URLs fall back to music sources", async ({ page }) => {
+test("section navigation replaces history and unknown links fall back to music sources", async ({ page }) => {
   await mock(page);
   await page.goto(`${origin}/#/library`);
   await page.getByRole("button", { name: "设置", exact: true }).click();
-  await page.getByRole("tab", { name: "播放配置", exact: true }).click();
-  await page.getByRole("tab", { name: "其他配置", exact: true }).click();
+  await navigate(page, "播放配置");
+  await navigate(page, "其他配置");
   await page.goBack();
   await expect(page).toHaveURL(/\/library$/);
   await page.goto(`${origin}/#/settings?tab=unknown&from=fixture`);
-  await expect(page.getByRole("tab", { name: "音乐源", exact: true })).toHaveAttribute("aria-selected", "true");
-  await expect(page.getByRole("heading", { name: "本地音乐", exact: true })).toBeVisible();
-  await page.getByRole("tab", { name: "其他配置", exact: true }).click();
+  await expect(navigation(page).getByRole("button", { name: "音乐源", exact: true })).toHaveAttribute("aria-current", "location");
+  await expect(page.getByRole("heading", { name: "本地音乐", exact: true })).toBeInViewport();
+  await navigate(page, "其他配置");
   await expect(page).toHaveURL(/tab=other&from=fixture$/);
 });
 
-test("keyboard navigation moves a single focus stop and only activates tabs on Enter or Space", async ({ page }) => {
-  const requests = await mock(page);
+test("section buttons support native keyboard navigation and focus the selected section", async ({ page }) => {
+  await mock(page);
   await page.goto(`${origin}/#/settings?tab=playback`);
-  const playback = page.getByRole("tab", { name: "播放配置", exact: true });
-  const sources = page.getByRole("tab", { name: "音乐源", exact: true });
-  const plugins = page.getByRole("tab", { name: "插件管理", exact: true });
-  const other = page.getByRole("tab", { name: "其他配置", exact: true });
+  await expectAnchor(page, "播放配置");
+  const nav = navigation(page);
+  const playback = nav.getByRole("button", { name: "播放配置", exact: true });
+  const dsp = nav.getByRole("button", { name: "DSP 配置", exact: true });
+  const other = nav.getByRole("button", { name: "其他配置", exact: true });
   await playback.focus();
-  await page.keyboard.press("ArrowLeft");
-  await expect(plugins).toBeFocused();
-  await expect(plugins).toHaveAttribute("tabindex", "0");
-  await expect(playback).toHaveAttribute("tabindex", "-1");
-  await expect(playback).toHaveAttribute("aria-selected", "true");
-  await page.keyboard.press("Home");
-  await expect(sources).toBeFocused();
-  await page.keyboard.press("ArrowLeft");
-  await expect(other).toBeFocused();
-  await page.keyboard.press("ArrowRight");
-  await expect(sources).toBeFocused();
-  await page.keyboard.press("End");
-  await expect(other).toBeFocused();
-  await expect(playback).toHaveAttribute("aria-selected", "true");
-  expect(requests.filter((path) => path.endsWith("/admin/plugins"))).toEqual([]);
-  await page.keyboard.press("Space");
-  await expect(other).toHaveAttribute("aria-selected", "true");
-  await expect(page.getByRole("tabpanel", { name: "其他配置", exact: true })).toBeVisible();
-  await expect(page.getByRole("tabpanel")).toHaveAttribute("id", (await other.getAttribute("aria-controls"))!);
-  await page.keyboard.press("Home");
+  await page.keyboard.press("Tab");
+  await expect(dsp).toBeFocused();
+  await expect(playback).toHaveAttribute("aria-current", "location");
   await page.keyboard.press("Enter");
-  await expect(sources).toHaveAttribute("aria-selected", "true");
-  await expect(page.getByRole("heading", { name: "本地音乐", exact: true })).toBeVisible();
+  await expectAnchor(page, "DSP 配置");
+  await expect(page).toHaveURL(/tab=dsp$/);
+  await expect(section(page, "DSP 配置")).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(section(page, "DSP 配置").getByRole("checkbox", { name: "启用本地音效", exact: true })).toBeFocused();
+  await other.evaluate((element) => element.focus({ preventScroll: true }));
+  await expect(other).toBeFocused();
+  await page.keyboard.press("Space");
+  await expectAnchor(page, "其他配置");
+  await expect(page).toHaveURL(/tab=other$/);
+  await expect(section(page, "其他配置")).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(section(page, "其他配置").getByRole("button", { name: "深夜 · 深色", exact: true })).toBeFocused();
+  await other.evaluate((element) => element.focus({ preventScroll: true }));
+  await page.keyboard.press("Shift+Tab");
+  await expect(dsp).toBeFocused();
+  await expect(page).toHaveURL(/tab=other$/);
 });
 
-test("regular users retain all tabs and see plugin permissions without admin requests", async ({ page }) => {
+test("regular users retain every section and see plugin permissions without admin requests", async ({ page }) => {
   const requests = await mock(page, "user");
   await page.goto(`${origin}/#/settings?tab=plugins`);
-  await expect(page.getByRole("tab")).toHaveText(tabNames);
+  await expect(navigation(page).getByRole("button")).toHaveText(sectionNames);
+  await expectAnchor(page, "插件管理");
   await expect(page.getByText("插件管理仅对管理员开放。", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "刷新插件列表", exact: true })).toHaveCount(0);
-  await page.getByRole("tab", { name: "音乐源", exact: true }).click();
+  await navigate(page, "音乐源");
   await expect(page.getByRole("heading", { name: "本地音乐", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: /^(添加本地目录|管理音乐目录)$/ })).toHaveCount(0);
   expect(requests.filter((path) => path.includes("/admin/"))).toEqual([]);
 });
 
-test("legacy directory links open music sources and dismiss before switching tabs", async ({ page }) => {
+test("legacy directory links take priority and dismiss before navigating to another section", async ({ page }) => {
   await mock(page);
   await page.goto(`${origin}/#/settings?tab=plugins&directories=${instanceIds.local}`);
-  await expect(page.getByRole("tab", { name: "音乐源", exact: true })).toHaveAttribute("aria-selected", "true");
+  await expect(navigation(page).getByRole("button", { name: "音乐源", exact: true })).toHaveAttribute("aria-current", "location");
   const directories = page.getByRole("dialog", { name: "添加本地目录", exact: true });
   await expect(directories).toHaveCount(1);
   await page.getByRole("button", { name: /^(取消|收起目录管理)$/ }).click();
   await expect(directories).toHaveCount(0);
-  await page.getByRole("tab", { name: "播放配置", exact: true }).click();
+  await navigate(page, "播放配置");
   await expect(page).toHaveURL(/\/settings\?tab=playback$/);
   await page.reload();
+  await expectAnchor(page, "播放配置");
   await expect(page.getByLabel(processingLabel)).toBeVisible();
   await expect(directories).toHaveCount(0);
 });
 
-test("leaving music sources cancels inline authorization and returning does not resume its polling", async ({ page }) => {
+test("scrolling away from music sources preserves authorization and its polling", async ({ page }) => {
   await mock(page);
-  await page.clock.install();
   const actions: { action: string; loginId: string }[] = [];
   let account: Record<string, unknown> = { state: "signedOut" };
   await page.route("**/api/v1/online-instances", (route) => route.fulfill({ json: { items: [{
@@ -207,17 +330,12 @@ test("leaving music sources cancels inline authorization and returning does not 
   await page.getByRole("button", { name: "登录QQ音乐", exact: true }).click();
   await expect(page.getByText("等待授权", { exact: true })).toBeVisible();
   await expect(page.getByAltText("QQ音乐登录二维码", { exact: true })).toBeVisible();
-  await page.getByRole("tab", { name: "音乐源", exact: true }).focus();
-  await page.keyboard.press("ArrowRight");
+  await navigate(page, "播放配置");
+  await expect(page.getByAltText("QQ音乐登录二维码", { exact: true })).toHaveCount(1);
+  await expect.poll(() => actions.some(({ action }) => action === "poll")).toBe(true);
+  await navigate(page, "音乐源");
   await expect(page.getByText("等待授权", { exact: true })).toBeVisible();
-  expect(actions.map(({ action }) => action)).toEqual(["begin"]);
-  await page.keyboard.press("Enter");
-  await expect.poll(() => actions.filter(({ action }) => action === "cancel").map(({ loginId }) => loginId)).toEqual(["qq-challenge"]);
-  await page.clock.runFor(4000);
-  expect(actions.some(({ action }) => action === "poll")).toBe(false);
-  await page.getByRole("tab", { name: "音乐源", exact: true }).click();
-  await expect(page.getByRole("button", { name: "登录QQ音乐", exact: true })).toBeEnabled();
-  await expect(page.getByAltText("QQ音乐登录二维码", { exact: true })).toHaveCount(0);
-  await page.clock.runFor(4000);
-  expect(actions.map(({ action }) => action)).toEqual(["begin", "cancel"]);
+  await expect(page.getByAltText("QQ音乐登录二维码", { exact: true })).toBeVisible();
+  expect(actions.filter(({ action }) => action === "begin")).toHaveLength(1);
+  expect(actions.filter(({ action }) => action === "cancel")).toEqual([]);
 });

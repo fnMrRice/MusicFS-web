@@ -25,13 +25,14 @@ const localStorageKey = "musicfs:local-dsp:v1:dsp-test:listener";
 test("local effects preview drafts, save explicitly, and restore saved values without server requests", async ({ page }) => {
   const control = await mock(page);
   await page.goto(`${origin}/#/settings?tab=dsp`);
-  await expect(page.getByRole("heading", { name: "本地音效", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "本地音效", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "输出设置", exact: true })).toBeVisible();
   await expect(page.getByText("音效在此浏览器处理，调整立即生效，无需重新播放。设置仅保存在本浏览器，按实例和账号区分。", { exact: true })).toHaveCount(0);
   await expect(page.getByText("服务端负责格式转换、转码及必要的声道转换；Web 播放不会重复应用服务端音效。", { exact: true })).toHaveCount(0);
   await expect(page.getByLabel("启用本地音效", { exact: true })).toBeChecked();
   await expect(page.locator(".dsp-chain > li")).toHaveCount(0);
-  const save = page.getByRole("button", { name: "保存", exact: true });
-  const revert = page.getByRole("button", { name: "撤销更改", exact: true });
+  const save = page.getByRole("region", { name: "本地音效", exact: true }).getByRole("button", { name: "保存", exact: true });
+  const revert = page.getByRole("region", { name: "本地音效", exact: true }).getByRole("button", { name: "撤销更改", exact: true });
   await expect(save).toBeDisabled();
   await expect(page.getByLabel("DSP Buffer 大小（帧）", { exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "添加效果", exact: true }).click();
@@ -53,10 +54,10 @@ test("local effects preview drafts, save explicitly, and restore saved values wi
   await page.getByRole("slider", { name: "调节 中心频率（Hz）", exact: true }).fill("2500");
   await expect(page.getByLabel("中心频率（Hz）", { exact: true })).toHaveValue("2500");
   await nodes.nth(0).getByLabel("启用 增益", { exact: true }).uncheck();
-  await expect(page.getByText("有未保存的更改", { exact: true })).toBeVisible();
+  await expect(page.getByRole("region", { name: "本地音效", exact: true }).getByText("有未保存的更改", { exact: true })).toBeVisible();
   expect(await page.evaluate((key) => localStorage.getItem(key), localStorageKey)).toBeNull();
   await save.click();
-  await expect(page.getByText("已保存", { exact: true })).toBeVisible();
+  await expect(page.getByRole("region", { name: "本地音效", exact: true }).getByText("已保存", { exact: true })).toBeVisible();
   await expect(save).toBeDisabled();
   const saved = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)!), localStorageKey);
   expect(saved).toMatchObject({ enabled: true, chain: [
@@ -111,14 +112,14 @@ test("effect cards retain parameters when collapsed and pointer order survives s
   await page.mouse.up();
   await expect(nodes.first().getByRole("button", { name: "展开 混响", exact: true })).toBeVisible();
   await expect(nodes.last().getByRole("button", { name: "展开 增益", exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "保存", exact: true }).click();
+  await page.getByRole("region", { name: "本地音效", exact: true }).getByRole("button", { name: "保存", exact: true }).click();
   await page.reload();
   await expect(nodes.first().getByRole("button", { name: "展开 混响", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "展开 增益", exact: true }).click();
   await expect(nodes.last().getByLabel("增益（dB）", { exact: true })).toHaveValue("-4");
   await page.getByRole("button", { name: "展开 混响", exact: true }).click();
   await page.getByRole("button", { name: "收起 混响", exact: true }).click();
-  await expect(page.getByRole("button", { name: "保存", exact: true })).toBeDisabled();
+  await expect(page.getByRole("region", { name: "本地音效", exact: true }).getByRole("button", { name: "保存", exact: true })).toBeDisabled();
   await page.screenshot({ path: info.outputPath("local-dsp-desktop.png") });
   await page.setViewportSize({ width: 390, height: 844 });
   await nodes.last().scrollIntoViewIfNeeded();
@@ -155,7 +156,7 @@ test("ten band equalizer supports presets, individual tuning, reset and saved mo
   await expect(preset).toBeHidden();
   await page.getByRole("button", { name: "展开 均衡器", exact: true }).click();
   await expect(page.getByRole("slider", { name: "调节 31 Hz", exact: true })).toHaveValue("6");
-  await page.getByRole("button", { name: "保存", exact: true }).click();
+  await page.getByRole("region", { name: "本地音效", exact: true }).getByRole("button", { name: "保存", exact: true }).click();
   await page.reload();
   await page.getByRole("button", { name: "展开 均衡器", exact: true }).click();
   await expect(page.getByRole("slider", { name: "调节 1000 Hz", exact: true })).toHaveValue("-3");
@@ -165,10 +166,10 @@ test("ten band equalizer supports presets, individual tuning, reset and saved mo
   const equalizerSliders = page.locator(".graphic-equalizer").getByRole("slider");
   await expect(equalizerSliders).toHaveCount(12);
   for (const slider of await equalizerSliders.all()) await expect(slider).toHaveValue("0");
-  await page.getByRole("button", { name: "撤销更改", exact: true }).click();
+  await page.getByRole("region", { name: "本地音效", exact: true }).getByRole("button", { name: "撤销更改", exact: true }).click();
   await expect(page.getByRole("slider", { name: "调节 31 Hz", exact: true })).toHaveValue("6");
   await preset.selectOption("rock");
-  await page.getByRole("button", { name: "保存", exact: true }).click();
+  await page.getByRole("region", { name: "本地音效", exact: true }).getByRole("button", { name: "保存", exact: true }).click();
   await page.reload();
   await page.getByRole("button", { name: "展开 均衡器", exact: true }).click();
   await expect(preset).toHaveValue("rock");
@@ -197,17 +198,17 @@ test("local parameters clamp on blur and report unavailable storage when saving"
   await page.getByLabel("增益（dB）", { exact: true }).fill("99");
   await page.getByLabel("选择效果", { exact: true }).focus();
   await expect(page.getByLabel("增益（dB）", { exact: true })).toHaveValue("12");
-  await page.getByRole("button", { name: "保存", exact: true }).click();
+  await page.getByRole("region", { name: "本地音效", exact: true }).getByRole("button", { name: "保存", exact: true }).click();
   await expect(page.getByText("本地存储不可用，当前设置仅在本次页面内保留，刷新后可能丢失。", { exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "保存", exact: true })).toBeEnabled();
+  await expect(page.getByRole("region", { name: "本地音效", exact: true }).getByRole("button", { name: "保存", exact: true })).toBeEnabled();
 });
 
 test("corrupt local settings can be replaced by saving the default configuration", async ({ page }) => {
   await mock(page);
   await page.addInitScript((key) => { if (localStorage.getItem(key) === null) localStorage.setItem(key, "{"); }, localStorageKey);
   await page.goto(`${origin}/#/settings?tab=dsp`);
-  const error = page.getByText("无法读取本地音效设置，已使用默认值。", { exact: true });
-  const save = page.getByRole("button", { name: "保存", exact: true });
+  const error = page.getByRole("region", { name: "本地音效", exact: true }).getByText("无法读取本地音效设置，已使用默认值。", { exact: true });
+  const save = page.getByRole("region", { name: "本地音效", exact: true }).getByRole("button", { name: "保存", exact: true });
   await expect(error).toBeVisible();
   await expect(page.locator(".dsp-chain > li")).toHaveCount(0);
   await expect(save).toBeEnabled(); await save.click();
@@ -241,9 +242,15 @@ test("touch handles reorder collapsed rows while touching a parameter leaves the
     await nodes.last().getByRole("button", { name: "展开 增益", exact: true }).click();
     const slider = nodes.last().getByRole("slider", { name: "调节 增益（dB）", exact: true });
     await slider.scrollIntoViewIfNeeded();
+    // CDP 触摸绕过 Playwright 的可操作性检查，先确认滚动后的滑杆稳定且未被导航遮挡。
+    await slider.click({ trial: true });
+    await expect.poll(() => slider.evaluate((element) => {
+      const box = element.getBoundingClientRect();
+      return document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2) === element;
+    })).toBe(true);
     const range = (await slider.boundingBox())!;
     await touch({ x: range.x + range.width / 2, y: range.y + range.height / 2 }, { x: range.x + range.width * 0.85, y: range.y + range.height / 2 });
-    expect(Number(await slider.inputValue())).toBeGreaterThan(0);
+    await expect.poll(async () => Number(await slider.inputValue())).toBeGreaterThan(0);
     await expect(nodes.first().getByRole("button", { name: "展开 混响", exact: true })).toBeVisible();
     await expect(nodes.last().getByRole("button", { name: "收起 增益", exact: true })).toBeVisible();
   } finally { await context.close(); }

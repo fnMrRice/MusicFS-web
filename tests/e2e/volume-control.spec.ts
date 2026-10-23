@@ -131,8 +131,8 @@ test('player and settings volumes stay synchronized and survive a server restart
   await slider(page).press('ArrowRight'); await percentage(page, '53%');
   await expect.poll(() => preferences(page)).toMatchObject({ volume: 0.53, lastVolume: 0.53 });
   await page.getByRole('button', { name: '设置', exact: true }).click();
-  await page.getByRole('tab', { name: '播放配置', exact: true }).click();
-  const settingsVolume = page.getByRole('tabpanel', { name: '播放配置', exact: true }).getByRole('slider', { name: '音量', exact: true });
+  await page.getByRole('navigation', { name: '设置分类', exact: true }).getByRole('button', { name: '播放配置', exact: true }).click();
+  const settingsVolume = page.getByRole('region', { name: '播放配置', exact: true }).getByRole('slider', { name: '音量', exact: true });
   await expect(settingsVolume).toHaveValue('0.53');
   await settingsVolume.fill('0.29'); await settingsVolume.focus();
   await expect(settingsVolume).toHaveAttribute('aria-valuetext', '29%');

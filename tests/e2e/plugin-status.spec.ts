@@ -22,6 +22,9 @@ async function mockPlugins(page: Page, snapshot: (url: URL) => unknown, online: 
     if (path.endsWith("/auth/session")) json = { csrfToken: "test", user: { id: "admin", role: "admin" } };
     if (path.endsWith("/admin/plugins")) json = snapshot(url);
     if (path.endsWith("/online-instances")) json = { items: online() };
+    if (path.endsWith("/configuration")) json = { revision: "test", roots: [] };
+    if (path.endsWith("/root-statistics")) json = { roots: [] };
+    if (path.endsWith("/scan-status")) json = { job: null };
     return route.fulfill({ json });
   });
 }
@@ -206,7 +209,7 @@ test("admins opt into all user instances and return to their own instances witho
   const entry = pluginEntry(card, plugin.id);
   await expect(allUsers).not.toBeChecked();
   await expect(entry.locator(".plugin-count")).toHaveText("1 个用户");
-  expect(scopes).toEqual([null]);
+  expect(scopes).toEqual([null, null]);
   await entry.locator("summary").click();
   await expect(entry.locator(".plugin-instance")).toHaveCount(1);
   await expect(entry.getByText("账号来源 · Alice", { exact: true })).toBeVisible();
@@ -221,14 +224,14 @@ test("admins opt into all user instances and return to their own instances witho
   await expect(alice).toContainText("admin");
   await expect(bob).toBeVisible();
   await expect(bob).toContainText("listener-b");
-  expect(scopes).toEqual([null, "true"]);
+  expect(scopes).toEqual([null, null, "true"]);
 
   await allUsers.uncheck();
   await expect(entry.locator(".plugin-count")).toHaveText("1 个用户");
   await expect(entry.locator(".plugin-instance")).toHaveCount(1);
   await expect(entry.getByText("账号来源 · Alice", { exact: true })).toBeVisible();
   await expect(entry.getByText("账号来源 · Bob", { exact: true })).toHaveCount(0);
-  expect(scopes).toEqual([null, "true", null]);
+  expect(scopes).toEqual([null, null, "true", null]);
 });
 
 test("missing counts stay hidden and plugins can provide zero with arbitrary units", async ({ page }) => {

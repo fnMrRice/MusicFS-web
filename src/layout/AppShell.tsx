@@ -33,6 +33,7 @@ export function AppShell() {
   const scroll = useRef<HTMLDivElement>(null);
   const content = useRef<HTMLDivElement>(null);
   const positions = useRef(new Map<string, number>());
+  const previousScrollPath = useRef<string | null>(null);
   const [account, setAccount] = useState(false);
   const [editingNickname, setEditingNickname] = useState(false);
   const nicknameWasOpen = useRef(false);
@@ -43,7 +44,11 @@ export function AppShell() {
   useLayoutEffect(() => {
     const root = scroll.current;
     if (!root) return;
-    const target = positions.current.get(location.key) ?? 0;
+    const sameSettingsPage = location.pathname === "/settings" && previousScrollPath.current === location.pathname;
+    previousScrollPath.current = location.pathname;
+    root.dataset.restoredScrollKey = !sameSettingsPage && positions.current.has(location.key) ? location.key : "";
+    const target = sameSettingsPage ? root.scrollTop : positions.current.get(location.key) ?? 0;
+    let position = target;
     let restored = false;
     const restore = () => {
       if (restored) return;
@@ -56,15 +61,19 @@ export function AppShell() {
     const cancel = () => {
       restored = true;
     };
+    // 路由卸载可能先缩短内容并截断 scrollTop，提前记录滚动位置供返回时恢复。
+    const remember = () => { if (restored) position = root.scrollTop; };
+    root.addEventListener("scroll", remember, { passive: true });
     root.addEventListener("wheel", cancel, { passive: true });
     root.addEventListener("pointerdown", cancel);
     return () => {
       observer.disconnect();
       root.removeEventListener("wheel", cancel);
       root.removeEventListener("pointerdown", cancel);
-      positions.current.set(location.key, restored ? root.scrollTop : target);
+      root.removeEventListener("scroll", remember);
+      positions.current.set(location.key, position);
     };
-  }, [location.key]);
+  }, [location.key, location.pathname]);
   useEffect(() => {
     const close = (e: PointerEvent) => {
       if (!accountRoot.current?.contains(e.target as Node)) setAccount(false);
