@@ -13,11 +13,17 @@ export function Modal({
 }) {
   useLocale();
   const ref = useRef<HTMLDialogElement>(null);
+  const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
+    const dialog = ref.current;
     const previous = document.activeElement as HTMLElement | null;
-    ref.current?.showModal();
+    dialog?.showModal();
+    // 默认聚焦标题，避免关闭按钮触发常驻提示；保留内容区自行指定的焦点。
+    if (heading.current?.parentElement?.contains(document.activeElement)) {
+      heading.current.focus({ preventScroll: true });
+    }
     return () => {
-      ref.current?.close();
+      dialog?.close();
       previous?.focus();
     };
   }, []);
@@ -34,7 +40,7 @@ export function Modal({
       }}
     >
       <div className="section-title">
-        <h2>{title}</h2>
+        <h2 ref={heading} tabIndex={-1}>{title}</h2>
         <IconButton icon="close" label={tr("关闭")} onClick={close} />
       </div>
       {children}
