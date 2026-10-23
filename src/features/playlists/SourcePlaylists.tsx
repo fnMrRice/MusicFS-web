@@ -6,6 +6,7 @@ import { useMusicSources, useSourceName } from "../../components/use-source-name
 import { Cover, Empty, ErrorNotice } from "../../components/ui";
 import { formatDate, tr, useLocale } from "../../i18n";
 import { ApiError } from "../../api/client";
+import { PublicPlaylistLink } from "./PublicPlaylistLink";
 
 export function SourcePlaylists() {
   const { instance = "" } = useParams();
@@ -29,6 +30,8 @@ export function SourcePlaylists() {
         ? <p className="notice">{tr("请先在设置中登录此音乐平台，再读取账号歌单。")}{" "}<Link to="/settings">{tr("设置")}</Link></p>
         : source.online?.availability === "offline" || source.provider?.availability === "offline"
           ? <p className="notice">{tr("来源暂时离线，请稍后重试。")}</p>
+          : source.online?.platform === "bilibili"
+            ? <PublicPlaylistLink instance={instance} />
           : !supported
             ? <p className="notice">{tr("此来源尚不支持读取账号歌单。")}</p>
             : <AccountPlaylists key={`${instance}:${revisions[instance] ?? 0}`} instance={instance} />}

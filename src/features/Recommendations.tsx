@@ -6,6 +6,7 @@ import { useResource } from "../components/query";
 import { Cover, Empty, ErrorNotice, IconButton } from "../components/ui";
 import { errorMessage } from "../api/client";
 import { useSourceName } from "../components/use-source-name";
+import { OnlinePlaylistTracks } from "./playlists/OnlinePlaylistTracks";
 export function Recommendations() {
   useLocale();
   const sourceName = useSourceName();
@@ -153,7 +154,7 @@ export function DiscoveryPlaylist() {
           </div>
           <p className="notice">
             {tr(
-              "打开歌单不会自动导入；当前在线来源不提供音频播放。曲目名称详情和完整浏览接口等待服务端完善。",
+              "打开歌单不会自动导入；播放能力由各来源提供。",
             )}
           </p>
           <p className="muted">
@@ -163,6 +164,7 @@ export function DiscoveryPlaylist() {
             {query.data.observedAt &&
               tr("观测时间：{0}", { "0": formatDate(query.data.observedAt) })}
           </p>
+          <OnlinePlaylistTracks instance={instance} external={external} />
         </>
       )}
       {message && (

@@ -7,6 +7,8 @@ export interface OnlineInstance {
   instanceId: string;
   name: string;
   platform: string;
+  authentication?: string;
+  sourceType?: "local" | "network";
   plugin?: PluginIdentity;
   accountId?: string;
   accountRevision?: string;
@@ -247,6 +249,14 @@ export class ContentApi {
       (r) => object(r.playlist) && string(r.playlist.title) && list(r.entries),
     );
   }
+  async playlistReference(instance: string, reference: string, signal?: AbortSignal): Promise<OnlinePlaylist> {
+    const query = new URLSearchParams({ kind: "playlists", q: reference.trim(), limit: "1" });
+    const result = await this.client.request<{ playlists: OnlinePlaylist[] }>(`/online-instances/${id(instance)}/search?${query}`, { signal });
+    if (!Array.isArray(result.playlists) || result.playlists.length !== 1 || !string(result.playlists[0].externalId)) {
+      throw new ApiError("INVALID_RESPONSE", "Invalid playlist reference");
+    }
+    return result.playlists[0];
+  }
   async playlists(
     after: string | null = null,
     signal?: AbortSignal,
@@ -329,6 +339,10 @@ export class ContentApi {
     instanceId: string,
     externalId: string,
   ): Promise<{ playlist: RemotePlaylist; merged: boolean }> {
+    const instances = await this.online();
+    if (instances.find((instance) => instance.instanceId === instanceId)?.authentication === "anonymous") {
+      return this.write("/remote-playlists", { instanceId, externalId, accountId: "" });
+    }
     const account = await this.client.request<{ state: string; accountId?: string }>(
       '/online-instances/' + id(instanceId) + '/account',
     );

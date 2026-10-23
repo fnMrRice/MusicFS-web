@@ -12,6 +12,7 @@ import { tr, useLocale } from "../i18n";
 import { pluginName } from "../components/source-name";
 import type { PluginIdentity } from "../api/types";
 import { PlatformAccount } from "./accounts/PlatformAccounts";
+import { Link } from "react-router-dom";
 
 export function MusicSources() {
   const { locale } = useLocale();
@@ -41,13 +42,19 @@ export function MusicSources() {
 
   return <div className="settings-card">
     <h3>{tr("音乐来源")}</h3>
-    <p className="muted">使用在线来源前请先登录对应音乐平台。登录不表示拥有会员或完整在线播放权限。</p>
+    <p className="muted">{tr("公开匿名来源无需平台账号；其他来源按提示登录。登录不代表拥有会员或完整播放权限。")}</p>
     <ErrorNotice error={providers.error} retry={providers.reload} />
     <ErrorNotice error={online.error} retry={online.reload} />
     {admin && <ErrorNotice error={plugins.error} retry={plugins.reload} />}
     {(providers.loading || online.loading) && <p>{tr("正在读取来源…")}</p>}
     {[...sources].map(([id, source]) => source.online
-      ? <PlatformAccount key={id} instance={source.online} />
+      ? source.online.authentication === "anonymous"
+        ? <section key={id} aria-label={sourceName(source.online)} style={{ marginBlock: 20 }}>
+          <h4>{sourceName(source.online)}</h4>
+          <p>{tr("匿名访问公开内容，无需平台登录。")}</p>
+          <Link to={`/search?source=${encodeURIComponent(id)}`}>{tr("打开链接或编号")}</Link>
+        </section>
+        : <PlatformAccount key={id} instance={source.online} />
       : admin && local.some((instance) => instance.instanceId === id)
         ? <LocalMusicSource key={id} instance={local.find((instance) => instance.instanceId === id)!}
           name={sourceName(source.provider!)} manage={(action) => choose(id, action)} />

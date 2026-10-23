@@ -5,6 +5,7 @@ export interface Ready { product: string; instanceId: string; apiVersion: string
 export interface AuthSession { user: { id: string; role: string }; csrfToken: string; expiresAt: string }
 export interface Provider {
   id: string; name: string; capabilities: string[]; availability: string; scanState?: string;
+  sourceType?: "local" | "network";
   plugin?: PluginIdentity;
   configuration?: { schemaRevision: string } | null;
   roots?: { id: string; name: string }[];

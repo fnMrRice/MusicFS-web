@@ -1,11 +1,12 @@
 import { tr, useLocale, formatDate } from "../../i18n";
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { useServices } from "../../app/services";
 import { usePages, useResource } from "../../components/query";
 import { ErrorNotice, Sentinel } from "../../components/ui";
 import { Modal } from "../../components/Modal";
 import { errorMessage } from "../../api/client";
-import type { RemotePlaylist, SyncJob } from "../../api/content";
+import type { Observation, RemotePlaylist, SyncJob } from "../../api/content";
 import { useSourceName } from "../../components/use-source-name";
 export function RemotePlaylists() {
   useLocale();
@@ -17,6 +18,7 @@ export function RemotePlaylists() {
   const [external, setExternal] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [preview, setPreview] = useState<Observation | null>(null);
   const providers = useResource("import-providers", (signal) =>
     s.content.online(signal),
   );
@@ -32,7 +34,9 @@ export function RemotePlaylists() {
     setBusy(true);
     setError(null);
     try {
-      await s.content.importRemote(instance, external);
+      const bilibili = providers.data?.find((p) => p.instanceId === instance)?.platform === "bilibili";
+      const canonical = bilibili ? (await s.content.playlistReference(instance, external)).externalId : external.trim();
+      await s.content.importRemote(instance, canonical);
       setVersion((v) => v + 1);
       setOpen(false);
     } catch (e) {
@@ -41,6 +45,17 @@ export function RemotePlaylists() {
       setBusy(false);
     }
   };
+  const showPreview = async () => {
+    setBusy(true);
+    setError(null);
+    setPreview(null);
+    try {
+      const canonical = (await s.content.playlistReference(instance, external)).externalId;
+      setPreview(await s.content.observation(instance, canonical));
+    } catch (e) { setError(errorMessage(e)); }
+    finally { setBusy(false); }
+  };
+  const bilibili = providers.data?.find((p) => p.instanceId === instance)?.platform === "bilibili";
   return (
     <section className="source-section">
       <div className="section-title">
@@ -84,13 +99,12 @@ export function RemotePlaylists() {
               <select
                 value={instance}
                 required
-                onChange={(e) => setInstance(e.target.value)}
+                onChange={(e) => { setInstance(e.target.value); setPreview(null); }}
               >
                 <option value="">{tr("选择来源")}</option>
                 {providers.data
                   ?.filter(
                     (p) =>
-                      p.platform === "netease" &&
                       p.capabilities.some(
                         (c) => c.name === "playlist.observe" && c.supported,
                       ),
@@ -106,16 +120,22 @@ export function RemotePlaylists() {
               {tr("平台歌单 ID")}
               <input
                 value={external}
-                onChange={(e) => setExternal(e.target.value)}
-                pattern="[1-9][0-9]{0,19}"
+                onChange={(e) => { setExternal(e.target.value); setPreview(null); }}
+                pattern={bilibili ? undefined : "[1-9][0-9]{0,19}"}
                 required
-                placeholder={tr("输入平台歌单 ID")}
+                placeholder={tr(bilibili ? "收藏夹链接、favorite:编号或 am 编号" : "输入平台歌单 ID")}
               />
             </label>
             <p className="muted">
               {tr("导入仅登记绑定；导入后请点击同步读取曲目。")}
             </p>
             <ErrorNotice error={error || providers.error} />
+            {bilibili && <>
+              <p className="muted">{tr("公开视频按全部分 P 展开；私有内容和登录暂不支持。")}</p>
+              <button type="button" disabled={busy || !external.trim()} onClick={() => void showPreview()}>{tr("预览")}</button>
+              {preview && <p role="status">{preview.playlist.title} · {tr("{0} 首", { 0: preview.entries.length })} · {tr(preview.complete ? "完整观测" : "观测不完整，已有快照不会被替换")} {" "}
+                <Link to={`/discover/${encodeURIComponent(instance)}/${encodeURIComponent(preview.playlist.externalId)}`}>{tr("查看曲目")}</Link></p>}
+            </>}
             <button className="primary" disabled={busy || !instance}>
               {busy ? tr("正在导入…") : tr("导入")}
             </button>

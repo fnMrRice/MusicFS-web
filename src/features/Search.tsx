@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useServices } from "../app/services";
 import { SearchHistory } from "./SearchHistory";
+import { OnlineAudioActions } from "./OnlineAudioActions";
 import { usePages, useResource } from "../components/query";
 import type { OnlineInstance } from "../api/content";
 import { useSourceName } from "../components/use-source-name";
@@ -185,7 +186,10 @@ function SearchSource({
       ) : provider.availability !== "available" ? (
         <p className="notice">{tr("来源暂时离线，请稍后重试。")}</p>
       ) : (
-        <SearchResults instance={provider.instanceId} query={query} />
+        <>
+          {provider.platform === "bilibili" && <p className="notice">{tr("输入公开视频 BV/AV、au 编号或完整链接；暂不支持关键词搜索。")}</p>}
+          <SearchResults instance={provider.instanceId} query={query} playable={provider.capabilities.some((c) => c.name === "stream.resolve" && c.supported)} />
+        </>
       )}
     </section>
   );
@@ -193,9 +197,11 @@ function SearchSource({
 function SearchResults({
   instance,
   query,
+  playable,
 }: {
   instance: string;
   query: string;
+  playable: boolean;
 }) {
   useLocale();
   const s = useServices();
@@ -222,19 +228,19 @@ function SearchResults({
         {selected.size > 0 && (
           <strong>{tr("已选择 {0} 首", { 0: selected.size })}</strong>
         )}
-        <button disabled title={tr("当前在线接口仅提供资料，不提供播放授权")}>
+        {!playable && <button disabled title={tr("当前在线接口仅提供资料，不提供播放授权")}>
           {tr("播放结果")}
-        </button>
-        <button disabled title={tr("等待在线曲目播放及完整结果解析能力")}>
+        </button>}
+        {!playable && <button disabled title={tr("等待在线曲目播放及完整结果解析能力")}>
           {tr("加入队列")}
-        </button>
+        </button>}
         {selected.size > 0 && (
           <button onClick={() => setSelected(new Set())}>
             {tr("清空选择")}
           </button>
         )}
         <span className="muted">
-          {tr("在线搜索结果仅供查看，播放能力尚未开放。")}
+          {tr(playable ? "点击播放后按需读取音频，无需等待完整下载。" : "在线搜索结果仅供查看，播放能力尚未开放。")}
         </span>
       </div>
       {!!page.items.length && (
@@ -261,6 +267,7 @@ function SearchResults({
                 <th>{tr("歌手")}</th>
                 <th>{tr("专辑")}</th>
                 <th>{tr("时长")}</th>
+                {playable && <th>{tr("操作")}</th>}
               </tr>
             </thead>
             <tbody>
@@ -290,6 +297,7 @@ function SearchResults({
                   <td>{t.artists.join(" / ") || "—"}</td>
                   <td>{t.album || "—"}</td>
                   <td>{duration(t.durationMs)}</td>
+                  {playable && <td><OnlineAudioActions instance={instance} external={t.externalId} title={t.title} /></td>}
                 </tr>
               ))}
             </tbody>
