@@ -55,6 +55,7 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
+  user-select: none;
 }
 .plugin-type-options > button,
 .plugin-type-options > label {

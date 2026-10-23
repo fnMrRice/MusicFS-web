@@ -168,6 +168,18 @@ test("shift-click selects only the clicked type and ordinary clicks restore mult
   await expect(types.locator('input:checked')).toHaveCount(2);
   await expect(search).toHaveValue("musicfs");
   await expectVisiblePlugins(card, [localPlugin.id, ncmPlugin.id, "musicfs.plugin.decoder.ffmpeg"]);
+
+  await musicLabel.click({ position: { x: labelBox!.width - 20, y: labelBox!.height / 2 } });
+  const codecLabel = types.locator("label").filter({ has: page.getByRole("checkbox", { name: "音频编解码", exact: true }) });
+  const codecBox = await codecLabel.boundingBox();
+  expect(codecBox).not.toBeNull();
+  await codecLabel.click({ modifiers: ["Shift"], position: { x: codecBox!.width - 20, y: codecBox!.height / 2 } });
+  await expectOnly(codec);
+  await expectVisiblePlugins(card, [ncmPlugin.id, "musicfs.plugin.decoder.ffmpeg"]);
+  expect(await page.evaluate(() => window.getSelection()?.toString() ?? "")).toBe("");
+  await musicLabel.click({ modifiers: ["Shift"], position: { x: labelBox!.width - 20, y: labelBox!.height / 2 } });
+  await expectOnly(music);
+  expect(await page.evaluate(() => window.getSelection()?.toString() ?? "")).toBe("");
 });
 
 test("plugin type help appears on hover, keyboard focus and click and dismisses with Escape", async ({ page }) => {
