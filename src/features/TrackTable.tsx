@@ -1,5 +1,5 @@
 import { tr, useLocale, statusText } from "../i18n";
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { SourceTrack, Provider } from "../api/types";
 import { useServices, useStore } from "../app/services";
 import { Cover, duration, ErrorNotice, Icon, IconButton } from "../components/ui";
@@ -11,10 +11,11 @@ import { MergeSongs } from "./matching/MergeSongs";
 import { TrackVersions } from "./matching/TrackVersions";
 import { RecordingCover } from "./matching/RecordingCover";
 import { useTrackCover } from "../components/use-track-cover";
+import { trackAvailabilityMessage, withProviderAvailability } from "../library/track-availability";
 import "./matching/matching.css";
 
 export function TrackTable({
-  tracks,
+  tracks: sourceTracks,
   providers = [],
   queryKey,
   complete = false,
@@ -31,6 +32,11 @@ export function TrackTable({
   useLocale();
   const sourceName = useSourceName();
   const s = useServices();
+  const cachedProviders = useStore(s.libraryApi.providerInstances);
+  const providerMap = useMemo(() => new Map([...providers, ...cachedProviders].map((p) => [p.id, p])), [cachedProviders, providers]);
+  const tracks = useMemo(() => sourceTracks.map((track) => withProviderAvailability(track, providerMap)), [sourceTracks, providerMap]);
+  const sourceTrackMap = useMemo(() => new Map(sourceTracks.flatMap((track) => [...(track.versions ?? []), track])
+    .map((track) => [track.sourceTrackId, track])), [sourceTracks]);
   const matchingPending = useStore(s.matchingDecisions.pending);
   const favorites = useStore(s.favorites);
   const [selected, setSelected] = useState(new Set<string>());
@@ -58,6 +64,7 @@ export function TrackTable({
     if (check.current) check.current.indeterminate = chosen.length > 0 && !all;
   }, [chosen.length, all]);
   const playable = tracks.filter((t) => t.availability === "available");
+  const chosenPlayable = chosen.filter((t) => t.availability === "available");
   function enqueue(items: SourceTrack[]) {
     s.enqueue(items);
     setMessage(
@@ -76,7 +83,8 @@ export function TrackTable({
     if (failure?.status === "rejected") setError(errorMessage(failure.reason));
     else setMessage(value ? "已收藏" : "已取消收藏");
   }
-  const menuPlayable = menu?.tracks.filter((track) => track.availability === "available") ?? [];
+  const menuPlayable = menu?.tracks.map((track) => withProviderAvailability(sourceTrackMap.get(track.sourceTrackId) ?? track, providerMap))
+    .filter((track) => track.availability === "available") ?? [];
   const menuFavorite = menu?.tracks.every((track) => s.favorites.has(track.sourceTrackId)) ?? false;
   const favoriteDisabled = favoriteBusy || favorites.pending.length > 0 || favorites.loading || !favorites.loaded;
   return (
@@ -85,7 +93,7 @@ export function TrackTable({
         {chosen.length ? (
           <>
             <strong>{tr("已选择 {0} 首", { 0: chosen.length })}</strong>
-            <button onClick={() => enqueue(chosen)}>{tr("加入队列")}</button>
+            <button disabled={!chosenPlayable.length} onClick={() => enqueue(chosenPlayable)}>{tr("加入队列")}</button>
             <button onClick={() => setAdd(chosen)}>{tr("添加到歌单")}</button>
             {onMatchingChange && <button disabled={chosen.length < 2 || matchingPending.length > 0} onClick={() => setMerge({ tracks: chosen, revision: matchingRevision })}>{tr("合并歌曲")}</button>}
             <button disabled={favoriteDisabled} onClick={() => void favorite(chosen, true)}>
@@ -314,11 +322,7 @@ function TrackRow({
             </button>}
             {t.availability !== "available" && (
               <small className="availability">
-                {t.availability === "offline"
-                  ? tr("来源离线")
-                  : t.availability === "missing"
-                    ? tr("文件缺失")
-                    : tr("可用性未知")}
+                {tr(trackAvailabilityMessage(t.availability))}
               </small>
             )}
           </div>

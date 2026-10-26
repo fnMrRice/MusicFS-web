@@ -1,4 +1,4 @@
-import { tr, useLocale, statusText } from "../i18n";
+import { tr, useLocale } from "../i18n";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useServices } from "../app/services";
@@ -10,7 +10,6 @@ import {
   Sentinel,
 } from "../components/ui";
 import { TrackTable } from "./TrackTable";
-import { scanStatusMessage } from "../library/scan-state";
 import { useSourceName } from "../components/use-source-name";
 import { Candidates } from "./matching/Candidates";
 import { MatchingRecovery } from "./matching/MatchingRecovery";
@@ -52,10 +51,6 @@ export function Library() {
     providers.reload();
     void state.refresh();
   };
-  const statuses = (providers.data ?? [])
-    .filter((p) => provider === "all" || p.id === provider)
-    .map((p) => [sourceName(p), scanStatusMessage(p)])
-    .filter(([, message]) => message);
   return (
     <section aria-label={tr("音乐文件")}>
       <div className="tabs" aria-label={tr("曲目分类")}>
@@ -137,11 +132,6 @@ export function Library() {
           </div>
           <ErrorNotice error={providers.error} retry={providers.reload} />
           <MatchingRecovery />
-          {statuses.map(([name, message]) => (
-            <p className="notice" key={name}>
-              {name}: {statusText(message ?? "")}
-            </p>
-          ))}
           {snapshot.items.length > 0 && (
             <TrackTable
               tracks={snapshot.items}

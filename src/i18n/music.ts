@@ -23,6 +23,8 @@ export default {
   "可在音乐库浏览本地曲目；在线来源需要在服务端配置。": ["Browse local tracks in your library. Online sources must be configured on the server.", "可在音樂庫瀏覽本機曲目；線上來源需於伺服器設定。", "ライブラリでローカル曲を閲覧できます。オンラインソースはサーバーで設定してください。"],
   "在线来源": ["Online source", "線上來源", "オンラインソース"],
   "来源离线": ["Source offline", "來源離線", "ソースがオフラインです"],
+  "来源不可用": ["Source unavailable", "來源不可用", "ソースを利用できません"],
+  "来源需要登录": ["Source sign-in required", "來源需要登入", "ソースへのログインが必要です"],
   "此来源尚不支持曲目搜索。": ["This source does not support track search yet.", "此來源尚不支援曲目搜尋。", "このソースは曲検索に未対応です。"],
   "来源暂时离线，请稍后重试。": ["This source is offline. Try again later.", "來源暫時離線，請稍後重試。", "ソースはオフラインです。後でもう一度お試しください。"],
   "已选择 {0} 首": ["{0} tracks selected", "已選擇 {0} 首", "{0} 曲を選択中"],

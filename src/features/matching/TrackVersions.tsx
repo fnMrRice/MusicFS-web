@@ -9,6 +9,7 @@ import { useResource } from "../../components/query";
 import { tr, useLocale } from "../../i18n";
 import { useDecision } from "./useDecision";
 import { TrackDetails } from "./TrackDetails";
+import { trackAvailabilityMessage } from "../../library/track-availability";
 
 export function TrackVersions({ tracks, revision, refresh, recordingId, defaultSourceTrackId, manualSourceTrackId, openActions }: {
   tracks: SourceTrack[]; revision?: number; refresh?: () => void;
@@ -49,7 +50,9 @@ export function TrackVersions({ tracks, revision, refresh, recordingId, defaultS
           openActions(track, rect.left, rect.bottom, origin);
         }
       } : undefined}>
-      <span className="track-version-name">{track.displayName}</span>
+      <span className="track-version-name">{track.displayName}
+        {track.availability !== "available" && <small className="availability">{tr(trackAvailabilityMessage(track.availability))}</small>}
+      </span>
       {track.sourceTrackId === defaultSourceTrackId && <span className="track-version-default">
         {tr(manualSourceTrackId === track.sourceTrackId ? "手动默认" : "自动默认")}
       </span>}
