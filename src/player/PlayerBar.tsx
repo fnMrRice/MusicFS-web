@@ -239,7 +239,7 @@ export function PlayerBar() {
           {panel === "queue" ? (
             <>
               <p className="muted">
-                {tr("当前浏览器会话 · {0} 首", { 0: q.items.length })}
+                {tr("临时播放列表 · {0} 首", { 0: q.items.length })}
               </p>
               {q.items.length ? (
                 <ol className="queue-list">
