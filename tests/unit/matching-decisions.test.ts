@@ -58,6 +58,37 @@ describe("Session-owned matching decisions", () => {
     decisions.setSession("other-server", "alice"); expect(decisions.pending.value).toEqual([]);
     decisions.setSession("server", "alice"); expect(decisions.pending.value[0]).toMatchObject({ key: "alice-key", status: "uncertain" });
   });
+  it("restores a batch selection and retries its exact scope and exclusions", async () => {
+    storage();
+    const selection: MatchingRequest = { kind: "links", expectedRevision: 2, targetRecordingId: null,
+      selection: { batch: true, exclude: ["excluded"], providerInstanceId: "local", groupBy: "recording", libraryRevision: "7", matchingRevision: 2 } };
+    const fetcher = vi.fn<typeof fetch>().mockRejectedValueOnce(new Error("Disconnected")).mockResolvedValueOnce(Response.json(result));
+    const api = new MatchingApi(new ApiClient(fetcher));
+    const original = new MatchingDecisions(api, vi.fn()); original.setSession("server", "alice");
+    await expect(original.submit(selection, "batch-key")).rejects.toMatchObject({ code: "NETWORK_ERROR" });
+    const restored = new MatchingDecisions(api, vi.fn()); restored.setSession("server", "alice");
+    expect(restored.pending.value).toEqual([{ key: "batch-key", request: selection, status: "uncertain" }]);
+    await restored.submit({ ...selection, expectedRevision: 99 }, "batch-key");
+    expect(fetcher.mock.calls[1][1]?.body).toBe(fetcher.mock.calls[0][1]?.body);
+    expect(new Headers(fetcher.mock.calls[1][1]?.headers).get("Idempotency-Key")).toBe("batch-key");
+  });
+  it("rejects persisted matching requests with mixed or malformed batch selectors", () => {
+    const saved = storage();
+    const invalid = [
+      { ...request, selection: { batch: true, exclude: [] } },
+      { kind: "links", expectedRevision: 2, targetRecordingId: null, selection: { batch: true, sourceTrackIds: ["a"] } },
+      { kind: "links", expectedRevision: 2, targetRecordingId: null, selection: { batch: true, exclude: [5] } },
+      { kind: "links", expectedRevision: 2, targetRecordingId: null, selection: { batch: false, sourceTrackIds: [] } },
+      ...[undefined, "-1", "01", "1.5", "9223372036854775808"].map((libraryRevision) => ({
+        kind: "links", expectedRevision: 2, targetRecordingId: null, selection: { batch: true, libraryRevision },
+      })),
+      { kind: "links", expectedRevision: 2, targetRecordingId: null, selection: { batch: true, libraryRevision: "1", groupBy: "recording" } },
+    ];
+    saved.set("musicfs:server:alice:matching-decisions", JSON.stringify(invalid.map((value, index) => ({ key: `invalid-${index}`, request: value, status: "uncertain" }))));
+    const decisions = new MatchingDecisions(new MatchingApi(new ApiClient(vi.fn())), vi.fn());
+    decisions.setSession("server", "alice");
+    expect(decisions.pending.value).toEqual([]);
+  });
   it.each(["manual-version", null])("restores and confirms a default-source change after refresh (%s)", async (sourceTrackId) => {
     storage();
     const selection: MatchingRequest = { kind: "default-source", expectedRevision: 2, recordingId: "recording", sourceTrackId };

@@ -154,6 +154,7 @@ test("a merge continues after back navigation and refreshes the cached library",
     return false;
   });
   await page.goto(`${origin}/#/settings`);
+  await page.getByRole("button", { name: "展开作品库", exact: true }).click();
   await page.getByRole("link", { name: "曲目列表", exact: true }).click();
   await page.getByRole("checkbox", { name: "选择 Alpha", exact: true }).check();
   await page.getByRole("checkbox", { name: "选择 Beta", exact: true }).check();

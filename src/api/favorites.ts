@@ -1,5 +1,6 @@
 import { ApiClient, ApiError } from "./client";
 import type { SourceTrack } from "./types";
+import { TrackSelectionApi, type TrackSelection } from "./track-selection";
 
 export interface FavoriteEntry { track: SourceTrack; recordedAt: string }
 export interface FavoritePage { items: FavoriteEntry[]; nextCursor: string | null; revision: string }
@@ -18,6 +19,9 @@ function entry(value: unknown): value is FavoriteEntry {
 
 export class FavoritesApi {
   constructor(private client: ApiClient) {}
+  batch(selection: TrackSelection, favorite: boolean, signal?: AbortSignal) {
+    return new TrackSelectionApi(this.client).favorite(selection, favorite, signal);
+  }
   async page(cursor: string | null = null, signal?: AbortSignal): Promise<FavoritePage> {
     const params = new URLSearchParams({ limit: "100" });
     if (cursor) params.set("cursor", cursor);

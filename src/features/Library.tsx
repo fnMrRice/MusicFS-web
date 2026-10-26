@@ -137,11 +137,15 @@ export function Library() {
               tracks={snapshot.items}
               providers={providers.data ?? []}
               queryKey={`${provider}:${revision}`}
+              selectionKey={`${provider}:${revision}:${snapshot.revision}:${snapshot.matchingRevision ?? ""}`}
               matchingRevision={snapshot.matchingRevision}
               onMatchingChange={snapshot.matchingRevision !== undefined ? refresh : undefined}
               complete={
                 !snapshot.cursor && !snapshot.loading && !snapshot.error
               }
+              pagination={{ loading: snapshot.loading, hasMore: !!snapshot.cursor, error: snapshot.error, more: () => state.more() }}
+              selectionScope={{ providerInstanceId: provider === "all" ? undefined : provider, groupBy: "recording",
+                libraryRevision: snapshot.revision ?? undefined, matchingRevision: snapshot.matchingRevision }}
             />
           )}
           <ErrorNotice

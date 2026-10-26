@@ -7,11 +7,68 @@ import { deferred, track } from "../../fixtures/dto";
 const entry = (id: string, title = id): FavoriteEntry => ({ track: { ...track, sourceTrackId: id, title }, recordedAt: "2026-10-22T10:00:00Z" });
 const page = (ids: string[], nextCursor: string | null = null, revision = "1"): FavoritePage => ({ items: ids.map((id) => entry(id)), nextCursor, revision });
 function fixture() {
-  const api = { page: vi.fn().mockResolvedValue(page([])), add: vi.fn().mockImplementation(async (id: string) => entry(id)), remove: vi.fn().mockResolvedValue(undefined) };
+  const api = { page: vi.fn().mockResolvedValue(page([])), add: vi.fn().mockImplementation(async (id: string) => entry(id)), remove: vi.fn().mockResolvedValue(undefined),
+    batch: vi.fn().mockResolvedValue({ affected: 1, sourceTrackIds: ["bulk"] }) };
   const state = new FavoritesState(api); state.setSession("server", "user");
   return { api, state };
 }
 describe("Personal favorites state", () => {
+  it("keeps batch writes in the session and serializes a later individual toggle", async () => {
+    const { api, state } = fixture();
+    const pending = deferred<{ affected: number; sourceTrackIds: string[] }>();
+    api.batch.mockReturnValueOnce(pending.promise);
+    const batch = state.setBatch({ batch: true, libraryRevision: "1" }, true, []);
+    const remove = state.setFavorite(entry("bulk").track, false);
+    await vi.waitFor(() => expect(api.batch).toHaveBeenCalledOnce());
+    expect(api.remove).not.toHaveBeenCalled();
+    pending.resolve({ affected: 1, sourceTrackIds: ["bulk"] });
+    await batch; await remove;
+    expect(state.has("bulk")).toBe(false);
+    expect(state.value.pending).toEqual([]);
+  });
+  it("discards an old session's late bulk response", async () => {
+    const { api, state } = fixture();
+    const pending = deferred<{ affected: number; sourceTrackIds: string[] }>();
+    api.batch.mockReturnValueOnce(pending.promise);
+    const batch = state.setBatch({ batch: true, libraryRevision: "1" }, true, []);
+    await vi.waitFor(() => expect(api.batch).toHaveBeenCalledOnce());
+    const signal = api.batch.mock.calls[0][2] as AbortSignal;
+    state.setSession("server", "other");
+    expect(signal.aborted).toBe(true);
+    pending.resolve({ affected: 1, sourceTrackIds: ["bulk"] }); await batch;
+    expect(state.has("bulk")).toBe(false);
+    expect(state.value.pending).toEqual([]);
+  });
+  it("applies bulk IDs without fetching metadata and refreshes lazily on the next view", async () => {
+    const { api, state } = fixture();
+    await state.load();
+    state.applyBatch(["loaded", "unloaded"], true, [entry("loaded").track]);
+    expect(api.page).toHaveBeenCalledTimes(1);
+    expect(state.has("loaded")).toBe(true);
+    expect(state.has("unloaded")).toBe(true);
+    expect(state.value.items.map((track) => track.sourceTrackId)).toEqual(["loaded"]);
+    await state.setFavorite(entry("unloaded").track, false);
+    expect(state.has("unloaded")).toBe(false);
+    api.page.mockResolvedValueOnce(page(["loaded"]));
+    await state.load();
+    expect(api.page).toHaveBeenCalledTimes(2);
+    state.setSession("server", "another-user");
+    expect(state.has("loaded")).toBe(false);
+  });
+  it("does not overwrite confirmed bulk IDs with a previously started collection read", async () => {
+    const { api, state } = fixture();
+    const pending = deferred<FavoritePage>();
+    api.page.mockReturnValueOnce(pending.promise);
+    const loading = state.load();
+    state.applyBatch(["added"], true, []);
+    state.applyBatch(["removed"], false, []);
+    pending.resolve(page(["removed"])); await loading;
+    expect(state.has("added")).toBe(true);
+    expect(state.has("removed")).toBe(false);
+    api.page.mockResolvedValueOnce(page(["added"]));
+    await state.load();
+    expect(state.value.items.map((track) => track.sourceTrackId)).toEqual(["added"]);
+  });
   it("loads every page atomically, deduplicates requests and preserves distinct source versions", async () => {
     const { api, state } = fixture();
     const more = deferred<FavoritePage>();

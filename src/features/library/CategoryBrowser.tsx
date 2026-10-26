@@ -134,7 +134,8 @@ function CategoryDetail({ api, kind, provider, id, query, refresh, providers, na
       <CategoryCollection key={`${id}:${refresh}`} api={api} kind={kind} provider={provider} parentId={id} providers={providers} navigate={navigate} />
     </section>}
     {pages.items.length > 0 && <TrackTable tracks={pages.items} providers={providers} queryKey={scope}
-      complete={!pages.cursor && !pages.loading && !pages.error} />}
+      complete={!pages.cursor && !pages.loading && !pages.error}
+      pagination={{ loading: pages.loading, hasMore: !!pages.cursor, error: pages.error, more: pages.more }} />}
     <ErrorNotice error={pages.error} retry={pages.retry} />
     {pages.loading && <p className="loading" role="status">{tr("正在加载…")}</p>}
     {!pages.loading && !pages.error && !pages.items.length && <Empty title={tr("没有找到相关曲目")} />}

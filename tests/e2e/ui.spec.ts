@@ -71,7 +71,7 @@ test('real shell, custom transport, themes and playlist writes survive route cha
   expect(errors).toEqual([]); await logout(page); await expect(page.locator('audio')).toHaveCount(0);
 });
 
-test('mock 1000-row cursor selection and retry do not auto-select appended rows', async ({ page }) => {
+test('mock 1000-row cursor selection survives retries and selects appended rows', async ({ page }) => {
   let failed = false; const requests: string[] = [];
   await page.route('**/api/v1/source-tracks?**', async route => {
     const cursor = new URL(route.request().url()).searchParams.get('cursor'); requests.push(cursor ?? 'first');
@@ -80,15 +80,16 @@ test('mock 1000-row cursor selection and retry do not auto-select appended rows'
     await route.fulfill({ json: { items: Array.from({ length: 100 }, (_, n) => ({ ...track, sourceTrackId: `mock-${offset + n}`, displayName: `Mock ${offset + n}` })), nextCursor: offset < 900 ? `c${offset + 100}` : null, libraryRevision: 'mock-1' } });
   });
   await login(page, server); await expect(page.locator('tbody tr')).toHaveCount(100);
-  const selectAll = page.getByRole('checkbox', { name: '全选当前已返回曲目' }); await selectAll.check();
+  const selectAll = page.getByRole('checkbox', { name: '全选曲目' }); await selectAll.check();
   await page.locator('#page-scroll').evaluate(e => { e.scrollTop = e.scrollHeight; });
   await expect(page.getByRole('alert')).toBeVisible(); expect(requests.filter(c => c === 'c100')).toHaveLength(1);
   await page.getByRole('button', { name: '重试', exact: true }).click();
   await expect(page.locator('tbody tr')).toHaveCount(200);
-  await expect(selectAll).toBeChecked({ indeterminate: true });
-  await expect(page.getByRole('checkbox', { name: '选择 Mock 100', exact: true })).not.toBeChecked();
+  await expect(selectAll).toBeChecked();
+  await expect(page.getByRole('checkbox', { name: '选择 Mock 100', exact: true })).toBeChecked();
   for (let n = 300; n <= 1000; n += 100) { await page.locator('#page-scroll').evaluate(e => { e.scrollTop = e.scrollHeight; }); await expect(page.locator('tbody tr')).toHaveCount(n); }
-  await expect(page.getByText('已选择 100 首', { exact: true })).toBeVisible(); await expect(page.locator('audio')).toHaveCount(0);
+  await expect(page.getByRole('checkbox', { name: '选择 Mock 999', exact: true })).toBeChecked();
+  await expect(page.locator('table.tracks tbody input:checked')).toHaveCount(1000); await expect(page.locator('audio')).toHaveCount(0);
   expect(requests.filter(c => c === 'c200')).toHaveLength(1);
   await expect(page.getByRole('button', { name: '加载更多' })).toHaveCount(0);
   await page.getByRole('button', { name: '刷新列表' }).click();
