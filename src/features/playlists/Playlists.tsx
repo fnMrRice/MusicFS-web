@@ -46,19 +46,10 @@ export function Playlists() {
   }, [params]);
   return (
     <section>
-      <div className="section-title">
-        <div>
-          <p className="eyebrow">{tr("MADE BY YOU")}</p>
-          <h2>{tr("把喜欢，收藏成一张歌单。")}</h2>
-        </div>
-        <button className="primary" onClick={() => setParams({ new: "1" })}>
-          <Icon name="plus" size={16} />
-          {tr("新建歌单")}
-        </button>
-      </div>
-      <p className="muted">
-        {tr("将本地曲目、远程歌单与个人歌单按顺序聚合。")}
-      </p>
+      <button className="primary playlist-create" onClick={() => setParams({ new: "1" })}>
+        <Icon name="plus" size={16} />
+        {tr("新建歌单")}
+      </button>
       <div className="cards">
         {page.items.map((p) => (
           <Link

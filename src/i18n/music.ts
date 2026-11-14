@@ -114,8 +114,6 @@ export default {
   "目标歌单": ["Target playlist", "目標歌單", "追加先のプレイリスト"],
   "歌单名称": ["Playlist name", "歌單名稱", "プレイリスト名"],
   "我的歌单": ["My playlists", "我的歌單", "マイプレイリスト"],
-  "把喜欢，收藏成一张歌单。": ["Turn your favorites into a playlist.", "把喜歡，收藏成一張歌單。", "お気に入りを、ひとつのプレイリストに。"],
-  "将本地曲目、远程歌单与个人歌单按顺序聚合。": ["Combine local tracks, remote playlists, and your own playlists in order.", "將本機曲目、遠端歌單與個人歌單依序彙整。", "ローカル曲、リモートプレイリスト、自分のプレイリストを順番にまとめます。"],
   "创建你的第一张歌单": ["Create your first playlist", "建立你的第一張歌單", "最初のプレイリストを作ろう"],
   "在曲目列表中勾选音乐，即可添加到歌单。": ["Select tracks in your library to add them to a playlist.", "在曲目清單中勾選音樂，即可加入歌單。", "曲目一覧で音楽を選んでプレイリストに追加できます。"],
   "创建歌单": ["Create playlist", "建立歌單", "プレイリストを作成"],

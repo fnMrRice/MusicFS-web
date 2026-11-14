@@ -1,6 +1,5 @@
 // Each entry contains English, Traditional Chinese, and Japanese.
 export default {
-  "MADE BY YOU": ["MADE BY YOU", "由你打造", "あなただけのプレイリスト"],
   "语言": ["Language", "語言", "言語"],
   "跟随浏览器": ["Follow browser", "跟隨瀏覽器", "ブラウザーに合わせる"],
   "语言偏好保存在当前浏览器，对登录页和所有账号生效。": ["Your language preference is saved in this browser and applies to the sign-in page and all accounts.", "語言偏好儲存在目前瀏覽器，適用於登入頁和所有帳號。", "言語設定はこのブラウザーに保存され、ログイン画面とすべてのアカウントに適用されます。"],
