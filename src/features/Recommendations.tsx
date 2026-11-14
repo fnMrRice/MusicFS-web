@@ -17,16 +17,7 @@ export function Recommendations() {
   );
   return (
     <section>
-      <div className="hero">
-        <div>
-          <p className="eyebrow">{tr("A LITTLE DISCOVERY, EVERY DAY")}</p>
-          <h2>{tr("让好音乐，不期而遇。")}</h2>
-          <p>{tr("来自你所连接来源的歌单推荐。")}</p>
-        </div>
-        <div className="hero-record" aria-hidden="true" />
-      </div>
-      <div className="section-title">
-        <h2>{tr("为你发现")}</h2>
+      <div className="recommendation-actions">
         <IconButton
           icon="refresh"
           label={tr("刷新推荐")}
@@ -83,8 +74,7 @@ export function Recommendations() {
         </section>
       ))}
       {query.data?.length === 0 && (
-        <Empty title={tr("先从你的音乐库开始")} icon="home">
-          {tr("尚未配置可用的推荐来源。")}
+        <Empty title={tr("尚未配置可用的推荐来源。")} icon="home">
           <p>
             <Link className="button primary" to="/library">
               {tr("浏览音乐库")}

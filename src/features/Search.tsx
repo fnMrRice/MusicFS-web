@@ -44,11 +44,6 @@ export function Search() {
     ) ?? [];
   return (
     <section>
-      <div className="search-heading">
-        <p className="eyebrow">{tr("FIND YOUR NEXT FAVORITE")}</p>
-        <h2>{tr("寻找此刻想听的音乐")}</h2>
-        <p className="muted">{tr("探索已连接的音乐来源。")}</p>
-      </div>
       <form
         className="search-form"
         onSubmit={(e) => {
@@ -141,10 +136,7 @@ export function Search() {
           )}
         </Empty>
       ) : !q ? (
-        <Empty title={tr("从一个名字开始")} icon="search">
-          {tr("输入歌曲或歌手名称，按 Enter 开始搜索。")}
-          <p>{tr("本地音乐库关键词搜索仍待服务端支持。")}</p>
-        </Empty>
+        <p className="muted">{tr("本地音乐库关键词搜索仍待服务端支持。")}</p>
       ) : !providers.loading && !providers.error && !sources.length ? (
         <Empty title={tr("暂无在线搜索来源")} icon="search">
           {tr("可在音乐库浏览本地曲目；在线来源需要在服务端配置。")}
