@@ -187,14 +187,30 @@
 .volume-slider:focus-within .volume-value {
   display: block;
 }
-.player-panel {
+.player-panels {
+  --panel-bottom: 115px;
+  --panel-height: min(65dvh, calc(100dvh - var(--panel-bottom) - 12px));
   position: absolute;
-  z-index: 2;
-  bottom: 115px;
+  z-index: 3;
+  bottom: var(--panel-bottom);
   right: 20px;
-  width: min(420px, calc(100vw - 40px));
-  max-height: 65vh;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 420px);
+  align-items: end;
+  gap: 12px;
+  width: max-content;
+  max-width: calc(100% - 40px);
+  max-height: var(--panel-height);
+  pointer-events: none;
+}
+.player-panel {
+  min-width: 0;
+  min-height: 0;
+  max-height: var(--panel-height);
   overflow: auto;
+  overscroll-behavior: contain;
+  pointer-events: auto;
   padding: 20px 24px;
   border: 1px solid var(--line);
   border-radius: 14px;
@@ -295,6 +311,15 @@
   }
 }
 @media (max-width: 850px) {
+  .player-panels {
+    display: flex;
+    flex-direction: column;
+    width: 420px;
+  }
+  .player-panel { width: 100%; }
+  .player-panel:not(:only-child) {
+    max-height: calc((var(--panel-height) - 12px) / 2);
+  }
   .time {
     display: none;
   }
@@ -339,8 +364,8 @@
   .now-playing .player-status {
     display: none;
   }
-  .player-panel {
-    bottom: 148px;
+  .player-panels {
+    --panel-bottom: 148px;
   }
   .playback-message {
     bottom: 145px;

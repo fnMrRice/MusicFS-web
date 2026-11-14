@@ -111,12 +111,17 @@ test('refresh restores a pinned empty queue without requiring a current track', 
   expect(creates).toEqual([]); expect(errors).toEqual([]);
 });
 
-test('temporary lyrics restores a visible pinned queue but respects an explicitly hidden queue', async ({ page }) => {
+test('temporary lyrics shares the pinned queue and closes independently', async ({ page }) => {
   const { creates, errors } = await setup(page);
   await play(page); await pinQueue(page);
   await lyrics(page).click();
-  await expect(panel(page).locator('.lyrics')).toHaveText('Alpha 第一行\nAlpha 第二行');
-  await close(page).click(); await expectQueue(page);
+  const lyricsDialog = page.getByRole('dialog', { name: '歌词', exact: true });
+  await expect(lyricsDialog.locator('.lyrics')).toHaveText('Alpha 第一行\nAlpha 第二行');
+  await expectQueue(page);
+  await page.getByRole('heading', { name: '播放队列', exact: true }).click();
+  await expect(lyricsDialog).toBeVisible();
+  await lyricsDialog.getByRole('button', { name: '关闭面板' }).click();
+  await expect(lyricsDialog).toHaveCount(0); await expectQueue(page);
   await queue(page).click(); await expect(panel(page)).toHaveCount(0);
   await lyrics(page).click();
   await expect(panel(page).getByRole('heading', { name: '歌词', exact: true })).toBeVisible();
@@ -126,25 +131,42 @@ test('temporary lyrics restores a visible pinned queue but respects an explicitl
   expect(creates).toEqual(['Alpha']); expect(errors).toEqual([]);
 });
 
-test('pinned queue and lyrics can take turns in the panel without restarting playback', async ({ page }) => {
+test('both pinned panels stay visible and fit together on desktop and mobile', async ({ page }) => {
   const { creates, errors } = await setup(page);
   await play(page); const audio = page.locator('audio'), original = await audio.elementHandle();
   const source = await audio.getAttribute('src');
   await pinQueue(page); await lyrics(page).click();
   await page.getByRole('button', { name: '固定歌词', exact: true }).click();
   await expect.poll(() => preferences(page)).toMatchObject({ queuePinned: true, lyricsPinned: true });
-  for (let iteration = 0; iteration < 2; iteration++) {
-    await queue(page).click(); await expectQueue(page);
-    await expect(queue(page)).toHaveAttribute('aria-pressed', 'true');
-    await expect(lyrics(page)).toHaveAttribute('aria-pressed', 'false');
-    await lyrics(page).click();
-    await expect(panel(page).getByRole('heading', { name: '歌词', exact: true })).toBeVisible();
-    await expect(lyrics(page)).toHaveAttribute('aria-pressed', 'true');
-    await expect(queue(page)).toHaveAttribute('aria-pressed', 'false');
+  const queueDialog = page.getByRole('dialog', { name: '播放队列', exact: true });
+  const lyricsDialog = page.getByRole('dialog', { name: '歌词', exact: true });
+  await outside(page);
+  await expect(queue(page)).toHaveAttribute('aria-pressed', 'true');
+  await expect(lyrics(page)).toHaveAttribute('aria-pressed', 'true');
+  await expect(queue(page)).toHaveAttribute('aria-controls', (await queueDialog.getAttribute('id'))!);
+  await expect(lyrics(page)).toHaveAttribute('aria-controls', (await lyricsDialog.getAttribute('id'))!);
+  for (const viewport of [{ width: 1200, height: 900 }, { width: 390, height: 844 }]) {
+    await page.setViewportSize(viewport);
+    await expect(queueDialog).toBeInViewport({ ratio: 1 });
+    await expect(lyricsDialog).toBeInViewport({ ratio: 1 });
+    await expect(queueDialog.getByRole('button', { name: 'Alpha.wav' })).toBeInViewport();
+    await expect(lyricsDialog.locator('.lyrics')).toBeInViewport();
+    const a = (await queueDialog.boundingBox())!, b = (await lyricsDialog.boundingBox())!;
+    expect(a.x + a.width <= b.x || b.x + b.width <= a.x || a.y + a.height <= b.y || b.y + b.height <= a.y).toBe(true);
   }
-  await close(page).click(); await expectQueue(page);
+  await queueDialog.getByRole('button', { name: '关闭面板' }).focus();
+  await page.keyboard.press('Escape');
+  await expect(queueDialog).toHaveCount(0); await expect(lyricsDialog).toBeVisible();
+  await queue(page).click(); await expectQueue(page); await expect(lyricsDialog).toBeVisible();
   expect(await original!.evaluate((element) => element === document.querySelector('audio'))).toBe(true);
   expect(await audio.getAttribute('src')).toBe(source); expect(creates).toEqual(['Alpha']); expect(errors).toEqual([]);
+  await page.reload();
+  await expectQueue(page); await expect(lyrics(page)).toBeDisabled();
+  await play(page); await expect(lyricsDialog).toBeVisible(); await expectQueue(page);
+  await page.getByRole('button', { name: '取消固定播放队列' }).click();
+  await expect(queueDialog).toBeVisible(); await expect(lyricsDialog).toBeVisible();
+  await page.getByRole('button', { name: '取消固定歌词' }).click();
+  await expect(lyricsDialog).toBeVisible(); await expect(queueDialog).toHaveCount(0);
 });
 
 async function tooltipGeometry(page: Page, info: TestInfo, label: string, input: 'mouse' | 'keyboard', name: string) {

@@ -66,12 +66,13 @@ async function play(page: Page, name = 'Alpha'): Promise<void> {
   await page.getByRole('button', { name: `播放 ${name}.wav`, exact: true }).click(); await waitPlaying(page);
 }
 async function expectLyrics(page: Page, name = 'Alpha'): Promise<void> {
-  await expect(panel(page).getByRole('heading', { name: '歌词', exact: true })).toBeVisible();
-  await expect(panel(page).locator('.lyrics')).toHaveText(`${name} 第一行\n${name} 第二行`);
-  await expect(panel(page).locator('.media-artwork')).toHaveCount(0);
-  await expect(panel(page)).not.toContainText('暂无歌词');
-  await expect(panel(page)).not.toContainText('此曲目暂无可用歌词。');
-  await expect(panel(page)).not.toContainText('展示当前来源已选用的歌词；暂不进行逐句定位。');
+  const dialog = page.getByRole('dialog', { name: '歌词', exact: true });
+  await expect(dialog.getByRole('heading', { name: '歌词', exact: true })).toBeVisible();
+  await expect(dialog.locator('.lyrics')).toHaveText(`${name} 第一行\n${name} 第二行`);
+  await expect(dialog.locator('.media-artwork')).toHaveCount(0);
+  await expect(dialog).not.toContainText('暂无歌词');
+  await expect(dialog).not.toContainText('此曲目暂无可用歌词。');
+  await expect(dialog).not.toContainText('展示当前来源已选用的歌词；暂不进行逐句定位。');
   await expect(lyrics(page)).toHaveAttribute('aria-expanded', 'true');
 }
 async function openPinned(page: Page): Promise<void> {
@@ -95,6 +96,12 @@ test('lyrics has the renamed entry and temporary panels close on outside clicks'
   const audio = page.locator('audio'), source = await audio.getAttribute('src');
   await lyrics(page).click(); await expectLyrics(page);
   await expect(page.getByRole('button', { name: '固定歌词', exact: true })).toBeVisible();
+  await queue(page).click();
+  await expect(page.getByRole('dialog', { name: '播放队列' })).toBeVisible();
+  await expect(lyrics(page)).toHaveAttribute('aria-expanded', 'false');
+  await lyrics(page).click(); await expectLyrics(page);
+  await expect(queue(page)).toHaveAttribute('aria-expanded', 'false');
+  await expect(panel(page)).toHaveCount(1);
   await clickOutside(page);
   await expect(panel(page)).toHaveCount(0);
   await expect(lyrics(page)).toHaveAttribute('aria-expanded', 'false');
@@ -145,21 +152,24 @@ test('the saved pin waits for a track after refresh and then opens current lyric
   expect(creates).toEqual(['Alpha', 'Beta']); expect(errors).toEqual([]);
 });
 
-test('closing the queue restores visible pinned lyrics but preserves explicit hiding', async ({ page }) => {
+test('pinned lyrics and a temporary queue can be opened in either order', async ({ page }) => {
   const { creates, errors } = await setup(page);
   await play(page); await openPinned(page);
+  const queueDialog = page.getByRole('dialog', { name: '播放队列', exact: true });
   await queue(page).click();
-  await expect(panel(page).getByRole('heading', { name: '播放队列', exact: true })).toBeVisible();
-  await queue(page).click(); await expectLyrics(page);
-  await queue(page).click();
-  await expect(panel(page).getByRole('heading', { name: '播放队列', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: '关闭面板', exact: true }).click(); await expectLyrics(page);
+  await expect(queueDialog).toBeVisible(); await expectLyrics(page);
+  await clickOutside(page);
+  await expect(queueDialog).toHaveCount(0); await expectLyrics(page);
   await lyrics(page).click();
   await expect(panel(page)).toHaveCount(0);
   await expect(lyrics(page)).toHaveAttribute('aria-pressed', 'false');
   await queue(page).click();
-  await expect(panel(page).getByRole('heading', { name: '播放队列', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: '关闭面板', exact: true }).click();
+  await expect(queueDialog).toBeVisible(); await expect(panel(page)).toHaveCount(1);
+  await lyrics(page).click();
+  await expect(queueDialog).toBeVisible(); await expectLyrics(page);
+  await page.keyboard.press('Escape');
+  await expect(queueDialog).toHaveCount(0); await expectLyrics(page);
+  await lyrics(page).click();
   await expect(panel(page)).toHaveCount(0);
   await expect(lyrics(page)).toHaveAttribute('aria-pressed', 'false');
   await expect.poll(() => preferences(page)).toMatchObject({ lyricsPinned: true });
