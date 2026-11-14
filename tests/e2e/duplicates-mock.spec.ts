@@ -1,3 +1,4 @@
+import { musicPage } from "../fixtures/music-catalog";
 import { test, expect, type Page, type Route } from "@playwright/test";
 import { preview, type PreviewServer } from "vite";
 import type { PluginSettings } from "../../src/api/plugin-settings";
@@ -31,7 +32,7 @@ async function mockApi(page: Page, special: (route: Route, path: string) => Prom
     let json: unknown = { items: [], nextCursor: null };
     if (path.endsWith("/health/ready")) json = { product: "MusicFS", apiVersion: "1", ready: true, instanceId: "duplicates-mock" };
     if (path.endsWith("/auth/session")) json = { csrfToken: "fixture", user: { id: "user", role: "admin" } };
-    if (path.endsWith("/source-tracks")) json = { items: tracks.map((track) => ({ ...track, versions: [track] })), libraryRevision: "1", matchingRevision: 0, nextCursor: null };
+    if (path.endsWith("/library/tracks")) json = musicPage(tracks.map((track) => ({ ...track, versions: [track] })));
     if (path.endsWith("/admin/plugins")) json = { items: plugin ? [{ pluginId, version: "1", settingsAvailable: true,
       plugin: { id: pluginId, name: "自定义工具", localizedNames: {}, features: ["recording-matching"] }, supportsMultipleInstances: false, instances: [] }] : [] };
     await route.fulfill({ json });
@@ -54,9 +55,8 @@ test("manual merge works without a matching plugin and a conflict requires resel
       }
       return true;
     }
-    if (path.endsWith("/source-tracks")) {
-      await route.fulfill({ json: { items: merged ? [{ ...tracks[0], recordingId: "recording", versions: tracks }] : tracks.map((track) => ({ ...track, versions: [track] })),
-        libraryRevision: "1", matchingRevision: revision, nextCursor: null } });
+    if (path.endsWith("/library/tracks")) {
+      await route.fulfill({ json: musicPage(merged ? [{ ...tracks[0], recordingId: "recording", versions: tracks }] : tracks.map((track) => ({ ...track, versions: [track] })), "1", revision) });
       return true;
     }
     return false;
@@ -129,31 +129,19 @@ test("arbitrary plugin declarations render all controls and keep an uncertain ac
   expect(submissions).toHaveLength(2);
 });
 
-test("an older server keeps source rows but never presents them as complete recording groups", async ({ page }) => {
-  await mockApi(page, async (route, path) => {
-    if (!path.endsWith("/source-tracks")) return false;
-    await route.fulfill({ json: { items: tracks, libraryRevision: "1", nextCursor: null } }); return true;
-  });
-  await page.goto(`${origin}/#/library`);
-  await page.getByRole("checkbox", { name: "选择 Alpha", exact: true }).check();
-  await page.getByRole("checkbox", { name: "选择 Beta", exact: true }).check();
-  await expect(page.getByRole("button", { name: "合并歌曲", exact: true })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "重复识别", exact: true })).toHaveCount(0);
-});
-
 test("a merge continues after back navigation and refreshes the cached library", async ({ page }) => {
   let merged = false;
   let submitRoute: Route | null = null;
   await mockApi(page, async (route, path) => {
     if (path.endsWith("/matching/links")) { submitRoute = route; return true; }
-    if (path.endsWith("/source-tracks")) {
-      await route.fulfill({ json: { items: merged ? [{ ...tracks[0], recordingId: "recording", versions: tracks }] : tracks.map((track) => ({ ...track, versions: [track] })),
-        libraryRevision: "1", matchingRevision: merged ? 1 : 0, nextCursor: null } });
+    if (path.endsWith("/library/tracks")) {
+      await route.fulfill({ json: musicPage(merged ? [{ ...tracks[0], recordingId: "recording", versions: tracks }] : tracks.map((track) => ({ ...track, versions: [track] })), "1", merged ? 1 : 0) });
       return true;
     }
     return false;
   });
   await page.goto(`${origin}/#/settings`);
+  await page.getByRole("button", { name: "展开作品库", exact: true }).click();
   await page.getByRole("link", { name: "曲目列表", exact: true }).click();
   await page.getByRole("checkbox", { name: "选择 Alpha", exact: true }).check();
   await page.getByRole("checkbox", { name: "选择 Beta", exact: true }).check();

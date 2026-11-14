@@ -21,6 +21,8 @@ export class PlayerController {
   state = initialState();
   onChange: (() => void) | null = null;
   onSelectionCancelled: (() => void) | null = null;
+  onPlaybackStarted: ((playback: Playback, signal: AbortSignal) => Promise<void>) | null = null;
+  private reportedSession: string | null = null;
   private generation = 0;
   private controller: AbortController | null = null;
   private audio: AudioPort | null = null;
@@ -71,6 +73,7 @@ export class PlayerController {
     private createAudio: AudioFactory,
     private capabilities: Capabilities,
     private unlockAudio: () => void = () => {},
+    private resolveSelection?: (selection: NonNullable<SourceTrack["playbackSelection"]>, signal: AbortSignal) => Promise<SourceTrack>,
   ) {}
   async select(
     track: SourceTrack,
@@ -101,6 +104,12 @@ export class PlayerController {
     this.controller = new AbortController();
     this.recovery = new RecoveryBudget();
     try {
+      if (track.playbackSelection && this.resolveSelection) {
+        track = await this.resolveSelection(track.playbackSelection, this.controller.signal);
+        if (generation !== this.generation) return;
+        this.state.track = track;
+        this.emit();
+      }
       const key = crypto.randomUUID();
       let playback: Playback;
       try {
@@ -110,6 +119,7 @@ export class PlayerController {
           preferences,
           key,
           this.controller.signal,
+          track.playbackSelection,
         );
       } catch (error) {
         if (generation !== this.generation || !isUncertain(error)) throw error;
@@ -119,6 +129,7 @@ export class PlayerController {
           preferences,
           key,
           this.controller.signal,
+          track.playbackSelection,
         );
       }
       if (generation !== this.generation) {
@@ -223,6 +234,15 @@ export class PlayerController {
       this.emit();
     }
   }
+  private reportStarted(): void {
+    const playback = this.state.playback;
+    const signal = this.controller?.signal;
+    if (!playback || !signal || !this.onPlaybackStarted || this.reportedSession === playback.sessionId) return;
+    this.reportedSession = playback.sessionId;
+    void this.onPlaybackStarted(playback, signal).catch(() => {
+      if (this.reportedSession === playback.sessionId) this.reportedSession = null;
+    });
+  }
   private observe(event: MediaObservation): void {
     if (this.state.playback)
       this.state.positionMs = trackPosition(this.state.playback, event.seconds);
@@ -239,6 +259,7 @@ export class PlayerController {
         break;
       }
       case "playing":
+        this.reportStarted();
         this.clearBufferingTimer();
         this.state.phase = "playing";
         this.state.wantsPlay = true;

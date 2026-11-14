@@ -1,3 +1,4 @@
+import { musicPage } from "../fixtures/music-catalog";
 import { routeApi } from "../fixtures/control-mock";
 import { test, expect, type Page } from '@playwright/test';
 import { preview, type PreviewServer } from 'vite';
@@ -39,7 +40,7 @@ async function setup(page: Page, antiphase = false) {
     let json: unknown = { items: [], nextCursor: null, nextAfter: null, libraryRevision: '1' };
     if (path.endsWith('/health/ready')) json = { product: 'MusicFS', ready: true, apiVersion: '1', instanceId: 'live-dsp' };
     if (path.endsWith('/auth/session')) json = { csrfToken: 'fixture', user: { id: 'listener', role: 'user' } };
-    if (path.endsWith('/source-tracks')) json = { items: [{ ...track, displayName: 'tone.wav', durationMs: 60000 }], nextCursor: null, libraryRevision: '1' };
+    if (path.endsWith('/library/tracks')) json = musicPage([{ ...track, displayName: 'tone.wav', durationMs: 60000 }]);
     if (path.endsWith('/playback/sessions') && request.method() === 'POST') {
       creates.push(request.postDataJSON());
       json = { ...playback(), outputProfile: { ...playback().outputProfile, channels: antiphase ? 2 : 1 }, seekableRange: { startMs: 0, endMs: 60000 } };

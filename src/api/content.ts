@@ -56,6 +56,8 @@ export interface RecommendationSource {
   error: { code: string; message: string } | null;
 }
 export interface SourceRef {
+  trackId?: string | null;
+  forcedSourceTrackId?: string | null;
   sourceTrackId: string | null;
   remoteSourceId: string | null;
 }

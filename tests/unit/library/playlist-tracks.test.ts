@@ -4,11 +4,28 @@ import type { PlaylistEntry } from "../../../src/api/content";
 import { LibraryApi } from "../../../src/api/library";
 import { resolvePlaylistTracks } from "../../../src/features/playlists/playlist-tracks";
 import { track } from "../../fixtures/dto";
+import { musicTrack } from "../../fixtures/music-catalog";
+import { displaySource } from "../../../src/api/music-catalog";
 
 function entry(id: string | null, key = id ?? "remote"): PlaylistEntry {
   return { entryId: key, source: { sourceTrackId: id, remoteSourceId: id ? null : "remote-source" }, provenance: [] };
 }
 describe("explicit playlist source resolution", () => {
+  it("preserves canonical titles and separate choices for repeated entries, including missing pins", async () => {
+    const version = { ...track, sourceTrackId: "second", title: "Plugin title", availability: "offline" };
+    const music = { ...musicTrack({ ...track, versions: [track, version] }), title: "Canonical title", trackId: "logical" };
+    const refs: PlaylistEntry[] = [null, "second", "removed"].map((id, i) => ({
+      ...entry(null, String(i)), source: { trackId: "logical", forcedSourceTrackId: id, sourceTrackId: null, remoteSourceId: null },
+    }));
+    const load = vi.fn().mockResolvedValue(music);
+    const result = await resolvePlaylistTracks(refs, vi.fn(), new AbortController().signal, load);
+    expect(load).toHaveBeenCalledTimes(1);
+    const sources = result.map((e) => e.track && displaySource(e.track));
+    expect(sources[0]).toMatchObject({ title: "Canonical title", sourceTrackId: track.sourceTrackId, playbackSelection: { trackId: "logical", forcedSourceTrackId: null } });
+    expect(sources[1]).toMatchObject({ title: "Canonical title", sourceTrackId: "second", availability: "offline" });
+    expect(sources[2]).toBeNull();
+    expect(result.map((e) => e.track && "trackId" in e.track && e.track.playlistEntryId)).toEqual(["0", "1", "2"]);
+  });
   it("retains entry order, deduplicates lookups and leaves remote or deleted references unresolved", async () => {
     const load = vi.fn(async (id: string) => {
       if (id === "removed") throw new ApiError("NOT_FOUND", "Missing track", 404);

@@ -90,6 +90,14 @@ test("real package import preserves nested tracks and attachment bytes through r
   expect(playback.request().postDataJSON().sourceTrackId).toBe(first.value.nodes.find((node) => node.path === "WAV/01.wav")?.sourceTrackId);
   await waitPlaying(page);
   await page.getByRole("button", { name: "暂停", exact: true }).click();
+  const readHistory = async (suffix: string) => {
+    const response = await page.request.get(`${server!.origin}/api/v1/me/${suffix}`);
+    expect(response.status(), await response.text()).toBe(200);
+    return (await response.json()).items;
+  };
+  await expect.poll(() => readHistory("content-history/asmr")).toEqual([expect.objectContaining({ workId })]);
+  expect(await readHistory("recently-played")).toEqual([]);
+  expect(await readHistory("content-history/radio")).toEqual([]);
   await page.getByRole("button", { name: "查看附件 说明.txt", exact: true }).click();
   let attachment = page.getByRole("dialog", { name: "附件：说明.txt", exact: true });
   await expect(attachment.locator("pre")).toHaveText(packageText);
@@ -136,6 +144,12 @@ test("real package import preserves nested tracks and attachment bytes through r
   expect(saved.items[0].nodes.find((node) => node.path === "WAV/03.wav")?.track?.availability).toBe("available");
   await page.getByRole("button", { name: "查看附件 说明.txt", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "附件：说明.txt", exact: true }).locator("pre")).toHaveText(revisedText);
+  await page.goto(`${server.origin}/#/recent?type=asmr`);
+  const tabs = page.getByRole("navigation", { name: "播放记录分类" });
+  await expect(tabs.getByRole("button")).toHaveText(["音乐", "CD专辑", "ASMR", "电台"]);
+  await expect(page.locator(".content-history").getByRole("link", { name: "雨夜本地音声包" })).toBeVisible();
+  await tabs.getByRole("button", { name: "电台", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "暂无播放记录" })).toBeVisible();
   await info.attach("work-package-real-results", { body: JSON.stringify({ first, second, persisted: saved }, null, 2), contentType: "application/json" });
 });
 

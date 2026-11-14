@@ -1,10 +1,10 @@
 import { ApiError, errorMessage } from "../api/client";
 import type { FavoriteEntry, FavoritesApi } from "../api/favorites";
-import type { SourceTrack } from "../api/types";
+import { playlistTrack, trackKey, type MusicTrack, type TrackItem } from "../api/music-catalog";
 import { Store } from "../app/store";
 
 interface FavoritesSnapshot {
-  items: SourceTrack[]; loaded: boolean; loading: boolean; error: string | null; pending: string[];
+  items: MusicTrack[]; loaded: boolean; loading: boolean; error: string | null; pending: string[];
 }
 const initial = (): FavoritesSnapshot => ({ items: [], loaded: false, loading: false, error: null, pending: [] });
 
@@ -34,7 +34,14 @@ export class FavoritesState extends Store<FavoritesSnapshot> {
     this.session = null;
     this.set(initial());
   }
-  has(sourceTrackId: string): boolean { return this.entries.has(sourceTrackId); }
+  private canonicalId(id: string): string {
+    if (this.entries.has(id)) return id;
+    for (const entry of this.entries.values()) {
+      if (entry.musicTrack.selectedSource?.versions?.some((source) => source.sourceTrackId === id)) return entry.musicTrack.trackId;
+    }
+    return id;
+  }
+  has(id: string): boolean { return this.entries.has(this.canonicalId(id)); }
   load = (refresh = false): Promise<void> => {
     if (!this.session) return Promise.resolve();
     if (this.loading) return this.loading;
@@ -63,21 +70,23 @@ export class FavoritesState extends Store<FavoritesSnapshot> {
     this.loading = loading;
     return loading;
   };
-  setFavorite(track: SourceTrack, favorite: boolean): Promise<void> {
+  getEntry(id: string): FavoriteEntry | undefined { return this.entries.get(this.canonicalId(id)); }
+  setFavorite(track: TrackItem, favorite: boolean, forcedSourceTrackId?: string | null): Promise<void> {
     if (!this.session) return Promise.reject(new ApiError("AUTH_REQUIRED", "Sign in to manage favorites", 401));
     const generation = this.generation;
-    const id = track.sourceTrackId;
-    // 同一来源的连续操作串行提交，确保服务端最终状态与最后一次选择一致。
+    const id = this.canonicalId(trackKey(track));
+    // 同一曲目的连续操作串行提交，确保服务端最终状态与最后一次选择一致。
     const previous = this.writes.get(id) ?? Promise.resolve();
     const operation = previous.catch(() => {}).then(async () => {
       if (generation !== this.generation) return;
       const request = new AbortController();
       this.requests.add(request);
       try {
-        const entry = favorite ? await this.api.add(id, request.signal) : (await this.api.remove(id, request.signal), null);
+        const entry = favorite ? await this.api.add(id, request.signal, forcedSourceTrackId) : (await this.api.remove(id, request.signal), null);
         if (generation !== this.generation) return;
-        if (entry) this.entries.set(id, entry); else this.entries.delete(id);
-        this.changes?.set(id, entry);
+        const canonicalId = entry?.musicTrack.trackId ?? this.canonicalId(id);
+        if (entry) this.entries.set(canonicalId, entry); else this.entries.delete(canonicalId);
+        this.changes?.set(canonicalId, entry);
         this.set({ ...this.value, items: this.tracks(), error: null });
       } catch (error) {
         if (generation !== this.generation) return;
@@ -93,9 +102,9 @@ export class FavoritesState extends Store<FavoritesSnapshot> {
     this.set({ ...this.value, pending: [...this.writes.keys()], error: null });
     return operation;
   }
-  private tracks(): SourceTrack[] {
+  private tracks(): MusicTrack[] {
     return [...this.entries.values()].sort((a, b) => b.recordedAt.localeCompare(a.recordedAt) ||
-      a.track.sourceTrackId.localeCompare(b.track.sourceTrackId)).map((entry) => entry.track);
+      a.musicTrack.trackId.localeCompare(b.musicTrack.trackId)).map((entry) => playlistTrack(entry.musicTrack, entry.forcedSourceTrackId));
   }
   private async readAll(signal: AbortSignal): Promise<Map<string, FavoriteEntry>> {
     for (let attempt = 0; ; ++attempt) {
@@ -109,7 +118,7 @@ export class FavoritesState extends Store<FavoritesSnapshot> {
           if (signal.aborted) throw new ApiError("CANCELLED", "Request cancelled");
           if (revision !== null && revision !== page.revision) throw new ApiError("CURSOR_EXPIRED", "Favorites revision changed", 410);
           revision = page.revision;
-          page.items.forEach((entry) => entries.set(entry.track.sourceTrackId, entry));
+          page.items.forEach((entry) => entries.set(entry.musicTrack.trackId, entry));
           if (page.nextCursor && (page.nextCursor === cursor || cursors.has(page.nextCursor)))
             throw new ApiError("PAGINATION_STALLED", "Favorites pagination did not advance");
           if (cursor) cursors.add(cursor);

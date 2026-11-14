@@ -16,7 +16,7 @@ export function Favorites() {
   const provider = params.get("source") || "all";
   const providers = useResource("providers", (signal) => s.libraryApi.providers(signal));
   useEffect(() => { void s.favorites.load(); }, [s]);
-  const tracks = favorites.items.filter((track) => provider === "all" || track.providerInstanceId === provider);
+  const tracks = favorites.items.filter((track) => provider === "all" || track.selectedSource?.versions?.some((source) => source.providerInstanceId === provider));
   return <section aria-label={tr("我的收藏")}>
     <div className="filters">
       <select aria-label={tr("来源")} value={provider} onChange={(event) => {

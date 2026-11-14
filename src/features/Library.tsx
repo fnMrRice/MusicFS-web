@@ -16,6 +16,7 @@ import { Candidates } from "./matching/Candidates";
 import { MatchingRecovery } from "./matching/MatchingRecovery";
 import { BulkMergeButton } from "./matching/BulkMerge";
 import { CategoryBrowser, categoryKinds } from "./library/CategoryBrowser";
+import { NewMusicTrack } from "./library/NewMusicTrack";
 
 export function Library() {
   useLocale();
@@ -41,6 +42,7 @@ export function Library() {
   const snapshot = useSyncExternalStore(subscribe, () => state.snapshot);
   const [revision, setRevision] = useState(0);
   const [candidates, setCandidates] = useState(false);
+  const [creating, setCreating] = useState(false);
   useEffect(() => {
     if (category !== "全部曲目") return;
     if (!state.snapshot.revision) void state.select(provider);
@@ -68,6 +70,7 @@ export function Library() {
               const next = new URLSearchParams(params);
               next.set("category", c);
               next.delete("categoryId");
+              next.delete("unknownCategory");
               next.delete("categoryQuery");
               setParams(next);
             }}
@@ -120,6 +123,7 @@ export function Library() {
               {tr("更多筛选")}
             </button>
             <div className="filter-end">
+              <button onClick={() => setCreating(true)}>{tr("新建曲目")}</button>
               {snapshot.matchingRevision !== undefined && <BulkMergeButton />}
               {snapshot.matchingRevision !== undefined && <button onClick={() => setCandidates(true)}>{tr("重复识别")}</button>}
               <input
@@ -183,6 +187,14 @@ export function Library() {
         </>
       )}
       {candidates && <Candidates close={() => setCandidates(false)} refresh={refresh} />}
+      {creating && <NewMusicTrack close={() => setCreating(false)} saved={() => {
+        setCreating(false);
+        if (provider !== "all") {
+          const next = new URLSearchParams(params);
+          next.delete("source");
+          setParams(next);
+        }
+      }} />}
     </section>
   );
 }

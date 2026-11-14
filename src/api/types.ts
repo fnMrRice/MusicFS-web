@@ -20,10 +20,12 @@ export interface SourceTrack {
   asset?: { fileSizeBytes?: number | null } | null;
   manualSourceTrackId?: string | null;
   versions?: SourceTrack[];
+  playbackSelection?: { trackId: string; forcedSourceTrackId: string | null };
 }
 export interface TrackPage { items: SourceTrack[]; nextCursor: string | null; libraryRevision: string; matchingRevision?: number }
 export interface OutputProfile { mime: string; codec: string | null; container: string | null; transport: string; channels?: number; layout?: string; sampleRate?: number; bitrateBps?: number | null }
 export interface Playback {
+  sourceTrackId: string;
   sessionId: string; attemptId: string; assetId: string; representationId: string;
   dspExecution: 'server' | 'client';
   deliveryMode: 'direct' | 'proxy' | 'processed'; outputProfile: OutputProfile;

@@ -1,3 +1,4 @@
+import { musicPage } from "../fixtures/music-catalog";
 import { test, expect, type Page, type Route } from "@playwright/test";
 import { preview, type PreviewServer } from "vite";
 import type { SourceTrack } from "../../src/api/types";
@@ -27,7 +28,7 @@ async function mockApi(page: Page, special: (route: Route, path: string) => Prom
     let json: unknown = { items: [], nextCursor: null };
     if (path.endsWith("/health/ready")) json = { product: "MusicFS", apiVersion: "1", ready: true, instanceId: "bulk-mock" };
     if (path.endsWith("/auth/session")) json = { csrfToken: "fixture", user: { id: "user", role: "admin" } };
-    if (path.endsWith("/source-tracks")) json = { items: tracks.map((track) => ({ ...track, versions: [track] })), libraryRevision: "1", matchingRevision: 0, nextCursor: null };
+    if (path.endsWith("/library/tracks")) json = musicPage(tracks.map((track) => ({ ...track, versions: [track] })));
     if (path.endsWith("/matching/revision")) json = { revision: 0, ...(capability ? { bulkMergeAvailable: true } : {}) };
     if (path.endsWith("/matching/candidates")) json = { items: [], revision: 0, nextAfter: null };
     await route.fulfill({ json });
@@ -128,13 +129,14 @@ test("bulk merging continues across navigation and updates every cached library"
   const refreshedSources = new Set<string>();
   await mockApi(page, async (route, path) => {
     if (path.endsWith("/matching/bulk-merge")) { submitRoute = route; return true; }
-    if (!path.endsWith("/source-tracks")) return false;
+    if (!path.endsWith("/library/tracks")) return false;
     if (merged) refreshedSources.add(new URL(route.request().url()).searchParams.get("providerInstanceId") ?? "all");
-    await route.fulfill({ json: { items: merged ? [{ ...tracks[0], recordingId: "recording", versions: tracks }] :
-      tracks.map((track) => ({ ...track, versions: [track] })), libraryRevision: "1", matchingRevision: merged ? 1 : 0, nextCursor: null } });
+    await route.fulfill({ json: musicPage(merged ? [{ ...tracks[0], recordingId: "recording", versions: tracks }] :
+      tracks.map((track) => ({ ...track, versions: [track] })), "1", merged ? 1 : 0) });
     return true;
   });
   await page.goto(`${origin}/#/library?source=local`); await expect(entry(page)).toBeEnabled();
+  await page.getByRole("button", { name: "展开作品库", exact: true }).click();
   await page.getByRole("link", { name: "曲目列表", exact: true }).click();
   await expect(page).toHaveURL(/#\/library$/);
   await expect(entry(page)).toBeEnabled();

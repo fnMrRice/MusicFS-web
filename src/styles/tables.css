@@ -36,6 +36,22 @@
   flex-wrap: wrap;
   margin: 16px 0;
 }
+.content-history {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.content-history li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  padding: 12px 4px;
+  border-bottom: 1px solid var(--line);
+}
+.content-history p { margin: 4px 0 0; }
+.content-history time { font-size: 13px; color: var(--muted); }
 .filters select {
   min-width: 125px;
   font-size: 13px;

@@ -6,6 +6,7 @@ import { useResource } from "../../components/query";
 import { Modal } from "../../components/Modal";
 import { ErrorNotice } from "../../components/ui";
 import { errorMessage } from "../../api/client";
+import { PlaylistBindingSources } from "./PlaylistBindingSources";
 export function PlaylistEditor({
   playlist,
   close,
@@ -85,6 +86,8 @@ export function PlaylistEditor({
                     : personal.find((p) => p.playlistId === b.targetId)?.name ||
                       b.targetId}
               </span>
+              {b.kind === "local" && b.entries && <PlaylistBindingSources entries={b.entries} change={(entries) =>
+                setBindings((old) => old.map((binding, n) => n === i ? { ...binding, entries } : binding))} />}
               <button
                 type="button"
                 aria-label={tr("上移规则 {0}", { "0": i + 1 })}

@@ -10,3 +10,6 @@
 .category-breadcrumbs [aria-current] { color: var(--accent); }
 .category-heading { display: flex; flex-wrap: wrap; align-items: baseline; gap: 16px; }
 .category-heading h2 { overflow-wrap: anywhere; }
+.catalog-track-form, .catalog-track-form label { display: grid; gap: 8px; }
+.catalog-track-form { gap: 16px; }
+.catalog-track-form textarea { min-width: 0; resize: vertical; }

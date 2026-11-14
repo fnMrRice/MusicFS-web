@@ -1,3 +1,4 @@
+import { musicPage } from "../fixtures/music-catalog";
 import { test, expect, type Page, type Route } from "@playwright/test";
 import { preview, type PreviewServer } from "vite";
 import type { SourceTrack } from "../../src/api/types";
@@ -32,7 +33,7 @@ async function mockApi(page: Page, special: (route: Route, path: string) => Prom
     let json: unknown = { items: [], nextCursor: null };
     if (path.endsWith("/health/ready")) json = { product: "MusicFS", apiVersion: "1", ready: true, instanceId: "details-mock" };
     if (path.endsWith("/auth/session")) json = { csrfToken: "fixture", user: { id: "user", role: "admin" } };
-    if (path.endsWith("/source-tracks")) json = { items: [{ ...tracks[0], versions: tracks }], libraryRevision: "1", matchingRevision: 0, nextCursor: null };
+    if (path.endsWith("/library/tracks")) json = musicPage([{ ...tracks[0], versions: tracks }]);
     if (path.endsWith("/provider-instances")) json = { items: tracks.map((track) => ({ id: track.providerInstanceId,
       name: `${track.sourceTrackId} 来源插件`, capabilities: [], availability: "available",
       plugin: { id: `plugin-${track.sourceTrackId}`, name: `${track.sourceTrackId} 来源插件`, localizedNames: {}, features: ["music-source"] } })) };

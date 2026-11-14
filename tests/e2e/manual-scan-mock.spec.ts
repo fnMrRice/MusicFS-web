@@ -1,3 +1,4 @@
+import { musicPage } from "../fixtures/music-catalog";
 import { test, expect, type Page, type Route } from '@playwright/test';
 import { preview, type PreviewServer } from 'vite';
 import { instanceIds, localPlugin } from '../fixtures/plugins';
@@ -28,7 +29,7 @@ async function mockApi(page: Page, scan: (route: Route, path: string) => Promise
       supportsMultipleInstances: false, instances: [{ instanceId: instanceIds.local, name: '本地音乐', runtimeState: state }] }] };
     if (path.endsWith('/configuration')) json = { revision: 'fixture-revision', roots: [{ id: 'music', name: 'Music', pathConfigured: true }],
       rootImportDefaultsSupported: true, importOptions: { schemaRevision: 'local-import-v5', importDefaults: options } };
-    if (path.endsWith('/source-tracks')) json = { items: published() ? [track] : [], nextCursor: null, libraryRevision: published() ? '2' : '1' };
+    if (path.endsWith('/library/tracks')) json = musicPage(published() ? [track] : [], published() ? '2' : '1');
     await route.fulfill({ json });
   });
 }

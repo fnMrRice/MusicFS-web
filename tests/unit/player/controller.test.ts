@@ -14,6 +14,22 @@ function setup(create = vi.fn().mockResolvedValue(playback())) {
   return { controller, api, audio, factory, event: (type: MediaObservation['type'], seconds = 0, paused = false) => observe({ type, seconds, paused }) };
 }
 describe('Player controller (Mock media; not decoder validation)', () => {
+  it('reports history once after the active media attempt actually starts playing', async () => {
+    const s = setup();
+    const reported = vi.fn().mockResolvedValue(undefined);
+    s.controller.onPlaybackStarted = reported;
+    await s.controller.select(track);
+    s.event('waiting');
+    expect(reported).not.toHaveBeenCalled();
+    s.event('playing');
+    s.event('pause');
+    s.event('playing');
+    expect(reported).toHaveBeenCalledTimes(1);
+    expect(reported.mock.calls[0][0]).toMatchObject({sessionId: 'session-1', attemptId: 'a1', sourceTrackId: track.sourceTrackId});
+    s.controller.stop();
+    s.event('playing');
+    expect(reported).toHaveBeenCalledTimes(1);
+  });
   it('fades a playing song before replacing it and fades in the new selection', async () => {
     const s = setup();
     const fade = deferred<void>();

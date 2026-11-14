@@ -1,4 +1,12 @@
 export default {
+  "编辑收藏来源": ["Edit favorite source", "編輯收藏來源", "お気に入りのソースを編集"],
+  "指定来源不可用": ["Selected source unavailable", "指定來源無法使用", "指定のソースを利用できません"],
+  "跟随曲目默认来源": ["Follow track default", "使用曲目預設來源", "曲の既定ソースを使う"],
+  "{0} 的歌单播放来源": ["Playlist source for {0}", "{0} 的歌單播放來源", "{0} のプレイリスト再生ソース"],
+  "编辑曲目来源": ["Edit track sources", "編輯曲目來源", "曲のソースを編集"],
+  "新建曲目": ["New track", "新增曲目", "曲を追加"],
+  "暂无来源": ["No source", "暫無來源", "ソースなし"],
+  "歌手（每行一个，可选）": ["Artists (one per line, optional)", "歌手（每行一位，選填）", "アーティスト（1 行に 1 組、任意）"],
   "当前时间，点击显示剩余时间": ["Elapsed time, click to show remaining time", "目前時間，點擊顯示剩餘時間", "再生時間。クリックで残り時間を表示"],
   "剩余时间，点击显示当前时间": ["Remaining time, click to show elapsed time", "剩餘時間，點擊顯示目前時間", "残り時間。クリックで再生時間を表示"],
   "总时间，点击显示剩余时间": ["Total time, click to show remaining time", "總時間，點擊顯示剩餘時間", "総再生時間。クリックで残り時間を表示"],

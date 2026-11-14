@@ -1,3 +1,4 @@
+import { musicPage, musicTrack } from "../fixtures/music-catalog";
 import { routeApi } from "../fixtures/control-mock";
 import { expect, test, type Page } from '@playwright/test';
 import { preview, type PreviewServer } from 'vite';
@@ -58,10 +59,11 @@ async function setup(page: Page, missingLast = false) {
         return route.fulfill({ status: 204 });
       }
       favorites.add(favorite[1]); revision++;
-      return route.fulfill({ json: { track: tracks.find((item) => item.sourceTrackId === favorite[1]), recordedAt: '2026-10-22T00:00:00Z' } });
+      const selected = tracks.find((item) => item.sourceTrackId === favorite[1])!;
+      return route.fulfill({ json: { track: selected, musicTrack: musicTrack(selected), forcedSourceTrackId: null, recordedAt: '2026-10-22T00:00:00Z' } });
     }
     if (path.endsWith('/me/favorites')) return route.fulfill({ json: {
-      items: tracks.filter((item) => favorites.has(item.sourceTrackId)).map((item) => ({ track: item, recordedAt: '2026-10-22T00:00:00Z' })),
+      items: tracks.filter((item) => favorites.has(item.sourceTrackId)).map((item) => ({ track: item, musicTrack: musicTrack(item), forcedSourceTrackId: null, recordedAt: '2026-10-22T00:00:00Z' })),
       nextCursor: null, revision: `${revision}/1`,
     } });
     if (path.endsWith('/playlists')) {
@@ -79,7 +81,7 @@ async function setup(page: Page, missingLast = false) {
     let json: unknown = { items: [], nextCursor: null, nextAfter: null, libraryRevision: '1' };
     if (path.endsWith('/health/ready')) json = { product: 'MusicFS', ready: true, apiVersion: '1', instanceId: 'track-actions' };
     if (path.endsWith('/auth/session')) json = { csrfToken: 'fixture', user: { id: 'listener', role: 'user' } };
-    if (path.endsWith('/source-tracks')) json = { items: tracks, nextCursor: null, libraryRevision: '1' };
+    if (path.endsWith('/library/tracks')) json = musicPage(tracks);
     if (path.endsWith('/playback/sessions') && method === 'POST') {
       const sourceTrackId = request.postDataJSON().sourceTrackId as string;
       creates.push(sourceTrackId);
@@ -175,8 +177,8 @@ test('right clicking a selected row applies queue and playlist actions to the fu
   await dialog.getByRole('button', { name: '保存', exact: true }).click();
   await expect(dialog).toHaveCount(0);
   expect(playlistWrites).toEqual([{ name: 'Selected tracks', bindings: [{ kind: 'local', entries: [
-    { source: { sourceTrackId: 'track-1', remoteSourceId: null } },
-    { source: { sourceTrackId: 'track-2', remoteSourceId: null } },
+    { source: { trackId: 'track-1', forcedSourceTrackId: null, sourceTrackId: null, remoteSourceId: null } },
+    { source: { trackId: 'track-2', forcedSourceTrackId: null, sourceTrackId: null, remoteSourceId: null } },
   ] }] }]);
   // 未选中的行有独立目标，不能误操作先前勾选的集合。
   await rightClick(page, 'Gamma.wav');

@@ -110,7 +110,7 @@ function PlaylistTracks({ id, revision }: { id: string; revision: number }) {
       );
       if (!signal.aborted) setConfirmation(p.needsConfirmation.length > 0);
       return {
-        items: await resolvePlaylistTracks(p.items, (sourceTrackId) => s.libraryApi.track(sourceTrackId, signal), signal),
+        items: await resolvePlaylistTracks(p.items, (id) => s.libraryApi.track(id, signal), signal, (id) => s.musicCatalog.track(id, signal)),
         cursor: p.nextOffset === null ? null : String(p.nextOffset),
       };
     },

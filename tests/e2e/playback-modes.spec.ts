@@ -1,3 +1,4 @@
+import { musicPage } from "../fixtures/music-catalog";
 import { routeApi } from "../fixtures/control-mock";
 import { expect, test, type Page } from '@playwright/test';
 import { preview, type PreviewServer } from 'vite';
@@ -45,9 +46,9 @@ async function setup(page: Page, count = 3, failPlayback = false) {
     let json: unknown = { items: [], nextCursor: null, nextAfter: null, libraryRevision: '1' };
     if (path.endsWith('/health/ready')) json = { product: 'MusicFS', ready: true, apiVersion: '1', instanceId: 'playback-modes' };
     if (path.endsWith('/auth/session')) json = { csrfToken: 'fixture', user: { id: 'listener', role: 'user' } };
-    if (path.endsWith('/source-tracks')) json = { items: titles.slice(0, count).map((displayName, index) => ({
+    if (path.endsWith('/library/tracks')) json = musicPage(titles.slice(0, count).map((displayName, index) => ({
       ...track, sourceTrackId: `track-${index + 1}`, assetId: `asset-${index + 1}`, displayName,
-    })), nextCursor: null, libraryRevision: '1' };
+    })));
     if (path.endsWith('/playback/sessions') && request.method() === 'POST') {
       creates.push(request.postDataJSON().sourceTrackId);
       if (failPlayback) return route.fulfill({ status: 503, json: { error: { code: 'SOURCE_UNAVAILABLE', message: 'Unavailable' } } });

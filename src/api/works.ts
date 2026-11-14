@@ -1,6 +1,19 @@
 import { ApiClient, ApiError } from "./client";
 
 export interface NamedValue { id: string; name: string }
+export interface ContentHistoryEntry {
+  workId: string;
+  workTitle: string;
+  sourceTrackId: string;
+  trackTitle: string;
+  recordedAt: string;
+}
+
+function isContentHistoryEntry(value: unknown): value is ContentHistoryEntry {
+  return object(value) && typeof value.workId === "string" && typeof value.workTitle === "string" &&
+    typeof value.sourceTrackId === "string" && typeof value.trackTitle === "string" &&
+    typeof value.recordedAt === "string" && Number.isFinite(Date.parse(value.recordedAt));
+}
 export interface ContentType {
   id: string;
   pluginId: string;
@@ -10,7 +23,7 @@ export interface ContentType {
   creditRoles: NamedValue[];
   externalIdNamespaces: NamedValue[];
   views: string[];
-  library?: { order: number; icon: string; trackListOptional: boolean };
+  library?: { order: number; icon: string; trackListOptional: boolean; separateHistory?: boolean };
 }
 export interface WorkFields {
   showInTrackList: boolean;
@@ -47,7 +60,8 @@ function isContentType(value: unknown): value is ContentType {
     typeof value.name === "string" && typeof value.description === "string" &&
     namedValues(value.creditRoles) && namedValues(value.externalIdNamespaces) && strings(value.views) &&
     (value.library === undefined || object(value.library) && Number.isSafeInteger(value.library.order) &&
-      typeof value.library.icon === "string" && typeof value.library.trackListOptional === "boolean");
+      typeof value.library.icon === "string" && typeof value.library.trackListOptional === "boolean" &&
+      (value.library.separateHistory === undefined || typeof value.library.separateHistory === "boolean"));
 }
 function isWork(value: unknown): value is Work {
   return object(value) && typeof value.workId === "string" && !!value.workId &&
@@ -68,6 +82,12 @@ function requireWork(value: unknown, id?: string): Work {
 
 export class WorksApi {
   constructor(private client: ApiClient) {}
+  async history(type: string, signal?: AbortSignal): Promise<ContentHistoryEntry[]> {
+    const response = await this.client.request<unknown>(`/me/content-history/${encodeURIComponent(type)}`, { signal });
+    if (!object(response) || !Array.isArray(response.items) || !response.items.every(isContentHistoryEntry))
+      throw new ApiError("INVALID_RESPONSE", "Invalid content history");
+    return response.items;
+  }
   async types(signal?: AbortSignal): Promise<ContentType[]> {
     const response = await this.client.request<unknown>("/content-types", { signal });
     if (!object(response) || !Array.isArray(response.items) || !response.items.every(isContentType) ||

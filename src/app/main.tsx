@@ -1,4 +1,4 @@
-import { tr, useLocale } from "../i18n";
+import { useLocale } from "../i18n";
 import { StrictMode, useLayoutEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
@@ -20,7 +20,7 @@ import { PlaylistDetail } from "../features/playlists/PlaylistDetail";
 import { SourcePlaylists } from "../features/playlists/SourcePlaylists";
 import { AlbumDetail } from "../features/AlbumDetail";
 import { Settings } from "../features/Settings";
-import { Empty } from "../components/ui";
+import { History } from "../features/History";
 import "../styles/global.css";
 
 const root = document.getElementById("app");
@@ -68,12 +68,7 @@ function Application() {
         <Route path="/albums/:id" element={<AlbumDetail />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/favorites" element={<Favorites />} />
-        <Route
-          path="/recent"
-          element={
-            <Empty title={tr("暂无播放记录")} icon="clock" />
-          }
-        />
+        <Route path="/recent" element={<History />} />
         <Route path="*" element={<Navigate to="/library" replace />} />
       </Route>
     </Routes>

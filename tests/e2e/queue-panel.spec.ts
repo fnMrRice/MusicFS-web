@@ -1,3 +1,4 @@
+import { musicPage } from "../fixtures/music-catalog";
 import { routeApi } from "../fixtures/control-mock";
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
 import { preview, type PreviewServer } from 'vite';
@@ -37,9 +38,9 @@ async function setup(page: Page, count = 2) {
     if (path.endsWith('/health/ready')) json = { product: 'MusicFS', ready: true, apiVersion: '1', instanceId: 'queue-panel' };
     if (path.endsWith('/auth/session')) json = { csrfToken: 'fixture', user: { id: 'listener', role: 'user' } };
     if (path.endsWith('/matching/revision')) json = { revision: 0, bulkMergeAvailable: true };
-    if (path.endsWith('/source-tracks')) json = { items: names.map((name) => ({
+    if (path.endsWith('/library/tracks')) json = musicPage(names.map((name) => ({
       ...track, sourceTrackId: name, assetId: name, displayName: `${name}.wav`, durationMs: 60000,
-    })), nextCursor: null, libraryRevision: '1' };
+    })));
     if (path.endsWith('/media-selection')) json = { bindings: [{ objectId: 'lyrics-Alpha', field: 'lyrics', current: true, state: 'available' }] };
     if (path.endsWith('/playback/sessions') && request.method() === 'POST') {
       creates.push(request.postDataJSON().sourceTrackId);

@@ -1,4 +1,6 @@
 export default {
+  "音乐": ["Music", "音樂", "音楽"],
+  "播放记录分类": ["Listening history categories", "播放記錄分類", "再生履歴の分類"],
   "作品库": ["Library", "作品庫", "作品ライブラリ"],
   "CD专辑": ["CD albums", "CD專輯", "CDアルバム"],
   "电台": ["Radio", "電台", "ラジオ"],

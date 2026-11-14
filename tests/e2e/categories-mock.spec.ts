@@ -1,3 +1,4 @@
+import { musicPage } from "../fixtures/music-catalog";
 import { routeApi } from "../fixtures/control-mock";
 import { test, expect, type Page, type Route } from "@playwright/test";
 import { preview, type PreviewServer } from "vite";
@@ -55,7 +56,21 @@ async function mockApi(page: Page, special?: (route: Route, url: URL) => Promise
       { id: "local", name: "本地来源", capabilities: [], availability: "available", roots: [{ id: "root", name: "音乐收藏" }] },
       { id: "other", name: "另一来源", capabilities: [], availability: "available", roots: [] },
     ] };
-    if (path.endsWith("/source-tracks")) json = { items: tracks.map((track) => ({ ...track, versions: [track] })), libraryRevision: "1", matchingRevision: 0, nextCursor: null };
+    if (path.endsWith("/library/tracks")) json = musicPage(tracks.map((track) => ({ ...track, versions: [track] })));
+    for (const kind of ["artist", "album", "genre"] as const) {
+      const collection = `/library/${kind}s`;
+      const idKey = `${kind}Id`;
+      if (path.endsWith(collection)) {
+        const items = categories[kind].map((item) => ({
+          [idKey]: item.unknown ? "" : item.categoryId, name: item.unknown ? "" : item.name, trackCount: item.trackCount,
+        }));
+        json = { items: url.searchParams.get("providerInstanceId") === "other" ? [] : items, nextAfter: null };
+      }
+      if (path.includes(collection + "/")) {
+        const item = categories[kind].find((c) => c.categoryId === path.split("/").at(-1));
+        json = item && { [idKey]: item.categoryId, name: item.name };
+      }
+    }
     if (path.endsWith("/library/categories")) {
       const kind = url.searchParams.get("categoryKind") as CategoryKind;
       const selected = url.searchParams.get("categoryId"); const parent = url.searchParams.get("parentId");
@@ -71,7 +86,7 @@ async function mockApi(page: Page, special?: (route: Route, url: URL) => Promise
 const tab = (page: Page, name: string) => page.getByLabel("曲目分类", { exact: true }).getByRole("button", { name, exact: true });
 
 test("artists, albums and genres open scoped track lists, including unknown categories", async ({ page }) => {
-  const { requests, released } = await mockApi(page);
+  const { requests } = await mockApi(page);
   await page.goto(`${origin}/#/library`);
   for (const [label, name, unknown] of [["歌手", "Artist A", "未知歌手"], ["专辑", "Album A", "未知专辑"], ["流派", "Jazz", "未知流派"]]) {
     await tab(page, label).click();
@@ -84,8 +99,9 @@ test("artists, albums and genres open scoped track lists, including unknown cate
     await page.locator(".category-card").filter({ hasText: unknown }).click();
     await expect(page.getByRole("heading", { name: unknown, exact: true })).toBeVisible();
   }
-  expect(requests.filter((url) => url.pathname.endsWith("/library/search")).every((url) => !!url.searchParams.get("categoryId"))).toBe(true);
-  expect(released.length).toBeGreaterThan(6);
+  const filters = requests.filter((url) => url.pathname.endsWith("/library/tracks")).map((url) => url.searchParams);
+  for (const field of ["artistId", "albumId", "genre"]) expect(filters.some((query) => query.has(field))).toBe(true);
+  for (const kind of ["artist", "album", "genre"]) expect(filters.some((query) => query.get("unknown") === kind)).toBe(true);
   expect(requests.some((url) => url.pathname.endsWith("/source-albums"))).toBe(false);
 });
 
@@ -122,7 +138,7 @@ test("track images use the returned media identity and damaged images fall back 
   await expect(rows.first().locator(".cover img")).toBeVisible();
   await expect.poll(() => rows.first().locator(".cover img").evaluate((image) => (image as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
   await expect(rows.nth(1).locator(".cover svg")).toBeVisible();
-  await page.getByRole("button", { name: "播放 Alpha.flac", exact: true }).click();
+  await page.getByRole("button", { name: "播放 Alpha", exact: true }).click();
   await expect(page.getByRole("region", { name: "播放器", exact: true }).locator(".cover img")).toBeVisible();
   await expect.poll(() => preparing !== null).toBe(true);
   await (preparing as unknown as Route).abort();
@@ -133,7 +149,7 @@ test("track images use the returned media identity and damaged images fall back 
 test("switching categories cancels pending reads and never shows their late results", async ({ page }) => {
   let pending: Route | null = null;
   await mockApi(page, async (route, url) => {
-    if (url.pathname.endsWith("/library/categories") && url.searchParams.get("categoryKind") === "artist") { pending = route; return true; }
+    if (url.pathname.endsWith("/library/artists")) { pending = route; return true; }
     return false;
   });
   await page.goto(`${origin}/#/library`); await tab(page, "歌手").click();
@@ -141,6 +157,6 @@ test("switching categories cancels pending reads and never shows their late resu
   await tab(page, "流派").click();
   await expect(page.locator(".category-card").filter({ hasText: "Jazz" })).toBeVisible();
   const delayed = pending as unknown as Route;
-  await delayed.fulfill({ json: catalogPage(new URL(delayed.request().url()), categories.artist) }).catch(() => {});
+  await delayed.fulfill({ json: { items: [{ artistId: "known", name: "Artist A", trackCount: 2 }], nextAfter: null } }).catch(() => {});
   await expect(page.locator(".category-card").filter({ hasText: "Artist A" })).toHaveCount(0);
 });

@@ -1,3 +1,4 @@
+import { musicPage } from "../fixtures/music-catalog";
 import { instanceIds } from "../fixtures/plugins";
 import { test, expect, type BrowserContext, type Page } from "@playwright/test";
 import { preview, type PreviewServer } from "vite";
@@ -39,8 +40,8 @@ async function mock(context: BrowserContext, authenticated = true) {
       };
     if (path.endsWith("/auth/session"))
       json = { csrfToken: "mock", user: { id: "test-user", role: "admin" } };
-    if (path.endsWith("/source-tracks"))
-      json = { items: [track], nextCursor: null, libraryRevision: "1" };
+    if (path.endsWith("/library/tracks"))
+      json = musicPage([track]);
     if (path.endsWith("/online-instances"))
       json = {
         items: [

@@ -1,3 +1,4 @@
+import { musicPage } from "../fixtures/music-catalog";
 import { routeApi } from "../fixtures/control-mock";
 import { expect, test, type Page } from '@playwright/test';
 import { preview, type PreviewServer } from 'vite';
@@ -40,7 +41,7 @@ async function setup(page: Page) {
     let json: unknown = { items: [], nextCursor: null, nextAfter: null, libraryRevision: '1' };
     if (path.endsWith('/health/ready')) json = { product: 'MusicFS', ready: true, apiVersion: '1', instanceId: backend.instanceId };
     if (path.endsWith('/auth/session')) json = { csrfToken: 'fixture', user: { id: 'listener', role: 'user' } };
-    if (path.endsWith('/source-tracks')) json = { items: [{ ...track, displayName: 'Volume.wav' }], nextCursor: null, libraryRevision: '1' };
+    if (path.endsWith('/library/tracks')) json = musicPage([{ ...track, displayName: 'Volume.wav' }]);
     if (path.endsWith('/playback/sessions') && request.method() === 'POST') {
       creates.push(request.postDataJSON().sourceTrackId);
       json = playback(`attempt-${creates.length}`);

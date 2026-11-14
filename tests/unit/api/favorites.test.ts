@@ -2,8 +2,9 @@ import { describe, expect, it, vi } from "vitest";
 import { ApiClient } from "../../../src/api/client";
 import { FavoritesApi } from "../../../src/api/favorites";
 import { track } from "../../fixtures/dto";
+import { musicTrack } from "../../fixtures/music-catalog";
 
-const entry = { track, recordedAt: "2026-10-22T10:00:00Z" };
+const entry = { track, musicTrack: musicTrack(track), forcedSourceTrackId: null, recordedAt: "2026-10-22T10:00:00Z" };
 const page = { items: [entry], nextCursor: null, revision: "revision-1" };
 describe("Favorites API", () => {
   it("loads scoped personal favorites with an opaque cursor", async () => {
@@ -17,7 +18,7 @@ describe("Favorites API", () => {
   });
   it("uses bodyless CSRF-protected PUT and DELETE requests", async () => {
     const id = "track/中文+one";
-    const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(new Response(JSON.stringify({ ...entry, track: { ...track, sourceTrackId: id } })))
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(new Response(JSON.stringify({ ...entry, musicTrack: {...entry.musicTrack, trackId: id, selectedSource: null}, track: null })))
       .mockResolvedValueOnce(new Response(null, { status: 204 }));
     const client = new ApiClient(fetcher); client.csrfToken = "csrf";
     const api = new FavoritesApi(client);

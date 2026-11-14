@@ -1,3 +1,4 @@
+import { musicPage } from "../fixtures/music-catalog";
 import { routeApi } from "../fixtures/control-mock";
 import { expect, test, type Page } from "@playwright/test";
 import { preview, type PreviewServer } from "vite";
@@ -39,13 +40,12 @@ test("a confirmed package clears cached track rows even when the fresh list fail
   const player = await playerMock(page);
   let release!: () => void, freshRequested = false, failFresh = true;
   const gate = new Promise<void>((resolve) => { release = resolve; });
-  await page.route("**/api/v1/source-tracks?*", async (route) => {
+  await page.route("**/api/v1/library/tracks?*", async (route) => {
     if (state.packages.length) {
       freshRequested = true; await gate;
       if (failFresh) return route.fulfill({ status: 503, json: { error: { code: "TEMPORARY_FAILURE" } } });
     }
-    return route.fulfill({ json: { items: state.packages.length ? [ordinary] : [hidden, ordinary],
-      libraryRevision: state.packages.length ? "2" : "1", nextCursor: null } });
+    return route.fulfill({ json: musicPage(state.packages.length ? [ordinary] : [hidden, ordinary], state.packages.length ? "2" : "1") });
   });
   await page.goto(`${origin}/#/library`);
   await playRow(page, hidden.displayName).click();

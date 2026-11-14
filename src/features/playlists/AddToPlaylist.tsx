@@ -1,15 +1,19 @@
 import { tr, useLocale } from "../../i18n";
 import { useState } from "react";
 import { useServices, useStore } from "../../app/services";
-import type { SourceTrack } from "../../api/types";
+import { trackKey, type TrackItem } from "../../api/music-catalog";
+import { PlaylistSourceSelect } from "./PlaylistSourceSelect";
+import { useResource } from "../../components/query";
 import { errorMessage } from "../../api/client";
 import { Modal } from "../../components/Modal";
 import { ErrorNotice } from "../../components/ui";
 export function AddToPlaylist({
   tracks,
+  pinned,
   close,
 }: {
-  tracks: SourceTrack[];
+  tracks: TrackItem[];
+  pinned?: string;
   close: () => void;
 }) {
   useLocale();
@@ -19,14 +23,23 @@ export function AddToPlaylist({
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [choices, setChoices] = useState<Record<string, string>>({});
+  const resolved = useResource(JSON.stringify(tracks.map(trackKey)), async (signal) => {
+    const result = [];
+    for (const item of tracks) {
+      result.push("trackId" in item ? item : await s.musicCatalog.track(item.sourceTrackId, signal, true));
+    }
+    return result;
+  });
   const save = async () => {
+    if (!resolved.data) return;
     setBusy(true);
     setError(null);
     try {
       const binding = {
         kind: "local" as const,
-        entries: tracks.map((t) => ({
-          source: { sourceTrackId: t.sourceTrackId, remoteSourceId: null },
+        entries: resolved.data.map((t, i) => ({
+          source: { trackId: t.trackId, forcedSourceTrackId: (choices[i] ?? pinned) || null, sourceTrackId: null, remoteSourceId: null },
         })),
       };
       if (target) {
@@ -75,10 +88,12 @@ export function AddToPlaylist({
             />
           </label>
         )}
-        <ErrorNotice error={error} />
+        {resolved.data?.map((track, i) => <PlaylistSourceSelect key={i} track={track} value={choices[i] ?? pinned ?? ""}
+          change={(id) => setChoices((previous) => ({ ...previous, [i]: id }))} />)}
+        <ErrorNotice error={error || resolved.error} retry={resolved.error ? resolved.reload : undefined} />
         <button
           className="primary"
-          disabled={busy || (!target && !name.trim())}
+          disabled={busy || !resolved.data || (!target && !name.trim())}
         >
           {busy ? tr("正在保存…") : tr("保存")}
         </button>

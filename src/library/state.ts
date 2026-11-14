@@ -1,8 +1,8 @@
 import { ApiError, errorMessage } from "../api/client";
-import type { SourceTrack, TrackPage } from "../api/types";
+import type { MusicTrack, MusicTrackPage } from "../api/music-catalog";
 
 export interface LibrarySnapshot {
-  items: SourceTrack[];
+  items: MusicTrack[];
   revision: string | null;
   matchingRevision?: number;
   cursor: string | null;
@@ -14,7 +14,7 @@ type PageLoader = (
   provider: string,
   cursor: string | null,
   signal: AbortSignal,
-) => Promise<TrackPage>;
+) => Promise<MusicTrackPage>;
 export class LibraryState {
   snapshot: LibrarySnapshot = {
     items: [],
@@ -30,7 +30,7 @@ export class LibraryState {
   private provider = "";
   private emptyPages = 0;
   private consumed = new Set<string>();
-  constructor(private load: PageLoader, private received?: (items: SourceTrack[]) => void) {}
+  constructor(private load: PageLoader, private received?: (items: MusicTrack[]) => void) {}
   select(provider: string): Promise<void> {
     if (provider !== this.provider) {
       this.provider = provider;
@@ -97,14 +97,14 @@ export class LibraryState {
       const added = page.items.filter(
         (item) =>
           !this.snapshot.items.some(
-            (old) => old.sourceTrackId === item.sourceTrackId,
+            (old) => old.trackId === item.trackId,
           ),
       );
       this.emptyPages = append && !added.length ? this.emptyPages + 1 : 0;
       if (
-        page.nextCursor &&
-        (page.nextCursor === cursor ||
-          this.consumed.has(page.nextCursor) ||
+        page.nextAfter &&
+        (page.nextAfter === cursor ||
+          this.consumed.has(page.nextAfter) ||
           this.emptyPages >= 3)
       )
         throw new ApiError("PAGINATION_STALLED", "Pagination did not advance");
@@ -114,11 +114,11 @@ export class LibraryState {
         : page.items;
       this.snapshot = {
         items: [
-          ...new Map(items.map((item) => [item.sourceTrackId, item])).values(),
+          ...new Map(items.map((item) => [item.trackId, item])).values(),
         ],
         revision: page.libraryRevision,
         matchingRevision: page.matchingRevision,
-        cursor: page.nextCursor,
+        cursor: page.nextAfter,
         loading: false,
         stale: false,
         error: null,

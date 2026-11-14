@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ApiClient } from "../../src/api/client";
 import { MatchingApi, mergeRequest, selectedVersions } from "../../src/api/matching";
 import { LibraryApi } from "../../src/api/library";
+import { musicPage } from "../fixtures/music-catalog";
 import { LibraryState } from "../../src/library/state";
 import type { SourceTrack } from "../../src/api/types";
 
@@ -85,11 +86,11 @@ describe("Grouped library snapshots", () => {
     }
   });
   it("does not append pages from a different matching revision even if music scanning is unchanged", async () => {
-    const load = vi.fn().mockResolvedValueOnce({ items: [track("a")], nextCursor: "next", libraryRevision: "1", matchingRevision: 3 })
-      .mockResolvedValueOnce({ items: [track("b")], nextCursor: null, libraryRevision: "1", matchingRevision: 4 });
+    const load = vi.fn().mockResolvedValueOnce(musicPage([track("a")], "1", 3, "next"))
+      .mockResolvedValueOnce(musicPage([track("b")], "1", 4));
     const state = new LibraryState(load);
     await state.select("all"); await state.more();
-    expect(state.snapshot.items.map((item) => item.sourceTrackId)).toEqual(["a"]);
+    expect(state.snapshot.items.map((item) => item.trackId)).toEqual(["a"]);
     expect(state.snapshot.matchingRevision).toBe(3);
     expect(state.snapshot.error).toContain("请刷新");
   });

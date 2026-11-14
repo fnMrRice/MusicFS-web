@@ -16,6 +16,7 @@ import { audioFactory } from "../player/audio-adapter";
 import { capabilities } from "../player/capabilities";
 import { Store } from "./store";
 import { LibraryState } from "../library/state";
+import { displaySource, MusicCatalogApi, playlistTrack } from "../api/music-catalog";
 import { CapabilityEvents } from "./capability-events";
 import { capabilityResources } from "./capability-resources";
 import { SourcePlaylistCatalog } from "./source-playlists";
@@ -78,6 +79,7 @@ export class Services {
   authApi = new AuthApi(this.client);
   profile = new PersonalProfileState(new ProfileApi(this.client));
   libraryApi = new LibraryApi(this.client);
+  musicCatalog = new MusicCatalogApi(this.client);
   favorites = new FavoritesState(new FavoritesApi(this.client));
   matchingDecisions = new MatchingDecisions(new MatchingApi(this.client), () => this.matchingChanged());
   content = new ContentApi(this.client);
@@ -153,8 +155,8 @@ export class Services {
       this.libraries.set(
         provider,
         new LibraryState((p, cursor, signal) =>
-          this.libraryApi.page(p, cursor, signal, true),
-          (items) => this.recordingCovers.reconcile(items, this.coverTracks()),
+          this.musicCatalog.tracks({ providerInstanceId: p }, cursor, signal),
+          (items) => this.recordingCovers.reconcile(items.map(displaySource).filter((item) => item !== null), this.coverTracks()),
         ),
       );
     return this.libraries.get(provider)!;
@@ -179,7 +181,23 @@ export class Services {
       audioFactory(root, this.dsp),
       capabilities(document.createElement("audio")),
       () => this.dsp.unlock(),
+      async ({ trackId, forcedSourceTrackId }, signal) => {
+        const track = await this.musicCatalog.track(trackId, signal);
+        const source = displaySource(playlistTrack(track, forcedSourceTrackId));
+        if (!source || source.availability !== "available") throw new ApiError("SOURCE_UNAVAILABLE", "Playlist source unavailable", 409);
+        return source;
+      },
     );
+    this.player.onPlaybackStarted = async (playback, signal) => {
+      const body = {sourceTrackId: playback.sourceTrackId, playbackSessionId: playback.sessionId, attemptId: playback.attemptId};
+      try {
+        await this.client.request("/me/recently-played", {method: "POST", body, signal});
+      } catch (error) {
+        if (signal.aborted || error instanceof ApiError && error.status && error.status < 500) throw error;
+        await this.client.request("/me/recently-played", {method: "POST", body, signal});
+      }
+      if (!signal.aborted) window.dispatchEvent(new Event("musicfs:history-changed"));
+    };
     this.playerState = new Store({ ...this.player.state });
     this.player.onSelectionCancelled = () => this.queue.rollbackSelection();
     this.player.onChange = () => {

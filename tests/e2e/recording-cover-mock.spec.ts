@@ -1,3 +1,4 @@
+import { musicPage } from "../fixtures/music-catalog";
 import { routeApi } from "../fixtures/control-mock";
 import { expect, test, type Page, type Route } from "@playwright/test";
 import { preview, type PreviewServer } from "vite";
@@ -62,10 +63,10 @@ async function mockApi(page: Page, special?: (route: Route, state: ReturnType<ty
       { id: "local", name: "音乐目录", plugin: { id: "local", name: "音乐目录", features: [] }, capabilities: [], availability: "available", roots: [] },
       { id: "archive", name: "备份来源", plugin: { id: "archive", name: "备份来源", features: [] }, capabilities: [], availability: "available", roots: [] },
     ] };
-    if (path.endsWith("/source-tracks")) {
+    if (path.endsWith("/library/tracks")) {
       pages++;
-      json = { items: [{ ...tracks[0], recordingId: recording ? "recording" : null, coverObjectId: state.coverObjectId,
-        versions: tracks }], libraryRevision: `revision-${state.revision}`, matchingRevision: 0, nextCursor: null };
+      json = musicPage([{ ...tracks[0], recordingId: recording ? "recording" : null, coverObjectId: state.coverObjectId,
+        versions: tracks }], `revision-${state.revision}`);
     }
     if (path.endsWith("/media-selection")) json = { bindings: [{ objectId: "small", field: "artwork", current: true, state: "available" }] };
     if (path.endsWith("/playback/sessions") && request.method() === "POST") { plays.push(request.postDataJSON().sourceTrackId); json = playback(); }
@@ -87,7 +88,7 @@ test("manual and automatic artwork stay consistent in library and player without
   const mock = await mockApi(page);
   const row = page.locator(".tracks tbody tr").first();
   await expect(row.locator(".cover img")).toHaveAttribute("src", "/api/v1/media/large");
-  await page.getByRole("button", { name: "播放 Small.wav", exact: true }).click();
+  await page.getByRole("button", { name: "播放 Song", exact: true }).click();
   await waitPlaying(page);
   await page.getByRole("button", { name: "暂停", exact: true }).click();
   const stream = await page.locator("audio").getAttribute("src");
@@ -139,8 +140,8 @@ test("manual and automatic artwork stay consistent in library and player without
   for (const [index, sampleRate] of ["44.1 kHz", "48 kHz", "采样率未知"].entries()) {
     const version = versions.locator(".track-version").nth(index);
     await expect(version.locator(".track-version-quality")).toContainText(sampleRate);
-    await expect(version.locator(".track-version-actions button").nth(0)).toHaveText("详情");
-    await expect(version.locator(".track-version-actions button").nth(1)).toHaveText("设为默认");
+    await expect(version.getByRole("button", { name: /^查看 .* 的详情$/ })).toHaveText("详情");
+    await expect(version.getByRole("button", { name: /^将 .* 设为默认版本$/ })).toHaveText("设为默认");
   }
   await versions.getByRole("button", { name: "Small.wav 的更多操作", exact: true }).click();
   await expect(page.getByRole("menu")).toBeVisible();

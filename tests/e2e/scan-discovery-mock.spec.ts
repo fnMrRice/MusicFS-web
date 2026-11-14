@@ -1,3 +1,4 @@
+import { musicPage } from "../fixtures/music-catalog";
 import { test, expect, type Page } from '@playwright/test';
 import { preview, type PreviewServer } from 'vite';
 import type { ScanJob, ScanRequest } from '../../src/api/scans';
@@ -49,7 +50,7 @@ async function mock(page: Page, remote: Remote) {
     if (path.endsWith('/configuration')) json = { revision: 'fixture-revision', roots: [
       { id: 'music', name: 'Music', pathConfigured: true }, { id: 'empty', name: 'Empty', pathConfigured: true }],
       rootImportDefaultsSupported: true, importOptions: { schemaRevision: 'local-import-v5', importDefaults: options } };
-    if (path.endsWith('/source-tracks')) json = { items: remote.published ? [track] : [], nextCursor: null, libraryRevision: remote.published ? '2' : '1' };
+    if (path.endsWith('/library/tracks')) json = musicPage(remote.published ? [track] : [], remote.published ? '2' : '1');
     await route.fulfill({ json });
   });
   return requests;

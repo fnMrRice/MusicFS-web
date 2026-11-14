@@ -1,3 +1,4 @@
+import { musicPage } from "../fixtures/music-catalog";
 import { routeApi } from "../fixtures/control-mock";
 import { test, expect, type Page } from '@playwright/test';
 import { preview, type PreviewServer } from 'vite';
@@ -82,10 +83,10 @@ test('switching waits for audible fade-out, fades in after delayed playing and l
     let json: unknown = { items: [], nextCursor: null, nextAfter: null, libraryRevision: '1' };
     if (path.endsWith('/health/ready')) json = { product: 'MusicFS', ready: true, apiVersion: '1', instanceId: 'transition-dsp' };
     if (path.endsWith('/auth/session')) json = { csrfToken: 'fixture', user: { id: 'listener', role: 'user' } };
-    if (path.endsWith('/source-tracks')) json = { items: [
+    if (path.endsWith('/library/tracks')) json = musicPage([
       { ...track, displayName: 'tone-a.wav', durationMs: 30000 },
       { ...track, sourceTrackId: 'track-2', assetId: 'asset-2', displayName: 'tone-b.wav', durationMs: 30000 },
-    ], nextCursor: null, libraryRevision: '1' };
+    ]);
     if (path.endsWith('/playback/sessions') && request.method() === 'POST') {
       await page.evaluate(() => {
         (window as unknown as ProbeWindow).musicfsTransitionRecording.events.push({ type: 'create', at: performance.now() });

@@ -1,3 +1,4 @@
+import { musicPage } from "../fixtures/music-catalog";
 import { instanceIds, neteasePlugin } from "../fixtures/plugins";
 import { test, expect } from '@playwright/test';
 import { startServer, type TestServer } from './server';
@@ -73,11 +74,11 @@ test('real shell, custom transport, themes and playlist writes survive route cha
 
 test('mock 1000-row cursor selection and retry do not auto-select appended rows', async ({ page }) => {
   let failed = false; const requests: string[] = [];
-  await page.route('**/api/v1/source-tracks?**', async route => {
-    const cursor = new URL(route.request().url()).searchParams.get('cursor'); requests.push(cursor ?? 'first');
+  await page.route('**/api/v1/library/tracks?**', async route => {
+    const cursor = new URL(route.request().url()).searchParams.get('after'); requests.push(cursor ?? 'first');
     if (cursor === 'c100' && !failed) { failed = true; await route.fulfill({ status: 503, json: { error: { code: 'SOURCE_UNAVAILABLE', message: 'Offline' } } }); return; }
     const offset = cursor ? Number(cursor.slice(1)) : 0;
-    await route.fulfill({ json: { items: Array.from({ length: 100 }, (_, n) => ({ ...track, sourceTrackId: `mock-${offset + n}`, displayName: `Mock ${offset + n}` })), nextCursor: offset < 900 ? `c${offset + 100}` : null, libraryRevision: 'mock-1' } });
+    await route.fulfill({ json: musicPage(Array.from({ length: 100 }, (_, n) => ({ ...track, sourceTrackId: `mock-${offset + n}`, displayName: `Mock ${offset + n}` })), 'mock-1', 0, offset < 900 ? `c${offset + 100}` : null) });
   });
   await login(page, server); await expect(page.locator('tbody tr')).toHaveCount(100);
   const selectAll = page.getByRole('checkbox', { name: '全选当前已返回曲目' }); await selectAll.check();
@@ -117,10 +118,10 @@ test('session expiry clears cached library and next identity gets isolated prefe
   await page.getByRole('button', { name: '我的', exact: true }).click();
   await page.getByRole('button', { name: '换肤', exact: true }).click();
   await page.getByRole('button', { name: '晨光 · 浅色' }).click(); await page.keyboard.press('Escape');
-  await page.route('**/api/v1/source-tracks?**', route => route.fulfill({ status: 401, json: { error: { code: 'UNAUTHORIZED', message: 'Expired' } } }));
+  await page.route('**/api/v1/library/tracks?**', route => route.fulfill({ status: 401, json: { error: { code: 'UNAUTHORIZED', message: 'Expired' } } }));
   await page.getByRole('button', { name: '刷新列表' }).click();
   await expect(page.getByRole('button', { name: '登录', exact: true })).toBeVisible(); await expect(page.locator('tbody tr')).toHaveCount(0); await expect(page.locator('audio')).toHaveCount(0);
-  await page.unroute('**/api/v1/source-tracks?**');
+  await page.unroute('**/api/v1/library/tracks?**');
   await page.route('**/api/v1/auth/session', async route => {
     const response = await route.fetch(); const data = await response.json(); data.user.id = 'mock-other-user'; await route.fulfill({ response, json: data });
   });

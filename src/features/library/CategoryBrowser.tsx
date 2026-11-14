@@ -9,6 +9,7 @@ import { useSourceName } from "../../components/use-source-name";
 import { tr, useLocale } from "../../i18n";
 import { TrackTable } from "../TrackTable";
 import { useCatalogPages } from "./use-catalog-pages";
+import { MusicCategoryBrowser } from "./MusicCategoryBrowser";
 import "./categories.css";
 
 export const categoryKinds: Record<string, CategoryKind> = { "歌手": "artist", "专辑": "album", "流派": "genre", "文件夹": "folder" };
@@ -32,6 +33,8 @@ export function CategoryBrowser({ kind, provider, providers, providerError, relo
   const sourceName = useSourceName();
   const [params, setParams] = useSearchParams();
   const selected = params.get("categoryId") || "";
+  const unknown = kind !== "folder" && params.get("unknownCategory") === "1";
+  const inCategory = !!selected || unknown;
   const query = params.get("categoryQuery") || "";
   const [draft, setDraft] = useState(query);
   const [refresh, setRefresh] = useState(0);
@@ -41,6 +44,7 @@ export function CategoryBrowser({ kind, provider, providers, providerError, relo
   const navigate: Navigate = (id) => {
     const next = new URLSearchParams(params);
     if (id) next.set("categoryId", id); else next.delete("categoryId");
+    if (id === "") next.set("unknownCategory", "1"); else next.delete("unknownCategory");
     next.delete("categoryQuery");
     setParams(next);
   };
@@ -53,21 +57,23 @@ export function CategoryBrowser({ kind, provider, providers, providerError, relo
     }}>
       <select aria-label={tr("来源")} value={provider} onChange={(event) => {
         const next = new URLSearchParams(params);
-        next.set("source", event.target.value); next.delete("categoryId"); next.delete("categoryQuery"); setParams(next);
+        next.set("source", event.target.value); next.delete("categoryId"); next.delete("unknownCategory"); next.delete("categoryQuery"); setParams(next);
       }}>
         <option value="all">{tr("全部来源")}</option>
         {providers.map((item) => <option key={item.id} value={item.id}>{sourceName(item)}</option>)}
       </select>
       <div className="filter-end">
         <input value={draft} maxLength={256} onChange={(event) => setDraft(event.target.value)}
-          aria-label={tr(selected ? "搜索当前列表" : "搜索分类")} placeholder={tr(selected ? "搜索当前列表" : "搜索分类")} />
+          aria-label={tr(inCategory ? "搜索当前列表" : "搜索分类")} placeholder={tr(inCategory ? "搜索当前列表" : "搜索分类")} />
         <button type="submit">{tr("搜索")}</button>
         {query && <button type="button" onClick={() => { const next = new URLSearchParams(params); next.delete("categoryQuery"); setParams(next); }}>{tr("清空")}</button>}
         <IconButton icon="refresh" label={tr("刷新列表")} onClick={() => { reloadProviders(); setRefresh((value) => value + 1); }} />
       </div>
     </form>
     <ErrorNotice error={providerError} retry={reloadProviders} />
-    {selected ? <CategoryDetail key={`${kind}:${provider}:${selected}`} api={api} kind={kind} provider={provider} id={selected}
+    {kind !== "folder" ? <MusicCategoryBrowser key={`${scope}:${unknown}`} kind={kind} provider={provider} providers={providers}
+      id={selected} unknown={unknown} query={query} navigate={navigate} /> :
+      selected ? <CategoryDetail key={`${kind}:${provider}:${selected}`} api={api} kind={kind} provider={provider} id={selected}
       query={query} refresh={refresh} providers={providers} navigate={navigate} /> :
       <CategoryCollection key={scope} api={api} kind={kind} provider={provider} query={query} providers={providers} navigate={navigate} />}
   </>;

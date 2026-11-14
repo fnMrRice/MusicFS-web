@@ -2,7 +2,7 @@ import { ApiClient, ApiError } from './client';
 import type { Capabilities, ObservedError, Playback, Preferences } from './types';
 
 export function validatePlayback(value: Playback): Playback {
-  if (!value || typeof value.sessionId !== 'string' || typeof value.attemptId !== 'string'
+  if (!value || typeof value.sourceTrackId !== 'string' || !value.sourceTrackId || typeof value.sessionId !== 'string' || typeof value.attemptId !== 'string'
     || !['client', 'server'].includes(value.dspExecution)
     || typeof value.assetId !== 'string' || typeof value.representationId !== 'string'
     || typeof value.streamUrl !== 'string' || !value.streamUrl.startsWith('/api/v1/') || value.streamUrl.startsWith('//')
@@ -16,9 +16,9 @@ export function validatePlayback(value: Playback): Playback {
 }
 export class PlaybackApi {
   constructor(private client: ApiClient) {}
-  async create(sourceTrackId: string, capabilities: Capabilities, preferences: Preferences, key: string, signal?: AbortSignal): Promise<Playback> {
+  async create(sourceTrackId: string, capabilities: Capabilities, preferences: Preferences, key: string, signal?: AbortSignal, selection?: { trackId: string; forcedSourceTrackId: string | null }): Promise<Playback> {
     return validatePlayback(await this.client.control('/playback/sessions', {
-      method: 'POST', body: { sourceTrackId, capabilities, preferences }, idempotencyKey: key, signal,
+      method: 'POST', body: { trackId: selection?.trackId, forcedSourceTrackId: selection?.forcedSourceTrackId ?? undefined, sourceTrackId, capabilities, preferences }, idempotencyKey: key, signal,
       onLateSuccess: (value) => {
         try { void this.close(validatePlayback(value as Playback).sessionId).catch(() => {}); }
         catch { /* 无效描述不能触发资源删除。 */ }

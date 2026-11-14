@@ -1,3 +1,4 @@
+import { musicPage } from "../fixtures/music-catalog";
 import { routeApi } from "../fixtures/control-mock";
 import { expect, test, type Page } from '@playwright/test';
 import { preview, type PreviewServer } from 'vite';
@@ -39,9 +40,9 @@ async function setup(page: Page) {
     let json: unknown = { items: [], nextCursor: null, nextAfter: null, libraryRevision: '1' };
     if (path.endsWith('/health/ready')) json = { product: 'MusicFS', ready: true, apiVersion: '1', instanceId: 'lyrics-panel' };
     if (path.endsWith('/auth/session')) json = { csrfToken: 'fixture', user: { id: 'listener', role: 'user' } };
-    if (path.endsWith('/source-tracks')) json = { items: ['Alpha', 'Beta'].map((name) => ({
+    if (path.endsWith('/library/tracks')) json = musicPage(['Alpha', 'Beta'].map((name) => ({
       ...track, sourceTrackId: name, assetId: name, displayName: `${name}.wav`, durationMs: 60000,
-    })), nextCursor: null, libraryRevision: '1' };
+    })));
     const selection = /\/source-tracks\/([^/]+)\/media-selection$/.exec(path);
     if (selection) json = { bindings: [
       { objectId: `lyrics-${selection[1]}`, field: 'lyrics', current: true, state: 'available' },

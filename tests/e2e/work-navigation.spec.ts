@@ -1,3 +1,4 @@
+import { musicPage } from "../fixtures/music-catalog";
 import { routeApi } from "../fixtures/control-mock";
 import { expect, test, type Page } from "@playwright/test";
 import { preview, type PreviewServer } from "vite";
@@ -52,7 +53,7 @@ async function mockNavigation(page: Page) {
         (!url.searchParams.get("tag") || item.tags.includes(url.searchParams.get("tag")!)));
       return route.fulfill({ json: { items, nextAfter: null } });
     }
-    if (path === "/source-tracks") return route.fulfill({ json: { items: [{ ...track, displayName: "导航测试.wav" }], nextCursor: null, libraryRevision: "1" } });
+    if (path === "/library/tracks") return route.fulfill({ json: musicPage([{ ...track, displayName: "导航测试.wav" }]) });
     if (path === "/playback/sessions" && request.method() === "POST") {
       state.creates.push(request.postDataJSON());
       return route.fulfill({ json: { ...playback("navigation"), outputProfile: { ...playback().outputProfile, channels: 1 } } });
