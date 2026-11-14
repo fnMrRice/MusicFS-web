@@ -3,7 +3,7 @@ import type { Page } from "@playwright/test";
 import type { PackagePreview, PackageSelection, WorkPackage } from "../../src/api/work-packages";
 import { packageFixture, packagePNG, packageText, previewFixture } from "../fixtures/work-packages";
 
-export async function mockPackages(page: Page) {
+export async function mockPackages(page: Page, contentType = "asmr") {
   const state = { packages: [] as WorkPackage[], previews: [] as PackageSelection[], previewReplies: new Map<string, PackagePreview>(), directories: [] as URL[],
     writes: [] as { body: unknown; key: string }[], replies: new Map<string, WorkPackage>(), attachments: [] as string[],
     failure: null as "network" | "gateway" | "invalid" | "conflict" | null, gate: null as Promise<void> | null,
@@ -13,9 +13,10 @@ export async function mockPackages(page: Page) {
     if (path === "/health/ready") return route.fulfill({ json: { product: "MusicFS", ready: true, apiVersion: "1", instanceId: "package-test" } });
     if (path === "/auth/session") return route.fulfill({ json: { csrfToken: "csrf", user: { id: "listener", role: "user" } } });
     if (path === "/me/profile") return route.fulfill({ json: { user: { id: "listener", role: "user" }, nickname: "听众" } });
-    if (path === "/content-types") return route.fulfill({ json: { items: [{ id: "asmr", pluginId: "example.asmr", pluginVersion: "1.0.0", name: "音声作品",
+    if (path === "/content-types") return route.fulfill({ json: { items: [{ id: contentType, pluginId: `example.${contentType}`, pluginVersion: "1.0.0", name: contentType === "cd_album" ? "CD专辑" : "ASMR",
+      library: { order: 10, icon: contentType === "cd_album" ? "disc" : "headphones", trackListOptional: contentType === "cd_album" },
       description: "", creditRoles: [{ id: "circle", name: "社团" }], externalIdNamespaces: [], views: ["work-list", "work-detail"] }] } });
-    if (path === "/works/one") return route.fulfill({ json: { workId: "one", contentType: "asmr", title: "雨夜音声", description: "多层目录与不同版本。",
+    if (path === "/works/one") return route.fulfill({ json: { workId: "one", contentType, showInTrackList: false, title: "雨夜音声", description: "多层目录与不同版本。",
       credits: [{ role: "circle", name: "雨夜社" }], externalIds: [], tags: [], revision: 1, createdAt: "2026-10-22", updatedAt: "2026-10-22" } });
     if (path.endsWith("/package-sources")) return route.fulfill({ json: { items: [{ providerInstanceId: "local", name: "本地作品", roots: [{ id: "root", name: "音声收藏" }] }] } });
     if (path.endsWith("/package-directories")) {

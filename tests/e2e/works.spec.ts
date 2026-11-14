@@ -12,16 +12,16 @@ test.afterAll(async () => {
 });
 
 const types: ContentType[] = [
-  { id: "music", name: "音乐专辑", description: "管理专辑、EP 与单曲发行，可导入 CD 抓轨或数字发行的本地音频及附带资料。", creditRoles: [{ id: "artist", name: "艺术家" }], externalIdNamespaces: [] },
-  { id: "asmr", name: "音声作品", creditRoles: [{ id: "circle", name: "社团" }, { id: "voice_actor", name: "声优" }],
+  { id: "cd_album", name: "CD专辑", library: { order: 10, icon: "disc", trackListOptional: true }, creditRoles: [{ id: "artist", name: "艺术家" }], externalIdNamespaces: [] },
+  { id: "asmr", name: "ASMR", library: { order: 20, icon: "headphones", trackListOptional: false }, creditRoles: [{ id: "circle", name: "社团" }, { id: "voice_actor", name: "声优" }],
     externalIdNamespaces: [{ id: "dlsite", name: "作品编号" }] },
-  { id: "spoken", name: "演播作品", creditRoles: [{ id: "reader", name: "朗读者" }],
+  { id: "spoken", name: "演播作品", library: { order: 40, icon: "album", trackListOptional: false }, creditRoles: [{ id: "reader", name: "朗读者" }],
     externalIdNamespaces: [{ id: "book_number", name: "书籍编号" }] },
-].map((type) => ({ ...type, pluginId: `example.${type.id}`, pluginVersion: "0.1.0", description: type.description ?? "", views: ["work-list", "work-detail"] }));
+].map((type) => ({ ...type, pluginId: `example.${type.id}`, pluginVersion: "0.1.0", description: "", views: ["work-list", "work-detail"] }));
 
 function fixture(id: string, title: string, contentType = "asmr"): Work {
   return { workId: id, title, contentType, description: "雨声中的夜晚。", credits: [{ role: "circle", name: "雨夜社" }],
-    externalIds: [{ namespace: "dlsite", value: "RJ123456" }], tags: ["雨声"], revision: 1,
+    externalIds: [{ namespace: "dlsite", value: "RJ123456" }], tags: ["雨声"], revision: 1, showInTrackList: false,
     createdAt: "2026-10-22T01:00:00Z", updatedAt: "2026-10-22T01:00:00Z" };
 }
 
@@ -126,10 +126,11 @@ test("work categories preserve filters across pages and expose readable detail",
 
 test("creation and editing use declared metadata and stable retry keys", async ({ page }) => {
   const state = await mock(page);
-  await page.goto(`${origin}/#/works`);
+  await page.goto(`${origin}/#/works?contentType=spoken`);
   await page.getByRole("button", { name: "新建作品", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "新建作品", exact: true });
-  await dialog.getByLabel("内容类型", { exact: true }).selectOption("spoken");
+  await expect(dialog.getByLabel("内容类型", { exact: true })).toHaveValue("spoken");
+  await expect(dialog.getByRole("checkbox")).toHaveCount(0);
   await dialog.getByLabel("作品标题", { exact: true }).fill("林间故事");
   await dialog.getByRole("button", { name: "添加署名" }).click();
   await expect(dialog.getByLabel("署名角色 1", { exact: true })).toHaveValue("reader");
@@ -177,6 +178,31 @@ test("conflicting updates require an explicit refresh and preserve the newer rec
   expect(state.writes).toHaveLength(1);
 });
 
+test("CD albums exist before import and keep their track-list preference across edits", async ({ page }) => {
+  const state = await mock(page);
+  await page.goto(`${origin}/#/works?contentType=cd_album`);
+  await page.getByRole("button", { name: "新建作品", exact: true }).click();
+  const create = page.getByRole("dialog", { name: "新建作品", exact: true });
+  const option = "在曲目列表中显示本专辑的曲目";
+  await expect(create.getByRole("checkbox", { name: option })).not.toBeChecked();
+  await create.getByLabel("作品标题", { exact: true }).fill("未导入的 CD");
+  await create.getByRole("checkbox", { name: option }).check();
+  await create.getByRole("button", { name: "创建作品", exact: true }).click();
+  await page.getByRole("dialog", { name: "导入本地副本", exact: true }).getByRole("button", { name: "取消", exact: true }).click();
+  expect(state.writes[0].body).toMatchObject({ contentType: "cd_album", showInTrackList: true });
+  await page.getByRole("link", { name: "返回作品库" }).click();
+  await page.getByRole("link").filter({ has: page.getByRole("heading", { name: "未导入的 CD" }) }).click();
+  await page.getByRole("button", { name: "编辑作品资料", exact: true }).click();
+  const edit = page.getByRole("dialog", { name: "编辑作品资料", exact: true });
+  await expect(edit.getByRole("checkbox", { name: option })).toBeChecked();
+  await edit.getByRole("checkbox", { name: option }).uncheck();
+  await edit.getByRole("button", { name: "保存修改", exact: true }).click();
+  await expect(page.getByText("曲目仅在本专辑中显示", { exact: true })).toBeVisible();
+  await page.reload();
+  await expect(page.getByText("曲目仅在本专辑中显示", { exact: true })).toBeVisible();
+  expect(state.writes[1].body).toMatchObject({ showInTrackList: false, expectedRevision: 1 });
+});
+
 test("finishing a submitted work after leaving does not return to the old editor", async ({ page }) => {
   const state = await mock(page);
   let finishWrite!: () => void;
@@ -185,7 +211,7 @@ test("finishing a submitted work after leaving does not return to the old editor
   const library = page.getByRole("button", { name: /^(展开|收起)作品库$/ });
   await expect(library).toBeVisible();
   if (await library.getAttribute("aria-expanded") === "false") await library.click();
-  await page.getByRole("navigation", { name: "主导航", exact: true }).getByRole("link", { name: "全部作品", exact: true }).click();
+  await page.getByRole("navigation", { name: "主导航", exact: true }).getByRole("link", { name: "ASMR", exact: true }).click();
   await page.getByRole("button", { name: "新建作品", exact: true }).click();
   const editor = page.getByRole("dialog", { name: "新建作品", exact: true });
   await editor.getByLabel("作品标题", { exact: true }).fill("后台完成的作品");
@@ -205,7 +231,7 @@ test("finishing a submitted work after leaving does not return to the old editor
 
 test("uncertain committed saves lock original content and replay without duplicate writes", async ({ page }) => {
   const state = await mock(page);
-  await page.goto(`${origin}/#/works`);
+  await page.goto(`${origin}/#/works?contentType=asmr`);
   for (const [index, failure] of (["network", "gateway", "invalid"] as const).entries()) {
     const editing = index > 0;
     await page.getByRole("button", { name: editing ? "编辑作品资料" : "新建作品", exact: true }).click();

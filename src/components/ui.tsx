@@ -137,6 +137,7 @@ const paths: Record<string, ReactNode> = {
     </>
   ),
   headphones: <path d="M4 14v-3a8 8 0 0 1 16 0v3M4 12H3v8h4v-8Zm16 0h1v8h-4v-8Z" />,
+  radio: <><rect x="3" y="8" width="18" height="12" rx="2" /><path d="m5 8 14-5M13 12h5m-5 4h3" /><circle cx="8" cy="14" r="2" /></>,
   lyrics: (
     <>
       <path d="M4 5h16M4 10h10M4 15h16M4 20h10" />
@@ -157,7 +158,7 @@ export function Icon({ name, size = 20 }: { name: string; size?: number }) {
       strokeLinejoin="round"
       aria-hidden="true"
     >
-      {paths[name] ?? paths.music}
+      {Object.hasOwn(paths, name) ? paths[name] : paths.music}
     </svg>
   );
 }

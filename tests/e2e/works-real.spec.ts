@@ -32,14 +32,11 @@ test("real work lifecycle persists ASMR metadata and rejects a stale browser edi
   const library = page.getByRole("button", { name: /^(展开|收起)作品库$/ });
   await expect(library).toBeVisible();
   if (await library.getAttribute("aria-expanded") === "false") await library.click();
-  const [typesResponse] = await Promise.all([
-    page.waitForResponse((item) => new URL(item.url()).pathname === "/api/v1/content-types"),
-    page.getByRole("navigation", { name: "主导航", exact: true }).getByRole("link", { name: "全部作品", exact: true }).click(),
-  ]);
+  const typesResponse = await page.request.get(`${server.origin}/api/v1/content-types`);
   expect(typesResponse.status(), await typesResponse.text()).toBe(200);
   const { items: contentTypes } = await typesResponse.json() as { items: ContentType[] };
   const asmr = contentTypes.find((item) => item.id === "asmr");
-  expect(asmr).toMatchObject({ pluginId: "musicfs.plugin.content.asmr", name: "音声作品" });
+  expect(asmr).toMatchObject({ pluginId: "musicfs.plugin.content.asmr", name: "ASMR" });
   expect(asmr?.creditRoles).toContainEqual({ id: "voice_actor", name: "声优" });
   expect(asmr?.externalIdNamespaces.some((item) => item.id === "dlsite")).toBe(true);
   await page.getByRole("navigation", { name: "主导航", exact: true }).getByRole("link", { name: "ASMR", exact: true }).click();
@@ -64,7 +61,7 @@ test("real work lifecycle persists ASMR metadata and rejects a stale browser edi
   expect(created).toMatchObject({ contentType: "asmr", title: "雨夜音声作品", revision: 1,
     credits: [{ role: "circle", name: "雨夜社" }, { role: "voice_actor", name: "雨音" }],
     externalIds: [{ namespace: "dlsite", value: "RJ123456" }], tags: ["雨声", "耳语"] });
-  await expect(page).toHaveURL(`${server.origin}/#/works/${created.workId}`);
+  await expect(page).toHaveURL(`${server.origin}/#/works/${created.workId}?contentType=asmr`);
   await expect(page.getByRole("heading", { name: created.title, exact: true })).toBeVisible();
   await expect(page.getByText("声优", { exact: true })).toBeVisible();
   await expect(page.getByText("雨音", { exact: true })).toBeVisible();

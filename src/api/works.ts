@@ -10,8 +10,10 @@ export interface ContentType {
   creditRoles: NamedValue[];
   externalIdNamespaces: NamedValue[];
   views: string[];
+  library?: { order: number; icon: string; trackListOptional: boolean };
 }
 export interface WorkFields {
+  showInTrackList: boolean;
   title: string;
   description: string;
   externalIds: { namespace: string; value: string }[];
@@ -43,12 +45,14 @@ function isContentType(value: unknown): value is ContentType {
   return object(value) && typeof value.id === "string" && !!value.id &&
     typeof value.pluginId === "string" && typeof value.pluginVersion === "string" &&
     typeof value.name === "string" && typeof value.description === "string" &&
-    namedValues(value.creditRoles) && namedValues(value.externalIdNamespaces) && strings(value.views);
+    namedValues(value.creditRoles) && namedValues(value.externalIdNamespaces) && strings(value.views) &&
+    (value.library === undefined || object(value.library) && Number.isSafeInteger(value.library.order) &&
+      typeof value.library.icon === "string" && typeof value.library.trackListOptional === "boolean");
 }
 function isWork(value: unknown): value is Work {
   return object(value) && typeof value.workId === "string" && !!value.workId &&
     typeof value.contentType === "string" && typeof value.title === "string" &&
-    typeof value.description === "string" && strings(value.tags) &&
+    typeof value.description === "string" && typeof value.showInTrackList === "boolean" && strings(value.tags) &&
     Array.isArray(value.externalIds) && value.externalIds.every((item) => object(item) &&
       typeof item.namespace === "string" && typeof item.value === "string") &&
     Array.isArray(value.credits) && value.credits.every((item) => object(item) &&

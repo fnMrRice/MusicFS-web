@@ -4,7 +4,7 @@ import { WorksApi, type Work } from "../../../src/api/works";
 
 const work: Work = {
   workId: "work/id", contentType: "asmr", title: "夜间音声", description: "", externalIds: [], credits: [], tags: [],
-  revision: 3, createdAt: "2026-10-22T01:00:00Z", updatedAt: "2026-10-22T02:00:00Z",
+  revision: 3, showInTrackList: false, createdAt: "2026-10-22T01:00:00Z", updatedAt: "2026-10-22T02:00:00Z",
 };
 const response = (value: unknown) => new Response(JSON.stringify(value));
 
@@ -25,7 +25,7 @@ describe("Work metadata API", () => {
     const client = new ApiClient(fetcher);
     client.csrfToken = "csrf";
     const api = new WorksApi(client);
-    const fields = { title: "新标题", description: "", externalIds: [], credits: [], tags: [] };
+    const fields = { title: "新标题", description: "", externalIds: [], credits: [], tags: [], showInTrackList: false };
     await api.update(work, fields, "stable-key");
     const [path, options] = fetcher.mock.calls[0];
     expect(path).toBe("/api/v1/works/work%2Fid");

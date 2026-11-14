@@ -1,43 +1,34 @@
-import { useMemo } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { WorksApi } from "../api/works";
 import { useServices, useStore } from "../app/services";
-import { useResource } from "../components/query";
 import { Icon } from "../components/ui";
-import { workCategoryName } from "../features/works/navigation";
+import { workListPath, type WorkTypes } from "../features/works/navigation";
 import { tr, useLocale } from "../i18n";
 import styles from "./LibraryNavigation.module.css";
 
-export function LibraryNavigation() {
+export function LibraryNavigation({ types }: { types: WorkTypes }) {
   useLocale();
   const services = useServices();
   const expanded = useStore(services.preferences).works;
   const setExpanded = (works: boolean) => services.preference({ works });
-  const api = useMemo(() => new WorksApi(services.client), [services]);
-  const types = useResource("work-content-types", (signal) => api.types(signal));
   const location = useLocation();
   const query = new URLSearchParams(location.search);
   const isWorks = location.pathname === "/works" || location.pathname.startsWith("/works/");
-  const isTracks = location.pathname === "/library";
-  const cdDump = isWorks && query.get("packageKind") === "cd_dump";
+  const isTracks = location.pathname === "/library" || location.pathname.startsWith("/albums/");
   const contentType = query.get("contentType");
-  const overview = location.pathname === "/works" && !contentType && !query.has("packageKind");
-  const current = isWorks || isTracks || location.pathname.startsWith("/albums/");
-  const rank = (id: string) => id === "music" ? 0 : id === "asmr" ? 1 : 2;
-  const categories = [...(types.data ?? [])].sort((left, right) => rank(left.id) - rank(right.id));
+  const current = isWorks || isTracks;
+  const categories = (types.data ?? []).flatMap((type) => type.library ? [{ ...type.library, type }] : [])
+    .sort((left, right) => left.order - right.order || left.type.id.localeCompare(right.type.id));
   const entries = [
-    { href: "/works", icon: "album", label: tr("全部作品"), active: overview },
     { href: "/library", icon: "music", label: tr("曲目列表"), active: isTracks },
-    ...categories.map((type) => ({
-      href: `/works?contentType=${encodeURIComponent(type.id)}`,
-      icon: type.id === "asmr" ? "headphones" : "album",
-      label: workCategoryName(type),
-      active: isWorks && !cdDump && contentType === type.id,
+    ...categories.map(({ type, icon }) => ({
+      href: workListPath(type.id),
+      icon,
+      label: tr(type.name),
+      active: isWorks && contentType === type.id,
     })),
-    { href: "/works?packageKind=cd_dump", icon: "disc", label: tr("CD 抓轨"), active: cdDump },
   ];
   return <div className={styles.libraryGroup}>
-    <button type="button" className={`${styles.header} ${current ? styles.within : ""} ${overview || (current && !expanded) ? styles.selected : ""}`}
+    <button type="button" className={`${styles.header} ${current ? styles.within : ""} ${current && !expanded ? styles.selected : ""}`}
       aria-expanded={expanded} aria-controls="work-library-navigation"
       aria-label={tr(expanded ? "收起作品库" : "展开作品库")}
       title={tr(expanded ? "收起作品库" : "展开作品库")}

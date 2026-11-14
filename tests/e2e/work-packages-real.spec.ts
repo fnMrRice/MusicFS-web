@@ -7,6 +7,8 @@ import { packagePNG, packageText } from "../fixtures/work-packages";
 import { instanceIds } from "../fixtures/plugins";
 import { startDirectoryServer, type DirectoryTestServer } from "./directory-server";
 import { login, waitPlaying } from "./helpers";
+import type { Work } from "../../src/api/works";
+import type { PackageSource } from "../../src/api/work-packages";
 
 let server: DirectoryTestServer | undefined;
 test.afterEach(async () => { await server?.stop(); server = undefined; });
@@ -72,7 +74,7 @@ test("real package import preserves nested tracks and attachment bytes through r
   const first = await importPackage(page, workId);
   expect(first.preview.counts).toEqual({ directories: 4, audio: 3, attachments: 3 });
   expect(first.value).toMatchObject({ workId, kind: "directory", revision: 1, relativePath: "RJ123456 雨夜" });
-  const beforeCD = await page.request.get(`${server.origin}/api/v1/works?packageKind=cd_dump`);
+  const beforeCD = await page.request.get(`${server.origin}/api/v1/works?contentType=cd_album`);
   expect(beforeCD.status()).toBe(200);
   expect((await beforeCD.json()).items).toEqual([]);
   expect(first.value.nodes).toHaveLength(10);
@@ -118,9 +120,9 @@ test("real package import preserves nested tracks and attachment bytes through r
   const second = await importPackage(page, workId, "cd_dump", true);
   expect(second.preview.counts.audio).toBe(4);
   expect(second.value).toMatchObject({ packageId: first.value.packageId, kind: "cd_dump", revision: 2 });
-  const afterCD = await page.request.get(`${server.origin}/api/v1/works?packageKind=cd_dump`);
+  const afterCD = await page.request.get(`${server.origin}/api/v1/works?contentType=cd_album`);
   expect(afterCD.status()).toBe(200);
-  expect((await afterCD.json()).items.map((work: { workId: string }) => work.workId)).toEqual([workId]);
+  expect((await afterCD.json()).items).toEqual([]);
   await expect(page.getByLabel("选择本地副本", { exact: true }).locator("option")).toHaveCount(1);
   await expect(page.getByText("03.wav", { exact: true })).toBeVisible();
   await server.restart();
@@ -135,4 +137,86 @@ test("real package import preserves nested tracks and attachment bytes through r
   await page.getByRole("button", { name: "查看附件 说明.txt", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "附件：说明.txt", exact: true }).locator("pre")).toHaveText(revisedText);
   await info.attach("work-package-real-results", { body: JSON.stringify({ first, second, persisted: saved }, null, 2), contentType: "application/json" });
+});
+
+test("CD visibility changes the music library while ASMR and radio keep their own recordings", async ({ page }) => {
+  test.setTimeout(240_000);
+  server = await startDirectoryServer();
+  const origin = server.origin;
+  const libraries = [
+    { type: "cd_album", name: "CD专辑", title: "音乐光盘", file: "concert.wav" },
+    { type: "asmr", name: "ASMR", title: "音声光盘", file: "rain.wav" },
+    { type: "radio", name: "电台", title: "周末节目", file: "show.wav" },
+  ];
+  for (const library of libraries) {
+    const dir = join(server.selectedRoot, library.title);
+    mkdirSync(dir);
+    copyFileSync(join(server.selectedRoot, "selected.wav"), join(dir, library.file));
+  }
+  await login(page, server);
+  await addRoot(page, server);
+  const sessionResponse = await page.request.get(`${origin}/api/v1/auth/session`);
+  const { csrfToken } = await sessionResponse.json();
+  const post = async (path: string, data: unknown, status: number) => {
+    const response = await page.request.post(`${origin}/api/v1${path}`, {
+      headers: { Origin: origin, "X-CSRF-Token": csrfToken, "Idempotency-Key": crypto.randomUUID() }, data,
+    });
+    expect(response.status(), await response.text()).toBe(status);
+    return response.json();
+  };
+
+  // 通过真实导入建立已归属的来源音轨。三种作品都使用光盘副本，测试内容分类独立于副本格式。
+  const sources = new Map<string, string>();
+  for (const library of libraries) {
+    const work: Work = await post("/works", {
+      contentType: library.type, title: library.title, description: "", credits: [], externalIds: [], tags: [],
+    }, 201);
+    const base = `/works/${work.workId}`;
+    const roots = await page.request.get(`${origin}/api/v1${base}/package-sources`);
+    const { items } = await roots.json() as { items: PackageSource[] };
+    const { providerInstanceId, roots: [root] } = items[0];
+    const preview: PackagePreview = await post(`${base}/package-previews`, {
+      providerInstanceId, rootId: root.id, path: library.title, kind: "cd_dump",
+    }, 200);
+    const imported: WorkPackage = await post(`${base}/packages`, { previewId: preview.previewId }, 200);
+    const audio = imported.nodes.find((node) => node.name === library.file);
+    expect(audio?.sourceTrackId).toBeTruthy();
+    sources.set(library.type, audio!.sourceTrackId);
+  }
+
+  const expand = page.getByRole("button", { name: "展开作品库", exact: true });
+  if (await expand.isVisible()) await expand.click();
+  const nav = page.locator("#work-library-navigation");
+  await expect(nav.getByRole("link")).toHaveText(["曲目列表", "CD专辑", "ASMR", "电台"]);
+  for (const library of libraries) {
+    await nav.getByRole("link", { name: library.name, exact: true }).click();
+    await expect(page.locator(".work-card h3")).toHaveText([library.title]);
+  }
+  const assertTracks = async (includeCD: boolean) => {
+    await nav.getByRole("link", { name: "曲目列表", exact: true }).click();
+    await expect(page.locator(".tracks tbody")).toContainText("selected.wav");
+    const rows = page.locator(".tracks tbody");
+    for (const library of libraries) {
+      if (library.type === "cd_album" && includeCD) await expect(rows).toContainText(library.file);
+      else await expect(rows).not.toContainText(library.file);
+    }
+    const response = await page.request.get(`${origin}/api/v1/source-tracks?limit=100`);
+    expect(response.status()).toBe(200);
+    const { items } = await response.json() as { items: { sourceTrackId: string }[] };
+    const ids = items.map((item) => item.sourceTrackId);
+    for (const [type, id] of sources) expect(ids.includes(id)).toBe(type === "cd_album" && includeCD);
+  };
+  await assertTracks(false);
+  for (const enabled of [true, false]) {
+    await nav.getByRole("link", { name: "CD专辑", exact: true }).click();
+    await page.locator(".work-card").getByText("音乐光盘", { exact: true }).click();
+    await page.getByRole("button", { name: "编辑作品资料", exact: true }).click();
+    const editor = page.getByRole("dialog", { name: "编辑作品资料", exact: true });
+    const option = editor.getByRole("checkbox", { name: "在曲目列表中显示本专辑的曲目" });
+    await expect(option).toBeChecked({ checked: !enabled });
+    await option.setChecked(enabled);
+    await editor.getByRole("button", { name: "保存修改", exact: true }).click();
+    await expect(editor).toHaveCount(0);
+    await assertTracks(enabled);
+  }
 });

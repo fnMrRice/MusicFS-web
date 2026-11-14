@@ -109,11 +109,11 @@ test("uncertain committed imports reuse the preview and key and stale previews r
 });
 
 test("CD entry opens once and changing or reimporting copy kind requires a fresh preview", async ({ page }) => {
-  const state = await mockPackages(page);
-  await page.goto(`${origin}/#/works/one?packageKind=cd_dump&import=1`);
+  const state = await mockPackages(page, "cd_album");
+  await page.goto(`${origin}/#/works/one?contentType=cd_album&import=1`);
   const dialog = page.getByRole("dialog", { name: "导入本地副本", exact: true });
   await expect(dialog).toBeVisible();
-  await expect(page).toHaveURL(/#\/works\/one\?packageKind=cd_dump$/);
+  await expect(page).toHaveURL(/#\/works\/one\?contentType=cd_album$/);
   await expect(dialog.getByLabel("副本类型", { exact: true })).toHaveValue("cd_dump");
   await dialog.getByRole("button", { name: "进入目录 RJ123456 雨夜", exact: true }).click();
   await dialog.getByRole("button", { name: "预览当前目录", exact: true }).click();
@@ -142,7 +142,7 @@ test("CD entry opens once and changing or reimporting copy kind requires a fresh
   await page.reload();
   await expect(page.getByRole("button", { name: "导入 CD 抓轨", exact: true })).toBeVisible();
   await expect(dialog).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "返回作品库", exact: true })).toHaveAttribute("href", "#/works?packageKind=cd_dump");
+  await expect(page.getByRole("link", { name: "返回作品库", exact: true })).toHaveAttribute("href", "#/works?contentType=cd_album");
 });
 
 test("closing an unknown import refreshes packages and completing after navigation does not change the route", async ({ page }) => {

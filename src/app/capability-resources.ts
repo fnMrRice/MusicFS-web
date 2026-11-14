@@ -1,4 +1,5 @@
 const affectedResources = new Set([
+  "work-content-types",
   "providers",
   "settings-providers",
   "settings-plugins",

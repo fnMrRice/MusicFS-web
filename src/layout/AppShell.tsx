@@ -11,7 +11,7 @@ import { NicknameEditor } from "../features/profile/NicknameEditor";
 import { ServiceStatus } from "./ServiceStatus";
 import { TaskQueue } from "./TaskQueue";
 import { LibraryNavigation } from "./LibraryNavigation";
-import { workSectionTitle } from "../features/works/navigation";
+import { useWorkTypes, workSectionTitle } from "../features/works/navigation";
 
 const links = [
   ["/search", "search", "搜索"],
@@ -29,6 +29,7 @@ export function AppShell() {
   const sourcePlaylists = useStore(s.sourcePlaylists.pages);
   const sourceName = useSourceName();
   const location = useLocation();
+  const workTypes = useWorkTypes();
   const navigate = useNavigate();
   const scroll = useRef<HTMLDivElement>(null);
   const content = useRef<HTMLDivElement>(null);
@@ -112,7 +113,7 @@ export function AppShell() {
     nicknameWasOpen.current = editingNickname;
   }, [editingNickname]);
   const title =
-    workSectionTitle(location.pathname, location.search) ??
+    workSectionTitle(location.pathname, location.search, workTypes.data) ??
     links.find(([path]) => location.pathname === path)?.[2] ??
     (location.pathname === "/settings"
       ? "设置"
@@ -150,7 +151,7 @@ export function AppShell() {
           aria-label={tr("主导航")}
         >
           {links.slice(0, 2).map(([path, icon, label]) => nav(path, icon, tr(label)))}
-          <LibraryNavigation />
+          <LibraryNavigation types={workTypes} />
           {links.slice(2).map(([path, icon, label]) => nav(path, icon, tr(label)))}
           <div className={styles.group}>
             <button
@@ -347,7 +348,7 @@ export function AppShell() {
           <ErrorNotice error={auth.error} />
           <div ref={content}>
             <ErrorBoundary key={location.pathname}>
-              <Outlet />
+              <Outlet context={workTypes} />
             </ErrorBoundary>
           </div>
         </div>

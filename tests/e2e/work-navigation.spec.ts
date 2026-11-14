@@ -16,15 +16,19 @@ test.beforeAll(async () => {
 test.afterAll(async () => { await new Promise<void>((resolve) => server?.httpServer.close(() => resolve())); });
 
 const types: ContentType[] = [
-  ["music", "音乐专辑"], ["asmr", "音声作品"], ["spoken", "演播作品"],
-].map(([id, name]) => ({ id, name, pluginId: `example.${id}`, pluginVersion: "0.1.0", description: "",
+  { id: "music", name: "音乐专辑" },
+  { id: "radio", name: "电台", library: { order: 30, icon: "radio", trackListOptional: false } },
+  { id: "asmr", name: "ASMR", library: { order: 20, icon: "headphones", trackListOptional: false } },
+  { id: "spoken", name: "演播作品", library: { order: 40, icon: "album", trackListOptional: false } },
+  { id: "cd_album", name: "CD专辑", library: { order: 10, icon: "disc", trackListOptional: true } },
+].map((type) => ({ ...type, pluginId: `example.${type.id}`, pluginVersion: "0.1.0", description: "",
   creditRoles: [], externalIdNamespaces: [], views: ["work-list", "work-detail"] }));
 function work(workId: string, title: string, contentType: string): Work {
   return { workId, title, contentType, description: "按目录收藏的本地作品。", credits: [], externalIds: [], tags: ["收藏"],
-    revision: 1, createdAt: "2026-10-22T01:00:00Z", updatedAt: "2026-10-22T01:00:00Z" };
+    revision: 1, showInTrackList: false, createdAt: "2026-10-22T01:00:00Z", updatedAt: "2026-10-22T01:00:00Z" };
 }
 const works = [work("asmr", "雨夜音声", "asmr"), work("album", "钢琴数字专辑", "music"),
-  work("cd", "钢琴 CD 抓轨", "music"), work("spoken", "林间演播", "spoken")];
+  work("cd", "钢琴 CD 专辑", "cd_album"), work("radio", "深夜节目", "radio"), work("spoken", "林间演播", "spoken")];
 
 async function mockNavigation(page: Page) {
   const state = { types: [...types], lists: [] as URL[], creates: [] as unknown[], deletes: [] as string[] };
@@ -44,7 +48,6 @@ async function mockNavigation(page: Page) {
     if (path === "/works") {
       state.lists.push(url);
       const items = works.filter((item) => (!url.searchParams.get("contentType") || item.contentType === url.searchParams.get("contentType")) &&
-        (!url.searchParams.get("packageKind") || item.workId === "cd") &&
         (!url.searchParams.get("q") || item.title.includes(url.searchParams.get("q")!)) &&
         (!url.searchParams.get("tag") || item.tags.includes(url.searchParams.get("tag")!)));
       return route.fulfill({ json: { items, nextAfter: null } });
@@ -82,9 +85,10 @@ test("the whole library row toggles without navigating and restores its state af
   await navigation(page).getByRole("button", { name: "展开作品库", exact: true }).getByText("作品库", { exact: true }).click();
   await expect(child(page, "ASMR")).toBeVisible();
   await expect(child(page, "演播作品")).toBeVisible();
-  await expect(child(page, "全部作品")).toHaveAttribute("href", "#/works");
+  await expect(child(page, "全部作品")).toHaveCount(0);
+  await expect(child(page, "专辑")).toHaveCount(0);
   expect(await navigation(page).locator('#work-library-navigation a').evaluateAll((links) =>
-    links.slice(0, 2).map((link) => link.getAttribute("aria-label")))).toEqual(["全部作品", "曲目列表"]);
+    links.map((link) => link.getAttribute("aria-label")))).toEqual(["曲目列表", "CD专辑", "ASMR", "电台", "演播作品"]);
   await navigation(page).getByRole("button", { name: "收起作品库", exact: true }).getByText("作品库", { exact: true }).click();
   await expect(child(page, "ASMR")).toBeHidden();
   await expect(page).toHaveURL(/#\/library$/);
@@ -110,18 +114,18 @@ test("the whole library row toggles without navigating and restores its state af
   const rowBounds = await collapsedRow.boundingBox();
   expect(rowBounds).not.toBeNull();
   await collapsedRow.click({ position: { x: rowBounds!.width * 0.65, y: rowBounds!.height / 2 } });
-  await expect(child(page, "全部作品")).toBeVisible();
+  await expect(child(page, "电台")).toBeVisible();
   await expect(page).toHaveURL(/#\/library$/);
-  await child(page, "全部作品").click();
-  await expect(page).toHaveURL(/#\/works$/);
-  await selected(page, "全部作品");
+  await child(page, "电台").click();
+  await expect(page).toHaveURL(/#\/works\?contentType=radio$/);
+  await selected(page, "电台");
   await expect(page.getByRole("group", { name: "作品分类", exact: true })).toHaveCount(0);
   await navigation(page).getByRole("button", { name: /收起作品库/ }).click();
   const expandButton = navigation(page).getByRole("button", { name: /展开作品库/ });
   await expandButton.focus();
   await page.keyboard.press("Space");
   await expect(child(page, "ASMR")).toBeVisible();
-  await selected(page, "全部作品");
+  await selected(page, "电台");
 });
 
 test("sidebar categories match query filters and retain future registered content types", async ({ page }, info) => {
@@ -130,31 +134,30 @@ test("sidebar categories match query filters and retain future registered conten
   await expand(page);
   await selected(page, "ASMR");
   await expect.poll(() => Object.fromEntries(state.lists.at(-1)?.searchParams ?? [])).toMatchObject({ contentType: "asmr", q: "雨", tag: "收藏" });
-  await child(page, "专辑").click();
-  await expect(page).toHaveURL(/#\/works\?contentType=music$/);
-  await selected(page, "专辑");
-  await expect.poll(() => state.lists.at(-1)?.searchParams.get("contentType")).toBe("music");
-  await expect(page.getByRole("heading", { name: "钢琴数字专辑", exact: true })).toBeVisible();
-  await child(page, /^CD\s?抓轨$/).click();
-  await expect(page).toHaveURL(/#\/works\?packageKind=cd_dump$/);
-  await selected(page, /^CD\s?抓轨$/);
+  await child(page, "电台").click();
+  await selected(page, "电台");
+  await expect(page.getByRole("heading", { name: "深夜节目", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "雨夜音声", exact: true })).toHaveCount(0);
+  await child(page, "CD专辑").click();
+  await expect(page).toHaveURL(/#\/works\?contentType=cd_album$/);
+  await selected(page, "CD专辑");
   await page.getByLabel("作品关键词", { exact: true }).fill("钢琴");
   await page.getByLabel("标签筛选", { exact: true }).fill("收藏");
   await page.getByRole("button", { name: "筛选", exact: true }).click();
-  await expect.poll(() => Object.fromEntries(state.lists.at(-1)?.searchParams ?? [])).toMatchObject({ packageKind: "cd_dump", q: "钢琴", tag: "收藏" });
-  expect(state.lists.at(-1)?.searchParams.has("contentType")).toBe(false);
-  await expect(page.getByRole("heading", { name: "钢琴 CD 抓轨", exact: true })).toBeVisible();
+  await expect.poll(() => Object.fromEntries(state.lists.at(-1)?.searchParams ?? [])).toMatchObject({ contentType: "cd_album", q: "钢琴", tag: "收藏" });
+  expect(state.lists.at(-1)?.searchParams.has("packageKind")).toBe(false);
+  await expect(page.getByRole("heading", { name: "钢琴 CD 专辑", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "钢琴数字专辑", exact: true })).toHaveCount(0);
-  await selected(page, /^CD\s?抓轨$/);
+  await selected(page, "CD专辑");
   await expect(page.getByRole("group", { name: "作品分类", exact: true })).toHaveCount(0);
   await page.screenshot({ path: info.outputPath("work-navigation-desktop-dark.png") });
   await child(page, "演播作品").click();
   await expect(page).toHaveURL(/#\/works\?contentType=spoken$/);
   await selected(page, "演播作品");
   await expect(page.getByRole("heading", { name: "林间演播", exact: true })).toBeVisible();
-  state.types = types.filter((type) => type.id !== "music");
+  state.types = types.filter((type) => type.id !== "cd_album");
   await page.reload();
-  await expect(child(page, "专辑")).toHaveCount(0);
+  await expect(child(page, "CD专辑")).toHaveCount(0);
   await expect(child(page, "演播作品")).toBeVisible();
 });
 
@@ -185,6 +188,15 @@ test("switching between tracks and work categories preserves the active player",
   await expect(page.getByRole("region", { name: "播放器", exact: true })).toContainText("导航测试.wav");
 });
 
+test("removed overview and album routes return to tracks without querying mixed works", async ({ page }) => {
+  const state = await mockNavigation(page);
+  for (const path of ["/works", "/works?contentType=music", "/works?tag=收藏"]) {
+    await page.goto(`${origin}/#${path}`);
+    await expect(page).toHaveURL(/#\/library$/);
+  }
+  expect(state.lists).toHaveLength(0);
+});
+
 test("work navigation remains reachable at 390 pixels without horizontal overflow", async ({ page }, info) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await mockNavigation(page);
@@ -194,7 +206,7 @@ test("work navigation remains reachable at 390 pixels without horizontal overflo
   const toggle = navigation(page).getByRole("button", { name: "收起作品库", exact: true });
   await toggle.scrollIntoViewIfNeeded();
   await expect(toggle).toBeInViewport();
-  for (const name of ["全部作品", "曲目列表", "专辑", "ASMR", /^CD\s?抓轨$/, "演播作品"]) {
+  for (const name of ["曲目列表", "CD专辑", "ASMR", "电台", "演播作品"]) {
     const link = child(page, name);
     await link.scrollIntoViewIfNeeded();
     await expect(link).toBeInViewport();
@@ -204,8 +216,8 @@ test("work navigation remains reachable at 390 pixels without horizontal overflo
   await navigation(page).getByRole("button", { name: /收起作品库/ }).click();
   await expect(child(page, "ASMR")).toBeHidden();
   await navigation(page).getByRole("button", { name: /展开作品库/ }).click();
-  await child(page, /^CD\s?抓轨$/).click();
-  await selected(page, /^CD\s?抓轨$/);
+  await child(page, "CD专辑").click();
+  await selected(page, "CD专辑");
   await child(page, "ASMR").click();
   await expect(page.getByRole("heading", { name: "雨夜音声", exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
