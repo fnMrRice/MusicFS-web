@@ -11,6 +11,7 @@ import { MergeSongs } from "./matching/MergeSongs";
 import { TrackVersions } from "./matching/TrackVersions";
 import { RecordingCover } from "./matching/RecordingCover";
 import { useTrackCover } from "../components/use-track-cover";
+import { TrackPlaybackIndicator } from "./TrackPlaybackIndicator";
 import "./matching/matching.css";
 
 export function TrackTable({
@@ -266,11 +267,11 @@ function TrackRow({
   const coverObjectId = useTrackCover(t);
   const [expanded, setExpanded] = useState(false);
   const versions = t.versions ?? [t];
-  const playing = versions.some((version) => version.sourceTrackId === currentTrack);
+  const isCurrent = versions.some((version) => version.sourceTrackId === currentTrack);
   return (
     <Fragment>
     <tr
-      className={`${playing ? "current" : ""} ${checked ? "checked" : ""} ${t.availability !== "available" ? "unavailable" : ""}`}
+      className={`${isCurrent ? "current" : ""} ${checked ? "checked" : ""} ${t.availability !== "available" ? "unavailable" : ""}`}
       tabIndex={-1}
       onContextMenu={(event) => { event.preventDefault(); openMenu(event.clientX, event.clientY, event.currentTarget); }}
       onKeyDown={(event) => {
@@ -291,7 +292,7 @@ function TrackRow({
         />
       </td>
       <td className="row-number">
-        {playing ? <span className="equalizer">▂▆▃</span> : number}
+        {isCurrent ? <TrackPlaybackIndicator number={number} /> : number}
       </td>
       <td>
         <div className="track-title">

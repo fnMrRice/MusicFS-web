@@ -1,7 +1,7 @@
 import { routeApi } from "../fixtures/control-mock";
 import { expect, test, type Page } from '@playwright/test';
 import { preview, type PreviewServer } from 'vite';
-import { playback, track } from '../fixtures/dto';
+import { deferred, playback, track } from '../fixtures/dto';
 import { waitPlaying } from './helpers';
 
 let server: PreviewServer;
@@ -80,6 +80,30 @@ async function finishTrack(page: Page): Promise<void> {
   await page.locator('audio').evaluate((audio: HTMLAudioElement) => { audio.currentTime = audio.duration - 0.05; });
 }
 const selected = (page: Page) => page.locator('.queue-list button.selected');
+
+test('track rows show bouncing dots while waiting, moving bars while playing, and a static pause icon', async ({ page }) => {
+  await setup(page);
+  const stream = deferred<void>();
+  await page.route('**/stream', async route => { await stream.promise; await route.fallback(); }, { times: 1 });
+  const row = page.locator('.tracks tr').filter({ has: page.getByRole('button', { name: '播放 Alpha.wav', exact: true }) });
+  try {
+    await row.getByRole('button', { name: '播放 Alpha.wav', exact: true }).click();
+    const dots = row.getByRole('img', { name: /正在加载|正在缓冲/ });
+    await expect(dots).toBeVisible();
+    await expect(dots.locator('span')).toHaveCount(3);
+    await expect(dots.locator('span').first()).toHaveCSS('animation-name', 'track-dot-bounce');
+  } finally {
+    stream.resolve();
+  }
+  const bars = row.getByRole('img', { name: '正在播放', exact: true });
+  await expect(bars).toBeVisible();
+  await expect(bars.locator('span').first()).toHaveCSS('animation-name', 'track-bar-level');
+  await page.getByRole('button', { name: '暂停', exact: true }).click();
+  await expect(row.getByRole('img', { name: '已暂停' })).toBeVisible();
+  await expect(bars).toHaveCount(0);
+  await page.getByRole('button', { name: '播放 Beta.wav', exact: true }).click();
+  await expect(row.locator('.row-number')).toHaveText('1');
+});
 
 test('playback mode cycles through all modes and empty or single queues cannot shuffle', async ({ page }) => {
   const { creates, errors } = await setup(page, 1);
