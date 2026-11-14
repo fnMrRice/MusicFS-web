@@ -7,7 +7,8 @@ import { tr, useLocale } from "../i18n";
 import { Link } from "react-router-dom";
 import type { PluginDisplayCount, PluginSnapshot } from "../api/directories";
 import { localizedPluginText, pluginName, sourceName } from "../components/source-name";
-import { matchesPlugin, pluginPurposes, pluginPurposeLabel } from "./plugin-filters";
+import { matchesPlugin, pluginPurposes, pluginPurposeLabel, pluginScrapedFields } from "./plugin-filters";
+import { scrapedFieldName } from "./scrapers/fields";
 import { InfrastructurePluginBadges, InfrastructurePluginDetails } from "./InfrastructurePlugin";
 import "./plugin-status.css";
 import { PluginSettings } from "./plugin-settings/PluginSettings";
@@ -122,6 +123,10 @@ export function PluginStatus() {
                   <span>{tr("用途")}：</span>
                   {pluginPurposes(p).map((purpose) => <span className="badge" key={purpose}>{pluginPurposeLabel(purpose)}</span>)}
                 </span>
+                {pluginScrapedFields(p).length > 0 && <span className="plugin-purposes">
+                  <span>{tr("支持刮削的内容")}：</span>
+                  {pluginScrapedFields(p).map((field) => <span key={field}>{scrapedFieldName(field)}</span>)}
+                </span>}
                 <span className="plugin-metadata">
                   <span>{tr("插件 ID")}：<code>{p.pluginId}</code></span>
                   <span>{tr("版本")}：{p.version?.trim() || tr("未知版本")}</span>

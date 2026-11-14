@@ -5,6 +5,7 @@ import type { SourceTrack } from "../api/types";
 import { ErrorNotice } from "../components/ui";
 import { errorMessage } from "../api/client";
 import { useTrackCover } from "../components/use-track-cover";
+import { TrackScraping } from "../features/scrapers/TrackScraping";
 interface Binding {
   objectId: string;
   field: string;
@@ -15,6 +16,8 @@ export function MediaPanel({ track }: { track: SourceTrack | null }) {
   useLocale();
   const s = useServices();
   const coverObjectId = useTrackCover(track);
+  const [scrapingId, setScrapingId] = useState<string | null>(null);
+  const [revision, setRevision] = useState(0);
   const [state, setState] = useState({
     lyrics: "",
     artwork: "",
@@ -62,10 +65,13 @@ export function MediaPanel({ track }: { track: SourceTrack | null }) {
       }
     })();
     return () => controller.abort();
-  }, [track?.sourceTrackId, track?.assetId, s]);
+  }, [track?.sourceTrackId, track?.assetId, s, revision]);
   const artwork = coverObjectId === undefined ? state.artwork : coverObjectId ? s.client.url(`/media/${encodeURIComponent(coverObjectId)}`) : "";
   return (
     <>
+      {track && <button onClick={() => setScrapingId(track.sourceTrackId)}>{tr("搜索在线资料")}</button>}
+      {track && scrapingId === track.sourceTrackId && <TrackScraping key={scrapingId} track={track}
+        close={() => setScrapingId(null)} applied={() => setRevision((value) => value + 1)} />}
       <ErrorNotice error={state.error} />
       {state.loading ? (
         <p>{tr("正在读取内容…")}</p>

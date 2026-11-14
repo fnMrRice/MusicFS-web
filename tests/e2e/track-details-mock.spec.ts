@@ -43,6 +43,35 @@ async function mockApi(page: Page, special: (route: Route, path: string) => Prom
   await page.getByRole("button", { name: "展开 Alpha 的来源版本", exact: true }).click();
 }
 
+test("a source track uses its own media revision when selecting online lyrics", async ({ page }) => {
+  const pluginId = "example.lyrics";
+  const target = { sourceTrackId: "Alpha", assetId: "Alpha", assetVersion: "v2" };
+  let attempts = 0;
+  await mockApi(page, async (route, path) => {
+    if (path.endsWith("/scrapers")) {
+      await route.fulfill({ json: { items: [{ pluginId, name: "Lyrics", type: "scraper", available: true, fields: ["lyrics"] }] } });
+    } else if (path.endsWith("/Alpha/media-selection")) {
+      await route.fulfill({ json: { revision: 4, target, bindings: [] } });
+    } else if (path.endsWith(`/scrapers/${pluginId}/search`)) {
+      expect(route.request().postDataJSON()).toMatchObject({ field: "lyrics", query: { artist: "Library artist", title: "Alpha", duration: 120 } });
+      await route.fulfill({ json: { items: [{ id: "123", title: "Alpha", lyrics: "[00:05]Lyric preview", candidateToken: "token" }] } });
+    } else if (path.endsWith("/Alpha/scraped-fields/lyrics")) {
+      expect(route.request().postDataJSON()).toEqual({ assetId: "Alpha", assetVersion: "v2", expectedRevision: 4, pluginId, candidateToken: "token" });
+      attempts++;
+      await route.fulfill({ json: { revision: 5, target, bindings: [] } });
+    } else return false;
+    return true;
+  });
+  await page.locator(".track-version").filter({ hasText: "Alpha.flac" }).getByRole("button", { name: "搜索在线资料" }).click();
+  const search = page.getByRole("dialog", { name: "搜索在线资料" });
+  await search.getByRole("button", { name: "搜索", exact: true }).click();
+  await expect(search.getByText("[00:05]Lyric preview")).toBeVisible();
+  expect(attempts).toBe(0);
+  await search.getByRole("button", { name: "选用这项资料" }).click();
+  await expect(search).toHaveCount(0);
+  expect(attempts).toBe(1);
+});
+
 test("source plugin fields render as text on mobile even for an unavailable version", async ({ page }, info) => {
   const requests: string[] = [];
   const html = '<img src=x onerror="window.pluginMarkupExecuted=true">';

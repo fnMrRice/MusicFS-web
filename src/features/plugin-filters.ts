@@ -10,6 +10,7 @@ const purposeLabels: Record<string, string> = {
   "audio-dsp": "DSP",
   "audio-analysis": "音频分析",
   metadata: "元数据",
+  scraper: "刮削插件",
   database: "数据库",
   "audio-decryption": "音频解密",
   decode: "音频解码",
@@ -17,7 +18,15 @@ const purposeLabels: Record<string, string> = {
 
 export function pluginPurposes(plugin: Plugin): string[] {
   const features = plugin.plugin?.features ?? [];
+  if (plugin.role === "scraper" || plugin.instances.some((item) => item.role === "scraper"))
+    return [...new Set([...features, "scraper"])];
   return features.length ? [...new Set(features)] : [""];
+}
+
+export function pluginScrapedFields(plugin: Plugin): string[] {
+  if (!pluginPurposes(plugin).includes("scraper")) return [];
+  return [...new Set([...(plugin.builtin?.capabilities ?? []),
+    ...plugin.instances.filter((item) => item.role === "scraper").flatMap((item) => item.capabilities ?? [])])];
 }
 
 export function pluginPurposeLabel(purpose: string): string {

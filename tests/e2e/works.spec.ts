@@ -52,7 +52,7 @@ async function mock(page: Page) {
       const items = matches.slice(start, start + 1);
       return route.fulfill({ json: { items, nextAfter: start + 1 < matches.length ? items[0].workId : null } });
     }
-    if (path.endsWith("/packages") && method === "GET") return route.fulfill({ json: { items: [] } });
+    if ((path.endsWith("/packages") || path.endsWith("/scraped-fields")) && method === "GET") return route.fulfill({ json: { items: [] } });
     if (path.startsWith("/works/") && method === "GET") {
       const work = state.works.find((item) => item.workId === decodeURIComponent(path.slice(7)));
       return work ? route.fulfill({ json: work }) : route.fulfill({ status: 404, json: { error: { code: "NOT_FOUND" } } });
@@ -122,6 +122,59 @@ test("work categories preserve filters across pages and expose readable detail",
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: info.outputPath("work-detail-mobile.png") });
+});
+
+test("a declared album track list previews in source order and saves only on selection", async ({ page }) => {
+  const state = await mock(page);
+  const pluginId = "example.discography";
+  const result = { id: "R1", title: "夜间音声", tracks: [{ disc: 1, number: 2, title: "第二轨" }, { disc: 2, number: 1, title: "第二碟" }] };
+  let applied = false;
+  const attempts: string[] = [];
+  await page.route("**/api/v1/scrapers", (route) => route.fulfill({ json: { items: [
+    { type: "scraper", pluginId, name: "Discography", fields: ["albumDetails", "albumTracks"], available: true },
+    { type: "scraper", pluginId: "disabled", name: "Offline", fields: ["lyrics"], available: false },
+    { type: "scraper", pluginId: "external", name: "Work shop", fields: ["workDetails"], available: true,
+      externalIdNamespace: "dlsite", requiresExternalId: true },
+  ] } }));
+  await page.route("**/api/v1/scrapers/*/search", async (route) => {
+    expect(route.request().postDataJSON()).toMatchObject({ field: "albumTracks", query: { title: "雨夜故事一" } });
+    return route.fulfill({ json: { items: [{ ...result, candidateToken: "signed" }] } });
+  });
+  await page.route("**/api/v1/works/one/scraped-fields", (route) => route.fulfill({
+    json: { items: applied ? [{ pluginId, field: "albumTracks", item: result }] : [] },
+  }));
+  await page.route("**/api/v1/works/one/scraped-fields/albumTracks", async (route) => {
+    expect(route.request().method()).toBe("PUT");
+    expect(route.request().postDataJSON()).toEqual({ expectedRevision: 1, pluginId, candidateToken: "signed" });
+    attempts.push(route.request().headers()["idempotency-key"]);
+    if (!applied) {
+      applied = true; state.works[0].revision++;
+      return route.abort("connectionfailed");
+    }
+    return route.fulfill({ json: { revision: 2 } });
+  });
+  await page.goto(`${origin}/#/works/one`);
+  await page.getByRole("button", { name: "搜索在线资料" }).click();
+  const dialog = page.getByRole("dialog", { name: "搜索在线资料" });
+  const sourceChoice = dialog.getByRole("combobox", { name: "资料来源", exact: true });
+  await expect(sourceChoice).toHaveValue("external");
+  await expect(dialog.getByLabel("来源编号", { exact: true })).toHaveValue("RJ123456");
+  await sourceChoice.selectOption("disabled");
+  await expect(dialog.getByRole("button", { name: "搜索", exact: true })).toBeDisabled();
+  await sourceChoice.selectOption(pluginId);
+  await dialog.getByRole("combobox", { name: "刮削内容", exact: true }).selectOption("albumTracks");
+  await dialog.getByRole("button", { name: "搜索", exact: true }).click();
+  await expect(dialog.getByRole("list", { name: "专辑曲目" }).getByRole("listitem")).toHaveCount(2);
+  expect(applied).toBe(false);
+  await dialog.getByRole("button", { name: "选用这项资料" }).click();
+  await dialog.getByRole("button", { name: "重试确认保存" }).click();
+  expect(attempts[0]).toBeTruthy();
+  expect(attempts).toEqual([attempts[0], attempts[0]]);
+  await expect(dialog).toHaveCount(0);
+  const saved = page.getByRole("region", { name: "刮削资料" });
+  await saved.getByText("专辑曲目", { exact: true }).click();
+  await expect(saved.getByRole("listitem").nth(0)).toContainText("1.2第二轨");
+  await expect(saved.getByRole("listitem").nth(1)).toContainText("2.1第二碟");
 });
 
 test("creation and editing use declared metadata and stable retry keys", async ({ page }) => {

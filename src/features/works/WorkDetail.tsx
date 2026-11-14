@@ -8,6 +8,7 @@ import { tr, useLocale } from "../../i18n";
 import { WorkEditor } from "./WorkEditor";
 import { useLibraryTypes, workListPath } from "./navigation";
 import { WorkPackages } from "./packages/WorkPackages";
+import { WorkScraping } from "../scrapers/WorkScraping";
 import "./works.css";
 
 export function WorkDetail() {
@@ -65,6 +66,7 @@ export function WorkDetail() {
           </section>
         </div>
       </div>
+      <WorkScraping key={`scrape-${work.workId}`} work={work} editable={!!type && !types.loading} refresh={resource.reload} />
       <WorkPackages key={work.workId} workId={work.workId} editable={!!type && !types.loading} initialKind={initialKind}
         autoImport={query.get("import") === "1"} importOpened={() => {
           const next = new URLSearchParams(query); next.delete("import"); setQuery(next, { replace: true });

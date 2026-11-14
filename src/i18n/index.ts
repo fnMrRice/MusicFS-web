@@ -6,6 +6,7 @@ import recordingCover from "./recording-cover";
 import favorites from "./favorites";
 import notices from "./notices";
 import plugins from "./plugins";
+import scrapers from "./scrapers";
 import directories from "./directories";
 import scans from "./scans";
 import tasks from "./tasks";
@@ -29,6 +30,7 @@ const messages: Record<string, readonly string[]> = {
   ...favorites,
   ...notices,
   ...plugins,
+  ...scrapers,
   ...directories,
   ...scans,
   ...tasks,

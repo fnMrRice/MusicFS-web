@@ -9,6 +9,7 @@ import { useResource } from "../../components/query";
 import { tr, useLocale } from "../../i18n";
 import { useDecision } from "./useDecision";
 import { TrackDetails } from "./TrackDetails";
+import { TrackScraping } from "../scrapers/TrackScraping";
 
 export function TrackVersions({ tracks, revision, refresh, recordingId, defaultSourceTrackId, manualSourceTrackId, openActions }: {
   tracks: SourceTrack[]; revision?: number; refresh?: () => void;
@@ -21,6 +22,7 @@ export function TrackVersions({ tracks, revision, refresh, recordingId, defaultS
   const sourceName = useSourceName();
   const [unlink, setUnlink] = useState<{ track: SourceTrack; revision?: number } | null>(null);
   const [details, setDetails] = useState<SourceTrack | null>(null);
+  const [scraping, setScraping] = useState<SourceTrack | null>(null);
   const canChooseDefault = !!recordingId && !!refresh;
   const current = useResource(`default-source-revision-${recordingId}-${revision}`, (signal) =>
     revision === undefined && canChooseDefault ? new MatchingApi(services.client).revision(signal) : Promise.resolve({ revision }));
@@ -61,6 +63,7 @@ export function TrackVersions({ tracks, revision, refresh, recordingId, defaultS
       <span>{duration(track.durationMs)}</span>
       <div className="track-version-actions">
         <button onClick={() => setDetails(track)} aria-label={tr("查看 {0} 的详情", { 0: track.displayName })}>{tr("详情")}</button>
+        <button onClick={() => setScraping(track)}>{tr("搜索在线资料")}</button>
         {canChooseDefault && (manualSourceTrackId === track.sourceTrackId ?
           <button disabled={blocked} onClick={() => chooseDefault(null)} aria-label={tr("取消默认版本")}>{tr("取消默认")}</button> :
           <button disabled={blocked} onClick={() => chooseDefault(track.sourceTrackId)}
@@ -81,6 +84,7 @@ export function TrackVersions({ tracks, revision, refresh, recordingId, defaultS
     {decision.conflict && <button className="text-button" onClick={() => { decision.reset(); current.reload(); refresh?.(); }}>{tr("刷新列表并重新选择")}</button>}
     {details && <TrackDetails key={`${details.providerInstanceId}-${details.sourceTrackId}`}
       sourceTrackId={details.sourceTrackId} providerInstanceId={details.providerInstanceId} close={() => setDetails(null)} />}
+    {scraping && <TrackScraping key={scraping.sourceTrackId} track={scraping} close={() => setScraping(null)} applied={refresh} />}
     {unlink && refresh && <UnlinkSong track={unlink.track} revision={unlink.revision} refresh={refresh} close={() => setUnlink(null)} />}
   </div>;
 }

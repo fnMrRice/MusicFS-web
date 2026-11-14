@@ -33,6 +33,8 @@ export interface PluginOperation {
   errorCode: string | null;
 }
 export interface ManagedInstance {
+  role?: string;
+  capabilities?: string[];
   instanceId: string;
   name: string;
   runtimeState: string;
@@ -62,6 +64,7 @@ export interface PluginDSP {
   }[];
 }
 export interface ManagedPlugin {
+  role?: string;
   pluginId: string;
   plugin: PluginIdentity;
   version: string;

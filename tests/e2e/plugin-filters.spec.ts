@@ -52,6 +52,18 @@ function entry(card: Locator, pluginId: string) {
   return card.locator(".plugin-entry").filter({ has: card.page().getByText(pluginId, { exact: true }) });
 }
 
+test("scraper type and supported content come from the plugin declaration", async ({ page }) => {
+  const plugin = { id: "example.remote", name: "Remote Metadata", localizedNames: {}, features: ["metadata", "scraper"] };
+  const card = await openPlugins(page, () => ({ items: [...entries, { pluginId: plugin.id, plugin, builtin: {
+    configured: true, capabilities: ["albumDetails", "albumTracks", "artistImage"],
+  }, version: "1.0.0", instances: [] }] }));
+  await card.getByRole("checkbox", { name: "刮削插件" }).check();
+  await expectVisiblePlugins(card, [plugin.id]);
+  const summary = entry(card, plugin.id).locator("summary");
+  for (const label of ["支持刮削的内容", "专辑详情", "专辑曲目", "歌手图像"])
+    await expect(summary).toContainText(label);
+});
+
 async function expectVisiblePlugins(card: Locator, ids: string[]) {
   await expect(card.locator(".plugin-entry")).toHaveCount(ids.length);
   for (const id of ids) await expect(entry(card, id)).toBeVisible();

@@ -1,0 +1,23 @@
+.scraper-search { display: grid; gap: 16px; min-width: 0; }
+.scraper-search form, .scraper-inputs { display: grid; gap: 12px; }
+.scraper-search label { display: grid; gap: 5px; min-width: 0; }
+.scraper-search input, .scraper-search select { min-width: 0; width: 100%; }
+.scraper-selectors, .scraper-inputs { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(170px, 100%), 1fr)); gap: 12px; }
+.scraper-search form > button { justify-self: start; }
+.scraper-controls { display: grid; gap: 14px; border: 0; padding: 0; margin: 0; min-width: 0; }
+.scraper-controls details[open] > summary { margin-bottom: 10px; }
+.scraper-results, .scraped-saved { display: grid; gap: 10px; }
+.scraped-saved { margin-top: 14px; }
+.scraper-result { border: 1px solid var(--line); border-radius: 8px; padding: 12px; min-width: 0; }
+.scraper-result summary { cursor: pointer; overflow-wrap: anywhere; }
+.scraper-result button { margin-top: 10px; }
+.scraped-preview { overflow-wrap: anywhere; }
+.scraped-image { display: block; max-width: 100%; max-height: 220px; object-fit: contain; margin-top: 8px; }
+.scraped-preview p, .scraped-lyrics { white-space: pre-wrap; }
+.scraped-byline, .scraped-track-list small { color: var(--muted); }
+.scraped-byline:not(:empty), .scraped-links { margin-top: 8px; }
+.scraped-links { display: flex; flex-wrap: wrap; gap: 12px; }
+.scraped-lyrics, .scraped-track-list { max-height: 16rem; overflow: auto; }
+.scraped-track-list { list-style: none; margin: 10px 0; padding: 0; }
+.scraped-track-list li { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; border-bottom: 1px solid var(--line); padding: 6px 0; }
+.scraped-track-list small { display: block; }
