@@ -1,11 +1,12 @@
 import { useState } from "react";
-import type { MusicCategoryKind, MusicTrackQuery } from "../../api/music-catalog";
+import type { MusicAlbum, MusicCategoryKind, MusicTrackQuery } from "../../api/music-catalog";
 import type { Provider } from "../../api/types";
 import { useServices } from "../../app/services";
 import { usePages, useResource } from "../../components/query";
 import { Empty, ErrorNotice, Icon, Sentinel } from "../../components/ui";
 import { tr } from "../../i18n";
 import { TrackTable } from "../TrackTable";
+import { AlbumScraping } from "../scrapers/AlbumScraping";
 
 const labels = { artist: "歌手", album: "专辑", genre: "流派" };
 const unknownLabels = { artist: "未知歌手", album: "未知专辑", genre: "未知流派" };
@@ -38,7 +39,14 @@ function MusicCategoryList({ kind, provider, query, navigate }: Props) {
 function MusicCategoryTracks({ kind, provider, providers, id, unknown, query, navigate }: Props) {
   const api = useServices().musicCatalog;
   const scope = `${kind}:${provider}:${id}:${unknown}:${query}`;
-  const title = useResource(scope, (signal) => unknown ? Promise.resolve(tr(unknownLabels[kind])) : api.categoryName(kind, id, signal));
+  const title = useResource<{ name: string; album?: MusicAlbum }>(scope, async (signal) => {
+    if (unknown) return { name: tr(unknownLabels[kind]) };
+    if (kind === "album") {
+      const album = await api.album(id, signal);
+      return { name: album.name, album };
+    }
+    return { name: await api.categoryName(kind, id, signal) };
+  });
   const [revision, setRevision] = useState<number>();
   const filter: MusicTrackQuery = { providerInstanceId: provider, q: query };
   if (unknown) filter.unknown = kind;
@@ -53,11 +61,13 @@ function MusicCategoryTracks({ kind, provider, providers, id, unknown, query, na
   return <>
     <nav className="category-breadcrumbs" aria-label={tr("分类路径")}>
       <button type="button" onClick={() => navigate(null)}>{tr(labels[kind])}</button>
-      {title.data && <span><Icon name="chevron" size={14} /><span aria-current="page">{title.data}</span></span>}
+      {title.data && <span><Icon name="chevron" size={14} /><span aria-current="page">{title.data.name}</span></span>}
     </nav>
     <ErrorNotice error={title.error} retry={title.reload} />
-    {title.data && <div className="category-heading"><h2>{title.data}</h2>
+    {title.data && <div className="category-heading"><h2>{title.data.name}</h2>
       {!pages.cursor && !pages.error && !pages.loading && <span className="muted">{tr("{0} 首", { 0: pages.items.length })}</span>}</div>}
+    {title.data?.album && <AlbumScraping key={`${title.data.album.albumId}:${title.data.album.revision}`} album={title.data.album}
+      refresh={title.reload} />}
     {pages.items.length > 0 && <TrackTable tracks={pages.items} providers={providers} queryKey={scope}
       matchingRevision={revision} onMatchingChange={pages.reload} complete={!pages.cursor && !pages.loading && !pages.error} />}
     <ErrorNotice error={pages.error} retry={pages.retry} />

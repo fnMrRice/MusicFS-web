@@ -8,6 +8,8 @@
 .scraper-controls details[open] > summary { margin-bottom: 10px; }
 .scraper-results, .scraped-saved { display: grid; gap: 10px; }
 .scraped-saved { margin-top: 14px; }
+.album-scraping { margin: 16px 0 24px; }
+.album-scraping h3 { margin: 0; }
 .scraper-result { border: 1px solid var(--line); border-radius: 8px; padding: 12px; min-width: 0; }
 .scraper-result summary { cursor: pointer; overflow-wrap: anywhere; }
 .scraper-result button { margin-top: 10px; }

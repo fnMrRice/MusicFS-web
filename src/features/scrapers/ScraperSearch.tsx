@@ -11,16 +11,19 @@ import "./scrapers.css";
 
 export type ApplyCandidate = (field: string, pluginId: string, candidate: ScrapeCandidate, key: string) => Promise<void>;
 
-export function ScraperSearch({ initial, preferredField, externalIds = [], apply, canApply, finished, refresh, savingChanged }: {
+export function ScraperSearch({ initial, preferredField, externalIds = [], allowedFields, apply, canApply, finished, refresh, savingChanged }: {
   initial: ScraperQuery; preferredField: string; apply?: ApplyCandidate; canApply: (field: string) => boolean;
   externalIds?: { namespace: string; value: string }[];
+  allowedFields?: readonly string[];
   finished: () => void; refresh: () => void; savingChanged: (busy: boolean) => void;
 }) {
   useLocale();
   const client = useServices().client;
   const api = useMemo(() => new ScrapersApi(client), [client]);
   const list = useResource("online-scrapers", (signal) => api.list(signal));
-  const sources = list.data?.filter((source) => source.fields.length) ?? [];
+  const sources = list.data?.map((source) => allowedFields
+    ? { ...source, fields: source.fields.filter((field) => allowedFields.includes(field)) } : source)
+    .filter((source) => source.fields.length) ?? [];
   const [sourceId, setSourceId] = useState("");
   const [chosenField, setField] = useState(preferredField);
   const source = sources.find((item) => item.pluginId === sourceId)

@@ -105,6 +105,18 @@ export class ScrapersApi {
     return items(result, (entry): entry is SavedScrapedField => record(entry) && nonempty(entry.field) &&
       nonempty(entry.pluginId) && isItem(entry.item));
   }
+  async savedAlbum(albumId: string, signal?: AbortSignal): Promise<SavedScrapedField[]> {
+    const result = await this.client.request<unknown>(`/library/albums/${encodeURIComponent(albumId)}/scraped-fields`, { signal });
+    return items(result, (entry): entry is SavedScrapedField => record(entry) && nonempty(entry.field) &&
+      ["albumDetails", "albumTracks", "artwork"].includes(entry.field) &&
+      nonempty(entry.pluginId) && isItem(entry.item));
+  }
+  async applyAlbum(albumId: string, field: string, expectedRevision: number, pluginId: string, candidateToken: string, key: string) {
+    const result = await this.client.request<unknown>(`/library/albums/${encodeURIComponent(albumId)}/scraped-fields/${encodeURIComponent(field)}`,
+      { method: "PUT", body: { expectedRevision, pluginId, candidateToken }, idempotencyKey: key });
+    if (!record(result) || !Number.isSafeInteger(result.revision) || Number(result.revision) <= expectedRevision)
+      throw new ApiError("INVALID_RESPONSE", "Invalid album scraped field revision");
+  }
   async apply(workId: string, field: string, expectedRevision: number, pluginId: string, candidateToken: string, key: string) {
     const result = await this.client.request<unknown>(`/works/${encodeURIComponent(workId)}/scraped-fields/${encodeURIComponent(field)}`,
       { method: "PUT", body: { expectedRevision, pluginId, candidateToken }, idempotencyKey: key });
