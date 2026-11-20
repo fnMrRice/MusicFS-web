@@ -24,14 +24,18 @@ test("album browsing previews the complete release and saves metadata and missin
   await modal.getByRole("button", { name: "搜索", exact: true }).click();
   await expect(modal.getByRole("button", { name: "选用这张专辑", exact: true })).toHaveCount(0);
   await modal.getByRole("button", { name: "预览完整专辑", exact: true }).click();
-  await expect(modal.getByText("第一曲", { exact: true })).toBeVisible();
+  const previewTracks = modal.getByRole("table", { name: "专辑曲目" });
+  await expect(previewTracks.getByRole("cell", { name: "第一曲", exact: true })).toBeVisible();
   expect(state.saved).toEqual([]);
-  await expect(modal.getByText("未收录曲目", { exact: true })).toBeVisible();
+  await expect(previewTracks.getByRole("cell", { name: "未收录曲目", exact: true })).toBeVisible();
   await modal.getByRole("button", { name: "选用这张专辑", exact: true }).click();
   await expect(modal).toHaveCount(0);
   const saved = details(page);
   await expect(detailsToggle(page)).toHaveAttribute("aria-expanded", "true");
-  await expect(saved.getByText("第一曲", { exact: true })).toBeVisible();
+  const tracklistToggle = saved.getByRole("button", { name: "曲目表", exact: true });
+  const savedTracks = saved.getByRole("table", { name: "专辑曲目" });
+  await expect(tracklistToggle).toHaveAttribute("aria-expanded", "false");
+  await expect(savedTracks).toBeHidden();
   expect(state.searches).toEqual([{ field: "albumDetails", query: { title: album.originalName } },
     { field: "albumTracks", query: { externalId: candidate.id, sourceUrl: candidate.sourceUrl } }]);
   expect(state.writes).toEqual([{ path: "/library/albums/one/scraped-fields",
@@ -40,10 +44,22 @@ test("album browsing previews the complete release and saves metadata and missin
   const added = page.locator(".tracks tbody tr").filter({ hasText: "未收录曲目" });
   await expect(added).toHaveClass(/source-missing/);
   await expect(added.getByRole("button", { name: "播放 未收录曲目", exact: true })).toBeDisabled();
+  await tracklistToggle.click();
+  await expect(tracklistToggle).toHaveAttribute("aria-expanded", "true");
+  await expect(savedTracks.getByRole("cell", { name: "第一曲", exact: true })).toBeVisible();
+  await expect(savedTracks.getByRole("cell", { name: "未收录曲目", exact: true })).toBeVisible();
+  await tracklistToggle.click();
+  await expect(tracklistToggle).toHaveAttribute("aria-expanded", "false");
+  await expect(savedTracks).toBeHidden();
+  await expect(added).toBeVisible();
+  await expect(page.getByRole("button", { name: "播放 第一曲", exact: true })).toBeEnabled();
   await page.reload();
   await expect(saved).toHaveCount(0);
   await detailsToggle(page).click();
-  await expect(saved.getByText("第一曲", { exact: true })).toBeVisible();
+  await expect(tracklistToggle).toHaveAttribute("aria-expanded", "false");
+  await expect(savedTracks).toBeHidden();
+  await tracklistToggle.click();
+  await expect(savedTracks.getByRole("cell", { name: "第一曲", exact: true })).toBeVisible();
   await expect(saved.getByRole("link", { name: "在平台查看", exact: true }).first()).toHaveAttribute("href", candidate.sourceUrl);
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);

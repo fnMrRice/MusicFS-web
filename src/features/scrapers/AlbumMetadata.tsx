@@ -1,6 +1,7 @@
+import { useId, useState } from "react";
 import type { MusicAlbum } from "../../api/music-catalog";
 import type { SavedScrapedField, ScrapedItem } from "../../api/scrapers";
-import { duration } from "../../components/ui";
+import { duration, Icon } from "../../components/ui";
 import { tr, useLocale, type Locale } from "../../i18n";
 import { AlbumCover } from "../library/AlbumCover";
 import { externalLink } from "./fields";
@@ -37,8 +38,13 @@ function MetadataFields({ album, item }: { album: MusicAlbum; item?: ScrapedItem
     </div>)}</dl>;
 }
 
-export function AlbumMetadata({ album, fields }: { album: MusicAlbum; fields: SavedScrapedField[] }) {
+export function AlbumMetadata({ album, fields, collapsibleTrackList = false }: {
+  album: MusicAlbum; fields: SavedScrapedField[]; collapsibleTrackList?: boolean;
+}) {
   useLocale();
+  const trackListId = useId();
+  const [expanded, setExpanded] = useState(false);
+  const showTracks = !collapsibleTrackList || expanded;
   const details = fields.find((entry) => entry.field === "albumDetails");
   return <>
     <article className="album-metadata-section">
@@ -50,12 +56,15 @@ export function AlbumMetadata({ album, fields }: { album: MusicAlbum; fields: Sa
     {fields.filter((entry) => entry.field !== "albumDetails").map(({ field, item }) => {
     const heading = field === "albumTracks" ? "曲目表" : "封面";
     return <article className="album-metadata-section" key={field}>
-      <header><h3>{tr(heading)}</h3>
+      <header><h3>{field === "albumTracks" && collapsibleTrackList && item.tracks?.length
+        ? <button type="button" className="album-tracklist-toggle" aria-expanded={expanded} aria-controls={trackListId}
+            onClick={() => setExpanded(open => !open)}><Icon name="chevron" size={14} />{tr(heading)}</button>
+        : tr(heading)}</h3>
         <PlatformLink value={item.sourceUrl} />
       </header>
       {field === "artwork" && <AlbumCover coverPath={item.imageUrl} name={album.name} size="preview" />}
-      {field === "albumTracks" && !!item.tracks?.length && <div className="album-tracklist-wrap">
-        <table className="album-tracklist">
+      {field === "albumTracks" && !!item.tracks?.length && <div id={trackListId} className="album-tracklist-wrap" hidden={!showTracks}>
+        {showTracks && <table className="album-tracklist">
           <caption className="sr-only">{tr("专辑曲目")}</caption>
           <thead><tr><th>{tr("曲序")}</th><th>{tr("曲名")}</th><th>{tr("艺人")}</th><th>{tr("时长")}</th></tr></thead>
           <tbody>{item.tracks.map((track, index) => <tr key={index}>
@@ -63,7 +72,7 @@ export function AlbumMetadata({ album, fields }: { album: MusicAlbum; fields: Sa
             <td>{track.title}</td><td>{track.artist || "—"}</td>
             <td>{track.duration ? duration(track.duration * 1000) : "—"}</td>
           </tr>)}</tbody>
-        </table>
+        </table>}
       </div>}
     </article>;
   })}</>;
