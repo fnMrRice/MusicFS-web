@@ -146,6 +146,7 @@ function PlaylistTracks({ id, revision }: { id: string; revision: number }) {
             !pages.error &&
             !unresolved.length
           }
+          pagination={{ loading: pages.loading, hasMore: !!pages.cursor, error: pages.error, more: pages.more }}
         />
       )}
       {unresolved.length > 0 && (

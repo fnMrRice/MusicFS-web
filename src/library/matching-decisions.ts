@@ -1,6 +1,7 @@
 import { ApiError } from "../api/client";
 import { MatchingApi, isBulkMergeMutation, type BulkMergeMutation, type MatchingMutation, type MatchingRequest } from "../api/matching";
 import { Store } from "../app/store";
+import { isTrackSelection } from "../api/track-selection";
 
 export interface PendingDecision { key: string; request: MatchingRequest; status: "pending" | "uncertain" }
 
@@ -12,8 +13,10 @@ function valid(value: unknown): value is PendingDecision {
   const id = (value: unknown) => typeof value === "string" && value.length > 0 && value.length <= 256;
   if (request.kind === "bulk-merge") return request.mode === "title_artist" ? request.minimumScore === undefined :
     request.mode === "score" && Number.isInteger(request.minimumScore) && request.minimumScore! >= 0 && request.minimumScore! <= 100;
-  if (request.kind === "links") return Array.isArray(request.sourceTrackIds) && request.sourceTrackIds.length >= 2 &&
-    request.sourceTrackIds.length <= 256 && request.sourceTrackIds.every(id) && (request.targetRecordingId === null || id(request.targetRecordingId));
+  if (request.kind === "links") return (request.targetRecordingId === null || id(request.targetRecordingId)) &&
+    (request.selection !== undefined ? request.sourceTrackIds === undefined && isTrackSelection(request.selection) :
+      Array.isArray(request.sourceTrackIds) && request.sourceTrackIds.length >= 2 &&
+      request.sourceTrackIds.length <= 256 && request.sourceTrackIds.every(id));
   if (request.kind === "unlinks") return id(request.sourceTrackId);
   if (request.kind === "default-source") return id(request.recordingId) && (request.sourceTrackId === null || id(request.sourceTrackId));
   return request.kind === "exclusions" && id(request.leftSourceTrackId) && id(request.rightSourceTrackId) && typeof request.excluded === "boolean";

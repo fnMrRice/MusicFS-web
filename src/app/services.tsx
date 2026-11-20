@@ -12,6 +12,7 @@ import type {
 } from "../api/types";
 import { PlayerController } from "../player/controller";
 import { PlaybackQueue, type PlaybackMode } from "../player/playback-queue";
+import { QueuePersistence } from "../player/queue-persistence";
 import { audioFactory } from "../player/audio-adapter";
 import { capabilities } from "../player/capabilities";
 import { Store } from "./store";
@@ -107,6 +108,7 @@ export class Services {
     (status) => this.audioOutput.reportStatus(status));
   playlists = new Store<Playlist[]>([]);
   queue = new PlaybackQueue();
+  private queuePersistence = new QueuePersistence(this.queue);
   recordingCovers = new RecordingCovers();
   player: PlayerController;
   playerState: Store<PlayerController["state"]>;
@@ -228,12 +230,12 @@ export class Services {
   private accept(session: AuthSession): void {
     this.recordingCovers.clear();
     this.player.stop();
-    this.queue.forgetSelection();
     this.dsp.dispose();
     this.sourcePlaylists.clear();
     this.content.clearOnlineInstances();
     this.libraryApi.clearProviderInstances();
     this.auth.set({ ...this.auth.value, session, busy: false, error: null });
+    this.queuePersistence.setServer(new URL(this.client.url(""), window.location.href).href);
     this.scans.setSession(this.auth.value.ready!.instanceId, session.user.id);
     this.refreshSubmissions.setSession(new URL(this.client.url(""), window.location.href).href, session.user.id);
     this.tasks.start(session.user.role === "admin");
@@ -342,7 +344,9 @@ export class Services {
       });
     }
   }
-  clear(): void {
+  clear(options: { preserveQueue?: boolean } = {}): void {
+    if (options.preserveQueue) this.queuePersistence.detach();
+    else this.queuePersistence.clear();
     this.tasks.clear();
     this.refreshSubmissions.clear();
     this.favorites.clear();

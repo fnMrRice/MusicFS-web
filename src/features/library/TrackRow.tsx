@@ -5,6 +5,7 @@ import { useServices, useStore } from "../../app/services";
 import { Cover, duration, Icon, IconButton } from "../../components/ui";
 import { TrackVersions } from "../matching/TrackVersions";
 import { useTrackCover } from "../../components/use-track-cover";
+import { trackAvailabilityMessage } from "../../library/track-availability";
 import { TrackPlaybackIndicator } from "../TrackPlaybackIndicator";
 
 export function TrackRow({
@@ -93,11 +94,7 @@ export function TrackRow({
             </button>}
             {t.availability !== "available" && (
               <small className="availability">
-                {t.availability === "offline"
-                  ? tr("来源离线")
-                  : t.availability === "missing"
-                    ? tr("文件缺失")
-                    : tr("可用性未知")}
+                {tr(trackAvailabilityMessage(t.availability))}
               </small>
             )}
           </div>

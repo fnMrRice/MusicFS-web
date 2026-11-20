@@ -1,5 +1,6 @@
 import { ApiClient, ApiError } from "./client";
 import type { SourceTrack } from "./types";
+import type { TrackSelection } from "./track-selection";
 
 export interface MatchCandidate {
   candidateId: string;
@@ -18,7 +19,8 @@ export type BulkMergeMode = "score" | "title_artist";
 export interface MatchingRevision { revision: number; bulkMergeAvailable?: boolean }
 export type MatchingRequest =
   | { kind: "bulk-merge"; expectedRevision: number; mode: BulkMergeMode; minimumScore?: number }
-  | { kind: "links"; expectedRevision: number; sourceTrackIds: string[]; targetRecordingId: string | null }
+  | ({ kind: "links"; expectedRevision: number; targetRecordingId: string | null } &
+    ({ sourceTrackIds: string[]; selection?: never } | { selection: TrackSelection; sourceTrackIds?: never }))
   | { kind: "unlinks"; expectedRevision: number; sourceTrackId: string }
   | { kind: "default-source"; expectedRevision: number; recordingId: string; sourceTrackId: string | null }
   | { kind: "exclusions"; expectedRevision: number; leftSourceTrackId: string; rightSourceTrackId: string; excluded: boolean };

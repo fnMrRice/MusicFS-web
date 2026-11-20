@@ -37,7 +37,7 @@ export async function startServer(options: { ncm?: boolean } = {}): Promise<Test
     webRoot, allowLoopbackHttp: true, allowedOrigins: [origin, 'http://127.0.0.1:5173'], maxSessions: 32,
     plugins: [
       { pluginId: 'musicfs.plugin.source.localfiles', executable: join(directory, 'musicfs-plugin-local' + suffix), enabled: true,
-        instances: [{ instanceId: instanceIds.local, name: '测试音乐', enabled: true,
+        instances: [{ instanceId: instanceIds.local, name: '测试音乐', enabled: true, importDefaults: { importLyrics: false },
           config: { musicRoots: [{ id: 'local', name: '测试音乐', path: music }] } }] },
       { pluginId: 'musicfs.plugin.decoder.ffmpeg', executable: join(directory, 'musicfs-plugin-audio-ffmpeg' + suffix), enabled: true,
         instances: [{ instanceId: instanceIds.ffmpeg, enabled: true, config: { ffmpegPath: ffmpeg, ffprobePath: ffprobe } }] },

@@ -88,7 +88,7 @@ createRoot(root).render(
 window.addEventListener("pagehide", () => services.player.stop());
 if (import.meta.hot)
   import.meta.hot.dispose(() => {
-    services.clear();
+    services.clear({ preserveQueue: true });
     audioRoot.remove();
   });
 void services.connect();

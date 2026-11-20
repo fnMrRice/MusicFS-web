@@ -110,7 +110,7 @@ export function PlayerPanels({ track }: { track: SourceTrack | null }) {
                 </div>
                 {isQueue ? (
                   <>
-                    <p className="muted">{tr("当前浏览器会话 · {0} 首", { 0: queue.items.length })}</p>
+                    <p className="muted">{tr("临时播放列表 · {0} 首", { 0: queue.items.length })}</p>
                     {queue.items.length ? (
                       <ol className="queue-list">
                         {queue.items.map((t, i) => (

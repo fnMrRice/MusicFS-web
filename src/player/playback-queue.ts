@@ -14,6 +14,11 @@ interface Selection {
   future: number[];
   priority: number[];
 }
+export interface PlaybackQueueSnapshot extends PlaybackQueueState {
+  history: number[];
+  future: number[];
+  priority: number[];
+}
 
 export class PlaybackQueue extends Store<PlaybackQueueState> {
   private history: number[] = [];
@@ -25,6 +30,22 @@ export class PlaybackQueue extends Store<PlaybackQueueState> {
 
   constructor(private random: () => number = Math.random) {
     super({ items: [], index: -1, mode: "sequence" });
+  }
+
+  snapshot(): PlaybackQueueSnapshot {
+    const history = [...this.history], future = [...this.future];
+    // 刷新只恢复导航状态，不恢复尚未完成的淡出切歌事务。
+    while (history.at(-1) === this.value.index) history.pop();
+    while (future.at(-1) === this.value.index) future.pop();
+    return { ...this.value, history, future, priority: [...this.priority] };
+  }
+
+  restore(snapshot: PlaybackQueueSnapshot): void {
+    this.forgetSelection();
+    this.history = snapshot.history;
+    this.future = snapshot.future;
+    this.priority = snapshot.priority;
+    this.set({ items: snapshot.items, index: snapshot.index, mode: snapshot.mode });
   }
 
   commitSelection(): void {

@@ -226,3 +226,51 @@ for (const viewport of [{ width: 1200, height: 900 }, { width: 390, height: 844 
     expect(creates).toEqual([]); expect(errors).toEqual([]);
   });
 }
+
+test('refresh preserves appended queue entries including duplicates without starting playback', async ({ page }) => {
+  const { creates, errors } = await setup(page, 3);
+  const titles = ['Alpha.wav', 'Beta.wav', 'Track 3.wav'];
+  await page.getByRole('button', { name: '加入队列', exact: true }).click();
+  await page.getByRole('button', { name: '加入队列', exact: true }).click();
+  await queue(page).click(); await expectQueue(page);
+  await expect(page.locator('.queue-list button')).toHaveText([...titles, ...titles]);
+  await page.reload();
+  await expect(page.getByRole('button', { name: '账号菜单', exact: true })).toBeVisible();
+  await expect(panel(page)).toHaveCount(0);
+  await queue(page).click(); await expectQueue(page);
+  await expect(page.locator('.queue-list button')).toHaveText([...titles, ...titles]);
+  await expect(page.locator('.queue-list button[aria-current="true"]')).toHaveCount(0);
+  await expect(page.locator('audio')).toHaveCount(0);
+  expect(creates).toEqual([]); expect(errors).toEqual([]);
+});
+
+test('refresh restores shuffled pinned queue, selected entry and mode without resuming audio', async ({ page }) => {
+  // 固定重排结果，同时保留重复曲目以验证恢复的是队列位置。
+  await page.addInitScript(() => { Math.random = () => 0; });
+  const { creates, errors } = await setup(page, 3);
+  const original = ['Alpha.wav', 'Beta.wav', 'Track 3.wav', 'Alpha.wav', 'Beta.wav', 'Track 3.wav'];
+  await page.getByRole('button', { name: '加入队列', exact: true }).click();
+  await page.getByRole('button', { name: '加入队列', exact: true }).click();
+  await pinQueue(page);
+  const buttons = page.locator('.queue-list button');
+  await buttons.nth(4).click(); await waitPlaying(page);
+  await page.getByRole('button', { name: '播放模式：顺序播放，点击切换', exact: true }).click();
+  await page.getByRole('button', { name: '打乱队列', exact: true }).click();
+  await expect.poll(() => buttons.allTextContents()).not.toEqual(original);
+  const shuffled = await buttons.allTextContents();
+  expect([...shuffled].sort()).toEqual([...original].sort());
+  const selectedIndex = await buttons.evaluateAll((items) => items.findIndex((item) => item.getAttribute('aria-current') === 'true'));
+  expect(selectedIndex).toBeGreaterThanOrEqual(0);
+  await expect(buttons.nth(selectedIndex)).toHaveText('Beta.wav');
+  await page.reload();
+  await expectQueue(page);
+  await expect(queue(page)).toHaveAttribute('aria-pressed', 'true');
+  await expect(buttons).toHaveText(shuffled);
+  await expect(buttons.nth(selectedIndex)).toHaveAttribute('aria-current', 'true');
+  await expect(page.locator('.queue-list button[aria-current="true"]')).toHaveCount(1);
+  await expect(page.getByRole('button', { name: '播放模式：列表循环，点击切换', exact: true })).toBeVisible();
+  await expect(page.locator('audio')).toHaveCount(0);
+  expect(creates).toEqual(['Beta']);
+  await buttons.nth(selectedIndex).click(); await waitPlaying(page);
+  expect(creates).toEqual(['Beta', 'Beta']); expect(errors).toEqual([]);
+});
