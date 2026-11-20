@@ -147,6 +147,13 @@ export class ScrapersApi {
       ["albumDetails", "albumTracks", "artwork"].includes(entry.field) &&
       nonempty(entry.pluginId) && isItem(entry.item));
   }
+  async clearAlbum(albumId: string, expectedRevision: number, key: string): Promise<void> {
+    const result = await this.client.request<unknown>(`/library/albums/${encodeURIComponent(albumId)}/scraped-fields`, {
+      method: "DELETE", body: { expectedRevision }, idempotencyKey: key,
+    });
+    if (!record(result) || !Number.isSafeInteger(result.revision) || Number(result.revision) < expectedRevision)
+      throw new ApiError("INVALID_RESPONSE", "Invalid cleared album revision");
+  }
   async applyAlbum(albumId: string, field: string, expectedRevision: number, pluginId: string, candidateToken: string, key: string) {
     const result = await this.client.request<unknown>(`/library/albums/${encodeURIComponent(albumId)}/scraped-fields/${encodeURIComponent(field)}`,
       { method: "PUT", body: { expectedRevision, pluginId, candidateToken }, idempotencyKey: key });

@@ -1,4 +1,11 @@
 export default {
+  "清空刮削资料": ["Clear scraped metadata", "清空刮削資料", "取得済みのメタデータを消去"],
+  "清空《{0}》从各平台保存的专辑资料、封面记录和曲目表？": ["Clear the album metadata, artwork records and track list saved from all platforms for “{0}”?", "清空《{0}》從各平台儲存的專輯資料、封面記錄和曲目表？", "「{0}」について各配信元から保存したアルバム情報、カバー画像の記録、曲目一覧を消去しますか？"],
+  "一并移除仅由这张专辑刮削补建且未被使用的曲目。音源、平台链接和已合并到曲库的资料会保留。": ["Unused tracks created solely by scraping this album will also be removed. Audio sources, platform links and metadata merged into the library are kept.", "一併移除僅由這張專輯刮削補建且未被使用的曲目。音源、平台連結和已合併到曲庫的資料會保留。", "このアルバムの情報取得でのみ作成され、使われていない曲も削除します。音源、配信元へのリンク、ライブラリに反映済みの情報は保持します。"],
+  "专辑资料已变化，请刷新后重新确认。": ["The album metadata has changed. Refresh it and confirm again.", "專輯資料已變更，請重新整理後再次確認。", "アルバム情報が変更されました。更新して再度確認してください。"],
+  "清空结果待确认。可手动重试，或关闭弹窗刷新专辑。": ["The result is unknown. Retry manually, or close the dialog to refresh the album.", "清空結果待確認。可手動重試，或關閉對話框重新整理專輯。", "消去の結果を確認できません。手動で再試行するか、ダイアログを閉じてアルバムを更新してください。"],
+  "确认清空": ["Confirm clear", "確認清空", "消去する"],
+  "重试确认清空": ["Retry clear", "重試確認清空", "消去を再試行"],
   "{0} 可在 {1} 秒后重试。": ["{0} You can retry in {1} seconds.", "{0} 可在 {1} 秒後重試。", "{0} {1} 秒後に再試行できます。"],
   "资料查询受到限制（HTTP {0}）。": ["Metadata search was limited (HTTP {0}).", "資料查詢受到限制（HTTP {0}）。", "資料の検索が制限されました（HTTP {0}）。"],
   "MusicFS 同时进行的资料查询过多，本次未向 {0} 发送请求。": ["MusicFS has too many active searches. It did not send a request to {0}.", "MusicFS 同時進行的資料查詢過多，本次未向 {0} 傳送請求。", "MusicFS で実行中の検索が多すぎるため、{0} にリクエストを送信しませんでした。"],

@@ -9,6 +9,7 @@ import { tr, useLocale } from "../../i18n";
 import { AlbumMetadata } from "./AlbumMetadata";
 import { AlbumScraperSearch } from "./AlbumScraperSearch";
 import { AlbumEditor } from "./AlbumEditor";
+import { AlbumScrapeClear } from "./AlbumScrapeClear";
 import { AlbumRefresh } from "./AlbumRefresh";
 import { AlbumPreviews } from "./album-previews";
 import { externalLink } from "./fields";
@@ -29,6 +30,7 @@ export function AlbumScraping({ album, artist, detailsId, detailsOpen, applied, 
   const [searchOpen, setSearchOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [clearTarget, setClearTarget] = useState<MusicAlbum | null>(null);
   const online = saved.data?.find((entry) => entry.field === "albumDetails")?.item;
   const linked = album.sourceLinks.some(link => !!externalLink(link.url));
   return <>
@@ -38,6 +40,7 @@ export function AlbumScraping({ album, artist, detailsId, detailsOpen, applied, 
         <button type="button" disabled={saved.loading || !linked} onClick={() => setRefreshing(true)}
           title={linked ? undefined : tr("请先在编辑资料中关联平台专辑页面。")}>{tr("刷新资料")}</button>
         <button type="button" disabled={saved.loading} onClick={() => setEditing(true)}>{tr("编辑资料")}</button>
+        {!!saved.data?.length && <button type="button" onClick={() => setClearTarget(album)}>{tr("清空刮削资料")}</button>}
       </div>
       <ErrorNotice error={saved.error} retry={saved.reload} />
       {saved.loading && <p className="muted" role="status">{tr("正在加载…")}</p>}
@@ -58,5 +61,7 @@ export function AlbumScraping({ album, artist, detailsId, detailsOpen, applied, 
     {refreshing && <Modal title={tr("对比专辑资料")} close={() => { if (!saving) setRefreshing(false); }}>
       <AlbumRefresh album={album} previews={previews} applied={() => { setRefreshing(false); applied(); }} savingChanged={setSaving} />
     </Modal>}
+    {clearTarget?.albumId === album.albumId && <AlbumScrapeClear album={clearTarget} api={api}
+      close={() => setClearTarget(null)} reload={() => { setClearTarget(null); applied(); }} />}
   </>;
 }
