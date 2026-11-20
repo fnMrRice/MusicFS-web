@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { preview, type PreviewServer } from "vite";
-import { album, candidate, completeCandidate, artwork, mock, dialog, details, detailsToggle, scraping,
+import { album, candidate, completeCandidate, artwork, mock, dialog, details, detailsToggle, albumSearchButton,
   openAlbum as openAlbumFixture } from "./album-scraping-mock";
 let server: PreviewServer;
 let origin: string;
@@ -60,7 +60,7 @@ test("a conflicting album selection refreshes the observed revision before anoth
   await expect(dialog(page).getByRole("alert")).toBeVisible();
   await dialog(page).getByRole("button", { name: "刷新资料", exact: true }).click();
   await expect(dialog(page)).toHaveCount(0);
-  await page.getByRole("button", { name: "搜索在线资料", exact: true }).click();
+  await albumSearchButton(page).click();
   await dialog(page).getByRole("button", { name: "搜索", exact: true }).click();
   await dialog(page).getByRole("button", { name: "预览完整专辑", exact: true }).click();
   await dialog(page).getByRole("button", { name: "选用这张专辑", exact: true }).click();
@@ -171,11 +171,11 @@ test("the unknown album category does not offer a shared scraping target", async
   await mock(page);
   await page.goto(`${origin}/#/library?category=${encodeURIComponent("专辑")}&unknownCategory=1`);
   await expect(page.getByRole("heading", { name: "未知专辑", exact: true })).toBeVisible();
-  await expect(scraping(page)).toHaveCount(0);
+  await expect(albumSearchButton(page)).toHaveCount(0);
   await expect(detailsToggle(page)).toHaveCount(0);
 });
 
-test("album details stay collapsed and the scraping action remains beside sorting during selection", async ({ page }, info) => {
+test("album search opens from expanded details before refresh, including while tracks are selected", async ({ page }, info) => {
   const state = await mock(page);
   state.saved = [{ field: "albumDetails", pluginId: "album-source", item: candidate }];
   await page.emulateMedia({ colorScheme: "dark" });
@@ -185,18 +185,19 @@ test("album details stay collapsed and the scraping action remains beside sortin
   const heading = await page.getByRole("heading", { name: album.name, exact: true }).boundingBox();
   const toggle = await detailsToggle(page).boundingBox();
   expect(toggle!.x).toBeGreaterThanOrEqual(heading!.x + heading!.width);
-  await expect(page.locator(".list-actions").getByRole("button", { name: "搜索在线资料", exact: true })).toBeVisible();
-  async function beforeSorting() {
-    const action = await scraping(page).boundingBox();
-    const sort = await page.getByRole("combobox", { name: "曲目排序", exact: true }).boundingBox();
-    expect(action!.x + action!.width).toBeLessThanOrEqual(sort!.x);
-    expect(Math.abs(action!.y + action!.height / 2 - sort!.y - sort!.height / 2)).toBeLessThan(2);
-  }
-  await beforeSorting();
+  const toolbarSearch = page.locator(".list-actions").getByRole("button", { name: /^(搜索|刮削|搜索在线资料)$/ });
+  await expect(toolbarSearch).toHaveCount(0);
+  const search = albumSearchButton(page);
+  await expect(search).toHaveCount(0);
   await page.screenshot({ path: info.outputPath("album-desktop-dark-collapsed.png") });
   await detailsToggle(page).click();
   await expect(detailsToggle(page)).toHaveAttribute("aria-expanded", "true");
   const panel = details(page);
+  await expect(search).toHaveText("搜索");
+  const searchBox = await search.boundingBox();
+  const refreshBox = await panel.getByRole("button", { name: "刷新资料", exact: true }).boundingBox();
+  expect(searchBox!.x + searchBox!.width).toBeLessThanOrEqual(refreshBox!.x);
+  expect(Math.abs(searchBox!.y + searchBox!.height / 2 - refreshBox!.y - refreshBox!.height / 2)).toBeLessThan(2);
   expect(await detailsToggle(page).getAttribute("aria-controls")).toBe(await panel.getAttribute("id"));
   await expect(panel.getByText("平台专辑名", { exact: true })).toHaveCount(0);
   for (const label of ["显示名", "原名", "艺人", "发行日期", "发行商", "音乐风格", "补充信息"]) {
@@ -216,31 +217,39 @@ test("album details stay collapsed and the scraping action remains beside sortin
   await expect(panel).toHaveCount(0);
   await page.getByRole("checkbox", { name: "选择 第一曲", exact: true }).check();
   await expect(page.getByRole("button", { name: "添加到歌单", exact: true })).toBeVisible();
-  await beforeSorting();
-  await scraping(page).click();
+  await expect(toolbarSearch).toHaveCount(0);
+  await expect(search).toHaveCount(0);
+  await detailsToggle(page).click();
+  await search.click();
   await expect(dialog(page)).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(dialog(page)).toHaveCount(0);
+  await expect(page.getByRole("checkbox", { name: "选择 第一曲", exact: true })).toBeChecked();
   await page.getByRole("button", { name: "清空选择", exact: true }).click();
+  await detailsToggle(page).click();
   await page.setViewportSize({ width: 390, height: 844 });
   await page.emulateMedia({ colorScheme: "light" });
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
-  await expect(scraping(page)).toBeInViewport();
+  await expect(search).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: info.outputPath("album-mobile-light-collapsed.png") });
   await detailsToggle(page).click();
+  await expect(search).toBeInViewport();
   await expect(panel.getByText("2013/4/2", { exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: info.outputPath("album-mobile-light-expanded.png") });
 });
 
-test("an empty album still exposes scraping and details without an oversized metadata section", async ({ page }) => {
+test("an empty album offers search in details without requiring a saved platform link", async ({ page }) => {
   await mock(page, { empty: true });
   await openAlbum(page, false);
   await expect(page.locator(".tracks tbody tr")).toHaveCount(0);
   await expect(details(page)).toHaveCount(0);
-  await expect(scraping(page)).toBeEnabled();
-  await scraping(page).click();
+  await expect(albumSearchButton(page)).toHaveCount(0);
+  await detailsToggle(page).click();
+  await expect(details(page).getByRole("button", { name: "刷新资料", exact: true })).toBeDisabled();
+  await expect(albumSearchButton(page)).toBeEnabled();
+  await albumSearchButton(page).click();
   await expect(dialog(page)).toBeVisible();
 });
 

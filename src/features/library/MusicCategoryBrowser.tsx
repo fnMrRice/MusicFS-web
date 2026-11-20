@@ -44,7 +44,6 @@ function MusicCategoryTracks({ kind, provider, providers, id, unknown, query, na
   const api = services.musicCatalog;
   const detailsId = useId();
   const [detailsOpen, setDetailsOpen] = useState(false);
-  const [searchOpen, setSearchOpen] = useState(false);
   const scope = `${kind}:${provider}:${id}:${unknown}:${query}`;
   const title = useResource<{ name: string; album?: MusicAlbum; artist?: NamedArtist }>(scope, async (signal) => {
     if (unknown) return { name: tr(unknownLabels[kind]) };
@@ -71,11 +70,8 @@ function MusicCategoryTracks({ kind, provider, providers, id, unknown, query, na
   }, (item) => item.trackId);
   const album = title.data?.album;
   const finish = () => {
-    setSearchOpen(false); setDetailsOpen(true);
     title.reload(); pages.reload(); services.invalidateLibraries();
   };
-  const scrape = album && <button type="button" className="album-scrape-action" aria-label={tr("搜索在线资料")}
-    onClick={() => setSearchOpen(true)}><Icon name="search" size={15} />{tr("刮削")}</button>;
   return <>
     <nav className="category-breadcrumbs" aria-label={tr("分类路径")}>
       <button type="button" onClick={() => navigate(null)}>{tr(labels[kind])}</button>
@@ -93,11 +89,10 @@ function MusicCategoryTracks({ kind, provider, providers, id, unknown, query, na
         {!pages.cursor && !pages.error && !pages.loading && <span className="muted">{tr("{0} 首", { 0: pages.items.length })}</span>}
       </div>
     </div>}
-    {album && <AlbumScraping album={album} detailsId={detailsId} detailsOpen={detailsOpen} searchOpen={searchOpen}
-      closeSearch={() => setSearchOpen(false)} applied={finish}
-      refresh={() => { setSearchOpen(false); title.reload(); pages.reload(); }} />}
+    {album && <AlbumScraping album={album} detailsId={detailsId} detailsOpen={detailsOpen}
+      applied={finish} refresh={() => { title.reload(); pages.reload(); }} />}
     {(pages.items.length > 0 || album) && <TrackTable tracks={pages.items} providers={providers} queryKey={scope}
-      toolbarActions={scrape} hideEmptyTable
+      hideEmptyTable
       pagination={{ loading: pages.loading, hasMore: !!pages.cursor, error: pages.error, more: pages.more }}
       albumScope={album && { albumId: album.albumId, revision: album.revision, reload: () => { title.reload(); pages.reload(); services.invalidateLibraries(); } }}
       matchingRevision={revision} onMatchingChange={kind === "album" && !unknown && !album ? undefined : pages.reload}
