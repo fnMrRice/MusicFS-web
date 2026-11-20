@@ -5,13 +5,13 @@ import { tr, useLocale, type Locale } from "../../i18n";
 import { AlbumCover } from "../library/AlbumCover";
 import { externalLink } from "./fields";
 
-function genreName(value?: string) {
+export function genreName(value?: string) {
   if (!value) return undefined;
   const labels: Record<string, string> = { mandopop: "华语流行", cantopop: "粤语流行" };
   return labels[value.toLowerCase()] ? tr(labels[value.toLowerCase()]!) : value;
 }
 
-function albumDate(value: string | null | undefined, locale: Locale) {
+export function albumDate(value: string | null | undefined, locale: Locale) {
   if (!value) return undefined;
   if (/^\d{4}$/.test(value)) return value;
   const date = new Date(value);
@@ -43,7 +43,7 @@ export function AlbumMetadata({ album, fields }: { album: MusicAlbum; fields: Sa
   const details = fields.find((entry) => entry.field === "albumDetails");
   return <>
     <article className="album-metadata-section">
-      <header><h3>{tr("专辑资料")}</h3><PlatformLink value={details?.item.sourceUrl} /></header>
+      <header><h3>{tr("专辑资料")}</h3><PlatformLink value={album.sourceUrl ?? undefined} /></header>
       <MetadataFields album={album} item={details?.item} />
       {!fields.length && <p className="muted album-metadata-empty">{tr("尚无在线专辑资料，可通过「刮削」补充。")}</p>}
     </article>

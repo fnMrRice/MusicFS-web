@@ -47,6 +47,7 @@ export interface ScrapedItem {
 }
 export interface ScrapeCandidate extends ScrapedItem { candidateToken: string }
 export interface SavedScrapedField { field: string; pluginId: string; item: ScrapedItem }
+export type AlbumMergeField = "name" | "artist" | "releaseDate" | "publisher" | "genre" | "description" | "cover" | "tracks";
 export interface TrackMediaSelection {
   target: { sourceTrackId: string; assetId: string; assetVersion: string };
   revision: number;
@@ -126,6 +127,13 @@ export class ScrapersApi {
       { method: "PUT", body: { expectedRevision, pluginId, candidates }, idempotencyKey: key });
     if (!record(result) || !Number.isSafeInteger(result.revision) || Number(result.revision) <= expectedRevision)
       throw new ApiError("INVALID_RESPONSE", "Invalid complete album revision");
+  }
+  async mergeAlbumMetadata(albumId: string, expectedRevision: number, pluginId: string,
+    candidates: { albumDetails: string; albumTracks: string }, fields: AlbumMergeField[], key: string) {
+    const result = await this.client.request<unknown>(`/library/albums/${encodeURIComponent(albumId)}/metadata-merge`,
+      { method: "PUT", body: { expectedRevision, pluginId, candidates, fields }, idempotencyKey: key });
+    if (!record(result) || !Number.isSafeInteger(result.revision) || Number(result.revision) <= expectedRevision)
+      throw new ApiError("INVALID_RESPONSE", "Invalid merged album revision");
   }
   async apply(workId: string, field: string, expectedRevision: number, pluginId: string, candidateToken: string, key: string) {
     const result = await this.client.request<unknown>(`/works/${encodeURIComponent(workId)}/scraped-fields/${encodeURIComponent(field)}`,

@@ -11,6 +11,8 @@ export interface MusicAlbum extends CatalogAlbum {
   coverPath: string | null;
   publisher: string | null;
   releaseDate: string | null;
+  sourceUrl: string | null;
+  sourcePluginId: string | null;
 }
 export interface MusicTrack {
   trackId: string;
@@ -41,7 +43,8 @@ const nullableText = (value: unknown) => value === null || text(value);
 function musicAlbum(value: unknown, albumId: string): value is MusicAlbum {
   return record(value) && value.albumId === albumId && text(value.name) && text(value.originalName) &&
     Number.isSafeInteger(value.revision) && Number(value.revision) > 0 && typeof value.isExternal === "boolean" &&
-    ["externalId", "coverPath", "publisher", "releaseDate"].every((key) => nullableText(value[key]));
+    ["externalId", "coverPath", "publisher", "releaseDate", "sourceUrl", "sourcePluginId"].every((key) => nullableText(value[key])) &&
+    (value.sourceUrl === null) === (value.sourcePluginId === null);
 }
 const source = (value: unknown): value is SourceTrack => record(value) && id(value.sourceTrackId) &&
   id(value.providerInstanceId) && text(value.displayName) && text(value.availability) &&
@@ -70,11 +73,14 @@ export class MusicCatalogApi {
     return value;
   }
 
-  async updateAlbum(album: MusicAlbum, changes: { name: string; publisher: string; releaseDate: string }, key: string) {
+  async updateAlbum(album: MusicAlbum, changes: { name: string; publisher: string; releaseDate: string;
+    sourceUrl?: string; sourcePluginId?: string }, key: string) {
     const value = await this.client.request<unknown>(`/library/albums/${encodeURIComponent(album.albumId)}`, {
       method: "PUT", idempotencyKey: key, body: { expectedRevision: album.revision, name: changes.name,
         externalId: album.externalId, isExternal: album.isExternal, coverPath: album.coverPath,
-        publisher: changes.publisher || null, releaseDate: changes.releaseDate || null },
+        publisher: changes.publisher || null, releaseDate: changes.releaseDate || null,
+        sourceUrl: changes.sourceUrl === undefined ? album.sourceUrl : changes.sourceUrl || null,
+        sourcePluginId: changes.sourceUrl === undefined ? album.sourcePluginId : changes.sourceUrl ? changes.sourcePluginId || null : null },
     });
     if (!musicAlbum(value, album.albumId) || value.revision <= album.revision || value.originalName !== album.originalName)
       throw new ApiError("INVALID_RESPONSE", "Invalid updated music album");
