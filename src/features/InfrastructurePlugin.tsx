@@ -15,11 +15,11 @@ const storageStates: Record<PluginStorage["runtimeState"], string> = {
 const modeLabel = (mode: "builtin" | "process") => tr(mode === "builtin" ? "服务端内置" : "独立进程");
 
 export function InfrastructurePluginBadges({ plugin }: { plugin: ManagedPlugin }) {
-  if (!plugin.required && !plugin.dsp && !plugin.execution) return null;
+  const execution = plugin.builtin || plugin.storage ? undefined : plugin.execution;
+  if (!plugin.required && !execution) return null;
   return <span className="plugin-infrastructure-badges">
     {plugin.required && <span className="badge">{tr("必需")}</span>}
-    {plugin.execution && <span className="badge">{modeLabel(plugin.execution)}</span>}
-    {plugin.dsp && <span className="badge">{tr(chainStates[plugin.dsp.chainState])}</span>}
+    {execution && <span className="badge">{modeLabel(execution)}</span>}
   </span>;
 }
 

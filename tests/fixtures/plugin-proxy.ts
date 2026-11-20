@@ -9,6 +9,7 @@ export const proxyPlugins: ManagedPlugin[] = [
 ].map(([id, name, feature]) => ({
   pluginId: id, plugin: { id, name, localizedNames: {}, features: ["metadata", feature] },
   version: "0.1.0", supportsMultipleInstances: false, instances: [], settingsAvailable: true,
+  displayCount: feature === "scraper" ? { value: 4, unit: "catalogs", localizedUnits: {} } : undefined,
   execution: "builtin", builtin: { configured: false, capabilities: ["scraper.album"] },
 }));
 
@@ -62,7 +63,7 @@ export async function mockProxyPlugins(page: Page): Promise<ProxyMock> {
 }
 
 export function pluginEntry(page: Page, index = 0) {
-  return page.locator("details.plugin-entry").filter({ has: page.getByText(proxyPlugins[index].pluginId, { exact: true }) });
+  return page.getByRole("listitem").filter({ has: page.getByText(proxyPlugins[index].pluginId, { exact: true }) });
 }
 
 export async function openProxySettings(page: Page, index = 0): Promise<Locator> {

@@ -20,16 +20,20 @@ test("translated configuration buttons keep clear of plugin identity on a narrow
   const entry = pluginEntry(page);
   const configure = page.getByRole("button", { name: "Configure Bangumi", exact: true });
   await expect(configure).toBeVisible();
-  const informationBox = await entry.locator(".plugin-information").boundingBox();
   const configureBox = await configure.boundingBox();
-  expect(informationBox!.x + informationBox!.width).toBeLessThanOrEqual(configureBox!.x - 6);
+  for (const text of ["Bangumi", "4 catalogs", "0.1.0"]) {
+    const field = entry.locator(".plugin-entry-heading").getByText(text);
+    await expect(field).toBeVisible();
+    const box = await field.boundingBox();
+    expect(box!.x + box!.width).toBeLessThanOrEqual(configureBox!.x);
+  }
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: info.outputPath("plugin-configuration-entries-mobile-en.png"), fullPage: true });
   await configure.click();
   const dialog = page.getByRole("dialog", { name: "Configure Bangumi", exact: true });
   await expect(dialog.getByRole("region", { name: "资料平台访问设置", exact: true })).toBeVisible();
   await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
-  await expect(entry).not.toHaveAttribute("open", "");
+  await expect(entry.locator(".plugin-entry-toggle")).toHaveAttribute("aria-expanded", "false");
 });
 
 test("plugin-owned configuration opens from a collapsed row without expanding it", async ({ page }, info) => {
@@ -37,25 +41,43 @@ test("plugin-owned configuration opens from a collapsed row without expanding it
   await page.emulateMedia({ colorScheme: "dark" });
   await page.goto(`${origin}/#/settings?tab=plugins`);
   const entry = pluginEntry(page);
-  await expect(entry).not.toHaveAttribute("open", "");
-  await expect(entry.locator("summary").getByRole("button")).toHaveCount(0);
+  const toggle = entry.locator(".plugin-entry-toggle");
+  const configure = entry.getByRole("button", { name: "配置 Bangumi", exact: true });
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  await expect(configure).toBeVisible();
+  const heading = entry.locator(".plugin-entry-heading");
+  const nameEnd = await heading.getByText("Bangumi", { exact: true }).evaluate(element => {
+    const range = document.createRange();
+    range.selectNodeContents(element);
+    return range.getBoundingClientRect().right;
+  });
+  const note = await heading.getByText("4 catalogs").boundingBox();
+  const version = await heading.getByText("0.1.0").boundingBox();
+  const button = await configure.boundingBox();
+  expect(note!.x).toBeGreaterThanOrEqual(nameEnd);
+  expect(note!.x - nameEnd).toBeLessThan(40);
+  expect(note!.x + note!.width).toBeLessThanOrEqual(version!.x);
+  expect(version!.x + version!.width).toBeLessThanOrEqual(button!.x);
+  await toggle.focus();
+  await page.keyboard.press("Tab");
+  await expect(configure).toBeFocused();
   await page.screenshot({ path: info.outputPath("plugin-configuration-entries.png"), fullPage: true });
   const dialog = await openProxySettings(page);
-  await expect(entry).not.toHaveAttribute("open", "");
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
   await expect(dialog).toContainText("由资料平台提供的连接选项。");
   await expect(dialog.getByLabel("访问方式", { exact: true })).toHaveValue("environment");
   await expect(dialog.getByLabel("代理服务器", { exact: true })).toHaveValue("");
   await expect(dialog.getByRole("button", { name: /^(保存设置|正在保存…)$/ })).toBeDisabled();
   await page.screenshot({ path: info.outputPath("plugin-proxy-desktop-dark.png"), fullPage: true });
   await dialog.getByRole("button", { name: "取消", exact: true }).click();
-  await expect(page.getByRole("button", { name: "配置 Bangumi", exact: true })).toBeFocused();
-  await entry.locator("summary").click();
-  await expect(entry).toHaveAttribute("open", "");
+  await expect(configure).toBeFocused();
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
   await expect(entry).toContainText("服务端内置");
   await expect(page.getByText(/内置能力已装配到服务端主进程/)).toHaveCount(0);
   const reopened = await openProxySettings(page);
   await reopened.getByRole("button", { name: "关闭", exact: true }).click();
-  await expect(entry).toHaveAttribute("open", "");
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
 });
 
 test("save and cancel preserve independent values for any declared plugin", async ({ page }, info) => {

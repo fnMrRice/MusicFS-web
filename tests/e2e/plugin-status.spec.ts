@@ -52,13 +52,14 @@ async function expectRefreshBesideSearch(card: Locator, label = "刷新插件列
 }
 
 test("plugin groups show identity, separate rows and expandable instances with refresh beside the search", async ({ page }, info) => {
+  await page.emulateMedia({ colorScheme: "dark" });
   let localState = "pending_configuration";
   let allowedDirectories = 4;
   await mockPlugins(page, () => ({ items: [
     { pluginId: localPlugin.id, plugin: localPlugin, version: "1.2.3", supportsMultipleInstances: false,
       displayCount: { value: allowedDirectories, unit: "allowed directories", localizedUnits: { "zh-CN": "个允许访问的目录" } },
       instances: [{ instanceId: instanceIds.local, name: "Local test", runtimeState: localState }] },
-    { pluginId: ncmPlugin.id, plugin: ncmPlugin, version: "2.0.1", supportsMultipleInstances: false,
+    { pluginId: ncmPlugin.id, plugin: ncmPlugin, version: "2.0.1", supportsMultipleInstances: false, settingsAvailable: true,
       instances: [{ instanceId: instanceIds.ncm, name: "NCM test", runtimeState: "disabled" }] },
     { pluginId: scraperPlugin.id, plugin: scraperPlugin, version: "3.0.0", supportsMultipleInstances: false,
       instances: [{ instanceId: instanceIds.scraper, name: "Scraper test", runtimeState: "ready" }] },
@@ -69,33 +70,55 @@ test("plugin groups show identity, separate rows and expandable instances with r
   const ncm = pluginEntry(card, ncmPlugin.id);
   const scraper = pluginEntry(card, scraperPlugin.id);
   await expect(card.locator(".plugin-entry")).toHaveCount(3);
-  for (const [entry, id, name, version] of [
+  const rows = [
     [local, localPlugin.id, "本地音乐", "1.2.3"],
     [ncm, ncmPlugin.id, "NCM 解密", "2.0.1"],
     [scraper, scraperPlugin.id, "本地元数据提取", "3.0.0"],
-  ] as const) {
-    const summary = entry.locator("summary");
-    await expect(summary.getByText(name, { exact: true })).toBeVisible();
-    await expect(summary.getByText(id, { exact: true })).toBeVisible();
-    await expect(summary).toContainText(version);
-    await expect(summary).not.toContainText("个实例");
-    await expect(entry).not.toHaveAttribute("open");
+  ] as const;
+  for (const [entry, id, name, version] of rows) {
+    const toggle = entry.locator(".plugin-entry-toggle");
+    await expect(toggle.getByText(name, { exact: true })).toBeVisible();
+    await expect(entry.getByText(id, { exact: true })).toBeHidden();
+    await expect(entry.locator(".plugin-entry-heading").getByText(version, { exact: false })).toBeVisible();
+    await expect(entry.locator(".plugin-purposes")).toBeHidden();
+    await expect(toggle).not.toContainText("个实例");
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
     await expect(entry.locator(".plugin-instance")).toBeHidden();
   }
   await expect(local.locator(".plugin-count")).toHaveText("4 个允许访问的目录");
+  await expect(local.getByRole("button", { name: /^配置 / })).toHaveCount(0);
+  const configure = ncm.getByRole("button", { name: "配置 NCM 解密", exact: true });
+  await expect(configure).toBeVisible();
+  const versionEnds = await card.locator(".plugin-version").evaluateAll(elements => elements.map(element => {
+    const range = document.createRange();
+    range.selectNodeContents(element);
+    return range.getBoundingClientRect().right;
+  }));
+  expect(versionEnds).toHaveLength(3);
+  expect(Math.max(...versionEnds) - Math.min(...versionEnds)).toBeLessThanOrEqual(1);
+  expect(Math.max(...versionEnds)).toBeLessThanOrEqual((await configure.boundingBox())!.x);
   await expect(ncm.locator(".plugin-count")).toHaveCount(0);
   await expect(scraper.locator(".plugin-count")).toHaveCount(0);
   await expectRefreshBesideSearch(card);
-  expect(await card.locator(".plugin-entry-row").evaluateAll(entries => entries.slice(1).every((entry, index) =>
+  const list = card.getByRole("list", { name: "插件列表" });
+  const listItems = list.getByRole("listitem");
+  await expect(listItems).toHaveCount(3);
+  expect(await listItems.evaluateAll(entries => entries.slice(1).every((entry, index) =>
     parseFloat(getComputedStyle(entry).borderTopWidth) > 0 ||
     parseFloat(getComputedStyle(entries[index]!).borderBottomWidth) > 0,
   ))).toBe(true);
+  await list.screenshot({ path: info.outputPath("plugin-list-collapsed.png") });
 
-  await local.locator("summary").click();
-  await ncm.locator("summary").click();
-  await scraper.locator("summary").focus();
+  await local.locator(".plugin-entry-toggle").click();
+  await ncm.locator(".plugin-entry-toggle").click();
+  await scraper.locator(".plugin-entry-toggle").focus();
   await page.keyboard.press("Enter");
-  await expect(scraper).toHaveAttribute("open");
+  for (const [entry, id, , version] of rows) {
+    await expect(entry.getByText(id, { exact: true })).toBeVisible();
+    await expect(entry.locator(".plugin-entry-details").getByText(version, { exact: false })).toHaveCount(0);
+    await expect(entry.locator(".plugin-purposes")).toBeVisible();
+  }
+  await expect(scraper.locator(".plugin-entry-toggle")).toHaveAttribute("aria-expanded", "true");
   await expect(card.getByText("待配置", { exact: true })).toBeVisible();
   await expect(card.getByText("已禁用", { exact: true })).toBeVisible();
   await expect(card.getByText("请从允许访问的目录中选择音乐目录。")).toBeVisible();
@@ -104,23 +127,23 @@ test("plugin groups show identity, separate rows and expandable instances with r
   await expect(card.getByText(/Local test|NCM test|Scraper test/)).toHaveCount(0);
   await expect(card.getByText(instanceIds.local, { exact: false })).toHaveCount(0);
   await page.keyboard.press("Space");
-  await expect(scraper).not.toHaveAttribute("open");
+  await expect(scraper.locator(".plugin-entry-toggle")).toHaveAttribute("aria-expanded", "false");
   await expect(scraper.locator(".plugin-instance")).toBeHidden();
   await page.keyboard.press("Enter");
   await expect(scraper.locator(".plugin-instance")).toBeVisible();
-  await ncm.locator("summary").click();
-  await expect(ncm).not.toHaveAttribute("open");
+  await ncm.locator(".plugin-entry-toggle").click();
+  await expect(ncm.locator(".plugin-entry-toggle")).toHaveAttribute("aria-expanded", "false");
   localState = "ready";
   allowedDirectories = 2;
   await card.getByRole("button", { name: "刷新插件列表" }).click();
   await expect(local.locator(".plugin-count")).toHaveText("2 个允许访问的目录");
   await expect(local.getByText("可用", { exact: true })).toBeVisible();
   await expect(scraper.getByText("可用", { exact: true })).toBeVisible();
-  await expect(local).toHaveAttribute("open");
-  await expect(scraper).toHaveAttribute("open");
-  await expect(ncm).not.toHaveAttribute("open");
+  await expect(local.locator(".plugin-entry-toggle")).toHaveAttribute("aria-expanded", "true");
+  await expect(scraper.locator(".plugin-entry-toggle")).toHaveAttribute("aria-expanded", "true");
+  await expect(ncm.locator(".plugin-entry-toggle")).toHaveAttribute("aria-expanded", "false");
   await expect(card.getByText("待配置", { exact: true })).toHaveCount(0);
-  await page.screenshot({ path: info.outputPath("plugin-management-desktop.png"), fullPage: true });
+  await list.screenshot({ path: info.outputPath("plugin-management-desktop.png") });
 });
 
 test("settings show restart-required disable while the plugin remains available", async ({ page }) => {
@@ -134,7 +157,7 @@ test("settings show restart-required disable while the plugin remains available"
   const card = pluginCard(page);
   const entry = pluginEntry(card, ncmPlugin.id);
   await expect(card.getByText("配置变更需要重启服务端后生效。", { exact: true })).toBeVisible();
-  await entry.locator("summary").click();
+  await entry.locator(".plugin-entry-toggle").click();
   await expect(card.getByText("等待重启后停用。", { exact: true })).toBeVisible();
   await expect(card.getByText("可用", { exact: true })).toBeVisible();
   await expect(card.getByText("已禁用", { exact: true })).toHaveCount(0);
@@ -143,7 +166,7 @@ test("settings show restart-required disable while the plugin remains available"
   await expect(card.getByText("已禁用", { exact: true })).toBeVisible();
   await expect(card.getByText("配置变更需要重启服务端后生效。", { exact: true })).toHaveCount(0);
   await expect(card.getByText("等待重启后停用。", { exact: true })).toHaveCount(0);
-  await expect(entry).toHaveAttribute("open");
+  await expect(entry.locator(".plugin-entry-toggle")).toHaveAttribute("aria-expanded", "true");
 });
 
 test("plugin-provided user counts and account names refresh after logout", async ({ page }) => {
@@ -168,13 +191,14 @@ test("plugin-provided user counts and account names refresh after logout", async
   const entry = pluginEntry(card, plugin.id);
   await expect(entry).toHaveCount(1);
   await expect(entry.locator(".plugin-count")).toHaveText("2 个用户");
-  await entry.locator("summary").click();
+  await expect(entry.getByRole("button", { name: /^配置 / })).toHaveCount(0);
+  await entry.locator(".plugin-entry-toggle").click();
   const instances = entry.locator(".plugin-instance");
   await expect(instances).toHaveCount(2);
   await expect(instances.nth(0).getByText("自定义来源 · Alice", { exact: true })).toBeVisible();
   await expect(instances.nth(1).getByText("自定义来源 · Bob", { exact: true })).toBeVisible();
   const ncm = pluginEntry(card, ncmPlugin.id);
-  await ncm.locator("summary").click();
+  await ncm.locator(".plugin-entry-toggle").click();
   await expect(ncm.locator(".plugin-instance").getByText("NCM 解密", { exact: true })).toBeVisible();
   await expect(card.getByText(/Ignored config|Never use|ab4dfbab|87d29d7b/)).toHaveCount(0);
   bound = false;
@@ -184,7 +208,7 @@ test("plugin-provided user counts and account names refresh after logout", async
   await expect(instances.nth(0).getByText("自定义来源", { exact: true })).toBeVisible();
   await expect(instances.nth(1).getByText("自定义来源 · Bob", { exact: true })).toBeVisible();
   await expect(card.getByText("自定义来源 · Alice", { exact: true })).toHaveCount(0);
-  await expect(entry).toHaveAttribute("open");
+  await expect(entry.locator(".plugin-entry-toggle")).toHaveAttribute("aria-expanded", "true");
 });
 
 test("admins opt into all user instances and return to their own instances without merging accounts", async ({ page }) => {
@@ -212,7 +236,7 @@ test("admins opt into all user instances and return to their own instances witho
   await expect(allUsers).not.toBeChecked();
   await expect(entry.locator(".plugin-count")).toHaveText("1 个用户");
   expect(scopes).toEqual([null, null]);
-  await entry.locator("summary").click();
+  await entry.locator(".plugin-entry-toggle").click();
   await expect(entry.locator(".plugin-instance")).toHaveCount(1);
   await expect(entry.getByText("账号来源 · Alice", { exact: true })).toBeVisible();
   await expect(entry.getByText("账号来源 · Bob", { exact: true })).toHaveCount(0);
@@ -247,13 +271,13 @@ test("missing counts stay hidden and plugins can provide zero with arbitrary uni
   await page.goto(`${origin}/#/settings?tab=plugins`);
   const card = pluginCard(page);
   const entry = pluginEntry(card, localPlugin.id);
-  await expect(entry.locator("summary").getByText("本地音乐", { exact: true })).toBeVisible();
-  await expect(entry.locator("summary").getByText(localPlugin.id, { exact: true })).toBeVisible();
-  await expect(entry.locator("summary")).toContainText("未知版本");
+  await expect(entry.locator(".plugin-entry-toggle").getByText("本地音乐", { exact: true })).toBeVisible();
+  await expect(entry.locator(".plugin-entry-heading").getByText("未知版本", { exact: false })).toBeVisible();
   await expect(entry.locator(".plugin-count")).toHaveCount(0);
   await expect(pluginEntry(card, custom.id).locator(".plugin-count")).toHaveText("0 项索引");
-  await entry.locator("summary").click();
-  await expect(entry).toHaveAttribute("open");
+  await entry.locator(".plugin-entry-toggle").click();
+  await expect(entry.locator(".plugin-entry-toggle")).toHaveAttribute("aria-expanded", "true");
+  await expect(entry.getByText(localPlugin.id, { exact: true })).toBeVisible();
   await expect(entry.locator(".plugin-instance")).toHaveCount(0);
   await expect(card.getByText("未发现已安装插件。", { exact: true })).toHaveCount(0);
 });
@@ -292,10 +316,11 @@ for (const [locale, name, version, refresh, refreshText, count] of [
     await page.goto(`${origin}/#/settings?tab=plugins`);
     const card = pluginCard(page);
     await expectRefreshBesideSearch(card, refresh, refreshText);
-    await expect(card.locator("summary").getByText(name, { exact: true })).toBeVisible();
-    await expect(card.locator("summary")).toContainText(version);
+    await expect(card.locator(".plugin-entry-toggle").getByText(name, { exact: true })).toBeVisible();
+    await expect(card.locator(".plugin-entry-heading").getByText(version, { exact: false })).toBeVisible();
     await expect(card.locator(".plugin-count")).toHaveText(count);
-    await expect(card.locator("summary").getByText(localPlugin.id, { exact: true })).toBeVisible();
+    await card.locator(".plugin-entry-toggle").click();
+    await expect(card.getByText(localPlugin.id, { exact: true })).toBeVisible();
     await expect(card.getByRole("button", { name: refresh, exact: true })).toBeVisible();
   });
 }
@@ -317,10 +342,11 @@ test("mobile plugin groups wrap long identifiers without horizontal overflow", a
   await page.goto(`${origin}/#/settings?tab=plugins`);
   const card = pluginCard(page);
   const entry = pluginEntry(card, plugin.id);
-  await expect(entry.locator("summary").getByText(plugin.id, { exact: true })).toBeVisible();
+  await expect(entry.getByText(plugin.id, { exact: true })).toBeHidden();
   await expectRefreshBesideSearch(card);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  await entry.locator("summary").click();
+  await entry.locator(".plugin-entry-toggle").click();
+  await expect(entry.getByText(plugin.id, { exact: true })).toBeVisible();
   await expect(entry.locator(".plugin-instance")).toHaveCount(2);
   await expect(entry.locator(".plugin-instance").nth(1)).toBeVisible();
   await page.screenshot({ path: info.outputPath("plugin-management-mobile.png"), fullPage: true });

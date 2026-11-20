@@ -72,80 +72,120 @@
   border-color: var(--accent);
   color: var(--accent);
 }
-.plugin-purposes {
-  display: flex;
-  flex-wrap: wrap;
+.plugin-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.plugin-entry {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
   align-items: center;
-  gap: 6px;
-  margin-top: 8px;
+}
+.plugin-entry + .plugin-entry {
+  border-top: 1px solid var(--line);
+}
+.plugin-entry-heading {
+  display: contents;
+}
+.plugin-entry-toggle {
+  grid-column: 1;
+  align-self: stretch;
+  justify-content: flex-start;
+  min-width: 0;
+  min-height: 56px;
+  padding: 10px 0;
+  gap: 12px;
+  background: transparent;
+  border: 0;
+  text-align: start;
+  overflow-wrap: anywhere;
+}
+.plugin-entry-toggle:hover {
+  background: transparent;
+  color: var(--accent);
+}
+.plugin-entry-toggle > svg {
+  flex-shrink: 0;
+  transform: rotate(-90deg);
+}
+.plugin-entry-toggle[aria-expanded="true"] > svg {
+  transform: rotate(0);
+}
+.plugin-entry-summary,
+.plugin-title {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  min-width: 0;
+}
+.plugin-entry-summary {
+  flex: 1;
+}
+.plugin-name {
+  font-size: 14px;
+}
+.plugin-count,
+.plugin-version {
   color: var(--muted);
   font-size: 12px;
+}
+.plugin-version {
+  margin-inline-start: auto;
+  text-align: end;
+}
+.plugin-configure {
+  grid-column: 2;
+  justify-self: end;
+  margin-inline-start: 16px;
+  gap: 6px;
+  white-space: nowrap;
+}
+.plugin-entry-details {
+  grid-column: 1 / -1;
+  min-width: 0;
+  margin: 0 0 16px 30px;
+  border-left: 2px solid var(--line);
+  padding-left: 16px;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.plugin-metadata {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+.plugin-entry-details .plugin-metadata > div {
+  display: grid;
+  grid-template-columns: minmax(70px, 110px) minmax(0, 1fr);
+  align-items: baseline;
+  gap: 12px;
+  padding: 0;
+}
+.plugin-metadata dt {
+  white-space: normal;
+}
+.plugin-metadata dd {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+  margin: 0;
+}
+.plugin-metadata code {
+  min-width: 0;
+  font-size: inherit;
 }
 .plugin-purposes .badge {
   color: var(--text);
 }
-.plugin-entry-row { position: relative; min-width: 0; }
-.plugin-entry-row + .plugin-entry-row {
-  border-top: 1px solid var(--line);
-}
-.plugin-entry-row.has-settings > .plugin-entry > summary { padding-right: 124px; }
-.plugin-configuration-action { position: absolute; top: 20px; right: 0; }
-.plugin-configuration-action button { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
-.plugin-entry > summary {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 20px 0;
-  cursor: pointer;
-  list-style: none;
-}
-.plugin-entry > summary::-webkit-details-marker {
-  display: none;
-}
-.plugin-entry > summary:hover {
-  color: var(--accent);
-}
-.plugin-entry > summary > svg {
-  flex-shrink: 0;
-  transform: rotate(-90deg);
-}
-.plugin-entry[open] > summary > svg {
-  transform: rotate(0);
-}
-.plugin-information {
-  flex: 1;
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-.plugin-information > strong {
-  display: block;
-  font-size: 14px;
-}
-.plugin-metadata {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 20px;
-  margin-top: 8px;
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.7;
-}
-.plugin-metadata > span {
-  min-width: 0;
-}
-.plugin-metadata code {
-  font-size: inherit;
-}
-.plugin-count {
-  max-width: 40%;
-  overflow-wrap: anywhere;
-  color: var(--muted);
-  font-size: 12px;
-}
-.plugin-instances {
-  margin: 0 0 20px 30px;
-  border-left: 2px solid var(--line);
-  padding-left: 18px;
+.plugin-instances,
+.plugin-infrastructure {
+  margin-top: 16px;
 }
 .plugin-instances h4 {
   margin: 0 0 4px;
@@ -183,14 +223,6 @@
   flex-wrap: wrap;
   gap: 6px;
   margin-top: 8px;
-}
-.plugin-infrastructure {
-  min-width: 0;
-  margin: 0 0 20px 30px;
-  border-left: 2px solid var(--line);
-  padding-left: 18px;
-  font-size: 13px;
-  overflow-wrap: anywhere;
 }
 .plugin-infrastructure h4 {
   margin: 0;
@@ -254,18 +286,14 @@
   font-size: inherit;
 }
 @media (max-width: 700px) {
-  .plugin-entry > summary {
+  .plugin-entry-toggle {
     gap: 8px;
-    flex-wrap: wrap;
   }
-  .plugin-count {
-    flex-basis: calc(100% - 26px);
-    max-width: none;
-    margin-left: 26px;
+  .plugin-configure {
+    margin-inline-start: 8px;
   }
-  .plugin-instances,
-  .plugin-infrastructure {
+  .plugin-entry-details {
     margin-left: 8px;
-    padding-left: 14px;
+    padding-left: 12px;
   }
 }

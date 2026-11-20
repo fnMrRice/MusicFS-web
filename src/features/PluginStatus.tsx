@@ -5,29 +5,12 @@ import { ErrorNotice, Icon } from "../components/ui";
 import { Tooltip } from "../components/Tooltip";
 import { Modal } from "../components/Modal";
 import { tr, useLocale } from "../i18n";
-import { Link } from "react-router-dom";
-import type { ManagedPlugin, PluginDisplayCount, PluginSnapshot } from "../api/directories";
-import { localizedPluginText, pluginName, sourceName } from "../components/source-name";
-import { matchesPlugin, pluginPurposes, pluginPurposeLabel, pluginScrapedFields } from "./plugin-filters";
-import { scrapedFieldName } from "./scrapers/fields";
-import { InfrastructurePluginBadges, InfrastructurePluginDetails } from "./InfrastructurePlugin";
-import "./plugin-status.css";
+import type { ManagedPlugin, PluginSnapshot } from "../api/directories";
+import { pluginName } from "../components/source-name";
+import { matchesPlugin, pluginPurposes, pluginPurposeLabel } from "./plugin-filters";
+import { PluginListEntry } from "./PluginListEntry";
 import { PluginSettings } from "./plugin-settings/PluginSettings";
-const states: Record<string, string> = {
-  disabled: "已禁用",
-  pending_configuration: "待配置",
-  starting: "正在启动",
-  ready: "可用",
-  draining: "正在停止",
-  failed: "启动或运行失败",
-};
-
-function PluginCount({ count, locale }: { count?: PluginDisplayCount; locale: string }) {
-  if (!count || !Number.isSafeInteger(count.value) || count.value < 0 ||
-    typeof count.unit !== "string" || !count.unit.trim()) return null;
-  const unit = localizedPluginText(count.unit, count.localizedUnits, locale);
-  return <span className="plugin-count">{`${count.value} ${unit}`}</span>;
-}
+import "./plugin-status.css";
 
 export function PluginStatus() {
   const { locale } = useLocale();
@@ -50,6 +33,13 @@ export function PluginStatus() {
   const purposeOptions = [...new Set([...items.flatMap(pluginPurposes), ...purposes])];
   const filtered = items.filter((plugin) => matchesPlugin(plugin, purposes, query));
   function reload() { plugins.reload(); online.reload(); }
+  function toggleExpanded(pluginId: string) {
+    setExpanded((previous) => {
+      const next = new Set(previous);
+      if (next.has(pluginId)) next.delete(pluginId); else next.add(pluginId);
+      return next;
+    });
+  }
   function togglePurpose(purpose: string, exclusive: boolean) {
     setPurposes((previous) => {
       if (exclusive) return new Set([purpose]);
@@ -105,75 +95,11 @@ export function PluginStatus() {
       <ErrorNotice error={online.error} retry={online.reload} />
       {plugins.data?.restartRequired && <p>{tr("配置变更需要重启服务端后生效。")}</p>}
       {plugins.loading && <p className="muted" role="status">{tr("正在读取插件…")}</p>}
-      <div className="plugin-list">
-        {filtered.map((p) => (
-          <div className={`plugin-entry-row${p.settingsAvailable ? " has-settings" : ""}`} key={p.pluginId}>
-          <details className="plugin-entry" open={expanded.has(p.pluginId)}
-            onToggle={(event) => {
-              const open = event.currentTarget.open;
-              setExpanded((previous) => {
-                if (previous.has(p.pluginId) === open) return previous;
-                const next = new Set(previous);
-                if (open) next.add(p.pluginId); else next.delete(p.pluginId);
-                return next;
-              });
-            }}>
-            <summary>
-              <Icon name="chevron" size={18} />
-              <span className="plugin-information">
-                <strong>{pluginName(p.plugin, locale)}</strong>
-                <InfrastructurePluginBadges plugin={p} />
-                <span className="plugin-purposes">
-                  <span>{tr("用途")}：</span>
-                  {pluginPurposes(p).map((purpose) => <span className="badge" key={purpose}>{pluginPurposeLabel(purpose)}</span>)}
-                </span>
-                {pluginScrapedFields(p).length > 0 && <span className="plugin-purposes">
-                  <span>{tr("支持刮削的内容")}：</span>
-                  {pluginScrapedFields(p).map((field) => <span key={field}>{scrapedFieldName(field)}</span>)}
-                </span>}
-                <span className="plugin-metadata">
-                  <span>{tr("插件 ID")}：<code>{p.pluginId}</code></span>
-                  <span>{tr("版本")}：{p.version?.trim() || tr("未知版本")}</span>
-                </span>
-              </span>
-              <PluginCount count={p.displayCount} locale={locale} />
-            </summary>
-            {p.storage || p.dsp || p.builtin ? <InfrastructurePluginDetails plugin={p} /> : <div className="plugin-instances">
-              <h4>{tr("插件实例")}</h4>
-              {p.instances.map((i) => (
-                <div className="plugin-instance" key={i.instanceId}>
-                  <div className="plugin-instance-heading">
-                    <strong>{p.supportsMultipleInstances
-                      ? i.accountName?.trim()
-                        ? `${pluginName(p.plugin, locale)} · ${i.accountName}`
-                        : sourceName({ ...online.data?.find((instance) => instance.instanceId === i.instanceId), plugin: p.plugin }, [], locale)
-                      : pluginName(p.plugin, locale)}</strong>
-                    <span className="badge">{tr(states[i.runtimeState] ?? "暂不可用")}</span>
-                  </div>
-                  {i.ownerUserId && <p className="muted">{tr("所属用户：{0}", { 0: i.ownerUserId })}</p>}
-                  {i.reason === "RESTART_REQUIRED" && <p className="muted">{tr("等待重启后停用。")}</p>}
-                  {i.runtimeState === "pending_configuration" && (
-                    <p className="muted">{tr(p.pluginId === "musicfs.plugin.source.localfiles"
-                      ? "请从允许访问的目录中选择音乐目录。"
-                      : p.pluginId === "musicfs.plugin.decoder.ffmpeg"
-                        ? "请在服务端配置可用的 FFmpeg 和 ffprobe 路径。"
-                        : "请在服务端完成插件配置。")}</p>
-                  )}
-                  {p.pluginId === "musicfs.plugin.source.localfiles" && <Link to={`/settings?directories=${encodeURIComponent(i.instanceId)}`}>{tr("管理音乐目录")}</Link>}
-                </div>
-              ))}
-              {p.instances.length === 0 && <p className="muted">{tr("暂无插件实例。")}</p>}
-            </div>}
-          </details>
-          {p.settingsAvailable && <div className="plugin-configuration-action">
-            <button type="button" aria-label={tr("配置 {0}", { 0: pluginName(p.plugin, locale) })}
-              onClick={() => { setConfigBusy(false); setConfiguring(p); }}>
-              <Icon name="settings" size={16} /><span>{tr("配置")}</span>
-            </button>
-          </div>}
-          </div>
-        ))}
-      </div>
+      <ul className="plugin-list" aria-label={tr("插件列表")}>
+        {filtered.map((plugin) => <PluginListEntry key={plugin.pluginId} plugin={plugin} locale={locale}
+          onlineInstances={online.data} expanded={expanded.has(plugin.pluginId)} onToggle={() => toggleExpanded(plugin.pluginId)}
+          onConfigure={() => { setConfigBusy(false); setConfiguring(plugin); }} />)}
+      </ul>
       {plugins.data?.items.length === 0 && <p>{tr("未发现已安装插件。")}</p>}
       {items.length > 0 && filtered.length === 0 && <p role="status">{tr("没有符合筛选条件的插件。")}</p>}
       {configuring && <Modal title={tr("配置 {0}", { 0: pluginName(configuring.plugin, locale) })}

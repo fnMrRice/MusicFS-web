@@ -57,12 +57,12 @@ test("builtin algorithms show configuration and purpose without fake instances",
   const card = await openPlugins(page, items);
   for (const plugin of items) {
     const item = entry(card, plugin.pluginId);
-    await expect(item.locator("summary")).toContainText("服务端内置");
-    await item.locator("summary").click();
+    await item.locator(".plugin-entry-toggle").click();
+    await expect(item.getByText("服务端内置", { exact: true })).toBeVisible();
     await expect(item).not.toContainText("内置能力已装配到服务端主进程");
     await expect(item.locator(".plugin-properties")).toContainText(plugin.builtin?.configured ? "已配置" : "未配置");
     await expect(item.getByText("暂无插件实例。", { exact: true })).toHaveCount(0);
-    await expect(item.getByRole("button")).toHaveCount(0);
+    await expect(item.getByRole("button")).toHaveCount(1);
   }
   const types = card.getByRole("group", { name: "插件类型", exact: true });
   const audioAnalysis = types.getByRole("checkbox", { name: "音频分析", exact: true });
@@ -70,7 +70,7 @@ test("builtin algorithms show configuration and purpose without fake instances",
   await audioAnalysis.check();
   await expect(card.locator(".plugin-entry")).toHaveCount(2);
   await expect(entry(card, "musicfs.plugin.analysis.chromaprint")).toBeVisible();
-  await expect(entry(card, "musicfs.plugin.matching.standard").locator("summary")).toContainText("标准录音匹配");
+  await expect(entry(card, "musicfs.plugin.matching.standard").locator(".plugin-entry-toggle")).toContainText("标准录音匹配");
   await audioAnalysis.uncheck();
   await types.getByRole("checkbox", { name: "元数据", exact: true }).check();
   await expect(card.locator(".plugin-entry")).toHaveCount(2);
@@ -82,10 +82,10 @@ test("database is required and read-only while empty DSP has a configuration sta
   const card = await openPlugins(page, [database, gain, legacy]);
   const db = entry(card, database.pluginId);
   const dsp = entry(card, gain.pluginId);
-  await expect(db.locator("summary")).toContainText("必需");
-  await expect(dsp.locator("summary")).toContainText("未配置");
-  await db.locator("summary").click();
-  await dsp.locator("summary").click();
+  await db.locator(".plugin-entry-toggle").click();
+  await dsp.locator(".plugin-entry-toggle").click();
+  await expect(db.locator(".plugin-infrastructure-badges")).toContainText("必需");
+  await expect(dsp.getByText("未配置", { exact: true })).toBeVisible();
   await expect(db).toContainText("数据库为服务端必需组件，不能停用");
   await expect(db).toContainText("修改后需重启服务端");
   await expect(db.locator(".plugin-properties")).toContainText("sqlite");
@@ -95,15 +95,15 @@ test("database is required and read-only while empty DSP has a configuration sta
   await expect(dsp).toContainText("不表示当前歌曲正在执行这些处理");
   for (const item of [db, dsp]) {
     await expect(item.getByText("暂无插件实例。", { exact: true })).toHaveCount(0);
-    await expect(item.getByRole("button")).toHaveCount(0);
+    await expect(item.getByRole("button")).toHaveCount(1);
     await expect(item.getByRole("switch")).toHaveCount(0);
     await expect(item.getByRole("checkbox")).toHaveCount(0);
   }
   const old = entry(card, legacy.pluginId);
-  await old.locator("summary").click();
+  await old.locator(".plugin-entry-toggle").click();
   await expect(old.getByText("暂无插件实例。", { exact: true })).toBeVisible();
   await expect(old.locator(".plugin-infrastructure")).toHaveCount(0);
-  await old.locator("summary").click();
+  await old.locator(".plugin-entry-toggle").click();
   await page.setViewportSize({ width: 1200, height: 1400 });
   await card.scrollIntoViewIfNeeded();
   await page.screenshot({ path: info.outputPath("infrastructure-desktop.png"), fullPage: true });
@@ -130,9 +130,9 @@ test("configured DSP outside the chain is distinct from an unconfigured DSP", as
   const configured = { ...gain, dsp: { configured: true, chainState: "not_in_chain", nodes: [] } };
   const card = await openPlugins(page, [configured]);
   const dsp = entry(card, gain.pluginId);
-  await expect(dsp.locator("summary")).toContainText("已配置，未入链");
-  await expect(dsp.locator("summary")).not.toContainText("未配置");
-  await dsp.locator("summary").click();
+  await dsp.locator(".plugin-entry-toggle").click();
+  await expect(dsp.getByText("已配置，未入链", { exact: true })).toBeVisible();
+  await expect(dsp.getByText("未配置", { exact: true })).toHaveCount(0);
   await expect(dsp.getByRole("list")).toHaveCount(0);
   await expect(dsp).toContainText("此 DSP 尚未加入处理链。");
 });
@@ -145,8 +145,8 @@ test("DSP preserves repeated nodes and full-chain positions with parameters and 
   ] };
   const card = await openPlugins(page, [{ ...gain, dsp }]);
   const item = entry(card, gain.pluginId);
-  await expect(item.locator("summary")).toContainText("已加入处理链");
-  await item.locator("summary").click();
+  await item.locator(".plugin-entry-toggle").click();
+  await expect(item.getByText("已加入处理链", { exact: true })).toBeVisible();
   const nodes = item.getByRole("list", { name: "处理链节点顺序", exact: true }).locator(":scope > li");
   await expect(nodes).toHaveCount(3);
   for (const [index, position] of [1, 3, 5].entries()) {
@@ -160,7 +160,7 @@ test("DSP preserves repeated nodes and full-chain positions with parameters and 
   await expect(nodes.nth(1)).toContainText("1.5");
   await expect(nodes.nth(2)).toContainText("无参数");
   await expect(nodes.nth(2).locator(".plugin-properties > div").first()).toContainText("1");
-  await expect(item.getByRole("button")).toHaveCount(0);
+  await expect(item.getByRole("button")).toHaveCount(1);
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await card.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
@@ -174,13 +174,13 @@ test("external database identity and health come from its payload", async ({ pag
   const card = await openPlugins(page, [{ ...database, pluginId: plugin.id, plugin, version: "4.3.2",
     storage: { backend: "plugin", mode: "process", runtimeState: "unavailable" } }]);
   const db = entry(card, plugin.id);
-  await expect(db.locator("summary")).toContainText("自定义数据库");
-  await expect(db.locator("summary")).toContainText("4.3.2");
-  await db.locator("summary").click();
+  await expect(db.locator(".plugin-entry-toggle")).toContainText("自定义数据库");
+  await expect(db.locator(".plugin-entry-heading").getByText("4.3.2", { exact: false })).toBeVisible();
+  await db.locator(".plugin-entry-toggle").click();
   await expect(db.locator(".plugin-properties")).toContainText("plugin");
   await expect(db.locator(".plugin-properties")).toContainText("独立进程");
   await expect(db.locator(".plugin-properties")).toContainText("不可用");
-  await expect(db.getByRole("button")).toHaveCount(0);
+  await expect(db.getByRole("button")).toHaveCount(1);
 });
 
 test("infrastructure labels and guidance follow the English language preference", async ({ page }) => {
@@ -188,11 +188,11 @@ test("infrastructure labels and guidance follow the English language preference"
   const card = await openPlugins(page, [{ ...database, storage: { ...database.storage, runtimeState: "unknown" } }, gain]);
   const db = entry(card, database.pluginId);
   const dsp = entry(card, gain.pluginId);
-  await expect(db.locator("summary")).toContainText("Required");
-  await expect(db.locator("summary")).toContainText("Database");
-  await expect(dsp.locator("summary")).toContainText("Not configured");
-  await db.locator("summary").click();
-  await dsp.locator("summary").click();
+  await db.locator(".plugin-entry-toggle").click();
+  await dsp.locator(".plugin-entry-toggle").click();
+  await expect(db.locator(".plugin-infrastructure-badges")).toContainText("Required");
+  await expect(db.locator(".plugin-purposes")).toContainText("Database");
+  await expect(dsp.getByText("Not configured", { exact: true })).toBeVisible();
   await expect(db).toContainText("cannot be disabled");
   await expect(db.locator(".plugin-properties")).toContainText("Unknown");
   await expect(db.locator(".plugin-properties")).toContainText("Built into server");

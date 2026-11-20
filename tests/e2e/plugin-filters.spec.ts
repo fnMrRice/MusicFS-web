@@ -60,9 +60,10 @@ test("scraper type and supported content come from the plugin declaration", asyn
   }, version: "1.0.0", instances: [] }] }));
   await card.getByRole("checkbox", { name: "刮削插件" }).check();
   await expectVisiblePlugins(card, [plugin.id]);
-  const summary = entry(card, plugin.id).locator("summary");
+  const item = entry(card, plugin.id);
+  await item.locator(".plugin-entry-toggle").click();
   for (const label of ["支持刮削的内容", "专辑详情", "专辑曲目", "歌手图像"])
-    await expect(summary).toContainText(label);
+    await expect(item.getByText(label)).toBeVisible();
 });
 
 async function expectVisiblePlugins(card: Locator, ids: string[]) {
@@ -70,7 +71,7 @@ async function expectVisiblePlugins(card: Locator, ids: string[]) {
   for (const id of ids) await expect(entry(card, id)).toBeVisible();
 }
 
-test("plugin list shows purposes and versions with empty type selection displaying every plugin", async ({ page }) => {
+test("each plugin shows its version in the list and reveals its purposes when expanded", async ({ page }) => {
   const card = await openPlugins(page);
   await expect(card.getByRole("heading", { name: "插件列表", exact: true })).toHaveCount(0);
   const types = card.getByRole("group", { name: "插件类型", exact: true });
@@ -87,9 +88,10 @@ test("plugin list shows purposes and versions with empty type selection displayi
     ["example.unclassified", ["未分类"]], ["musicfs.plugin.content.asmr", ["内容类型"]],
   ] as const;
   for (const [id, labels] of purposes) {
-    const summary = entry(card, id).locator("summary");
-    await expect(summary).toContainText("1.2.3");
-    for (const label of labels) await expect(summary.locator(".plugin-purposes").getByText(label, { exact: true })).toBeVisible();
+    const item = entry(card, id);
+    await expect(item.locator(".plugin-entry-heading").getByText("1.2.3", { exact: false })).toBeVisible();
+    await item.locator(".plugin-entry-toggle").click();
+    for (const label of labels) await expect(item.locator(".plugin-purposes").getByText(label, { exact: true })).toBeVisible();
   }
 });
 
@@ -292,7 +294,8 @@ test("refresh keeps active filters while updating matching plugin data", async (
   version = "2.0.0";
   await card.getByRole("button", { name: "刷新插件列表", exact: true }).click();
   await expectVisiblePlugins(card, [localPlugin.id]);
-  await expect(entry(card, localPlugin.id).locator("summary")).toContainText("2.0.0");
+  const item = entry(card, localPlugin.id);
+  await expect(item.locator(".plugin-entry-heading").getByText("2.0.0", { exact: false })).toBeVisible();
   await expect(music).toBeChecked();
   await expect(search).toHaveValue("local");
 });
@@ -309,10 +312,13 @@ for (const [locale, group, all, metadata, codec, contentType, searchLabel, empty
     await expect(types.getByRole("button", { name: all, exact: true })).toBeVisible();
     await expect(types.getByRole("checkbox", { name: metadata, exact: true })).toBeVisible();
     await expect(types.getByRole("checkbox", { name: codec, exact: true })).toBeVisible();
-    const purposes = entry(card, scraperPlugin.id).locator(".plugin-purposes");
+    const scraper = entry(card, scraperPlugin.id);
+    await scraper.locator(".plugin-entry-toggle").click();
+    const purposes = scraper.locator(".plugin-purposes");
     await expect(purposes.getByText(metadata, { exact: true })).toBeVisible();
     await types.getByRole("checkbox", { name: contentType, exact: true }).check();
     await expectVisiblePlugins(card, ["musicfs.plugin.content.asmr"]);
+    await entry(card, "musicfs.plugin.content.asmr").locator(".plugin-entry-toggle").click();
     await expect(card.locator(".plugin-purposes").getByText(contentType, { exact: true })).toBeVisible();
     await card.getByRole("searchbox", { name: searchLabel, exact: true }).fill("no-match");
     await expect(card.getByText(empty, { exact: true })).toBeVisible();

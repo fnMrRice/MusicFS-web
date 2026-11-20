@@ -71,8 +71,8 @@ test('plugin settings drive duplicate recognition while candidates still require
   await verifyHashes(page, server.origin, fixture.tracks);
   await page.getByRole('button', { name: '设置', exact: true }).click();
   await page.getByRole('navigation', { name: '设置分类', exact: true }).getByRole('button', { name: '插件管理', exact: true }).click();
-  const entry = page.locator('details.plugin-entry').filter({ hasText: plugin });
-  await entry.locator('..').getByRole('button', { name: /^配置 / }).click();
+  const entry = page.getByRole('listitem').filter({ has: page.getByText(plugin, { exact: true }) });
+  await entry.getByRole('button', { name: /^配置 / }).click();
   const dialog = page.getByRole('dialog', { name: /^配置 / });
   const form = dialog.locator('section');
   await expect(form.getByRole('checkbox')).toHaveCount(1);
