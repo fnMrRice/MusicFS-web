@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { preview, type PreviewServer } from "vite";
-import type { MusicTrack } from "../../src/api/music-catalog";
+import type { MusicTrack, TrackMetadata } from "../../src/api/music-catalog";
 import { routeApi } from "../fixtures/control-mock";
 import { track } from "../fixtures/dto";
 import { musicPage, musicTrack } from "../fixtures/music-catalog";
@@ -46,10 +46,13 @@ async function catalog(page: Page, { grey = false, otherAlbum = false } = {}) {
     }
     if (path === "/library/albums/one") return route.fulfill({ json: { ...album, revision: state.albumRevision } });
     if (path === "/library/albums/one/merge-tracks") {
-      const primary = state.items.find(item => item.trackId === request.postDataJSON().targetTrackId)!;
+      const body = request.postDataJSON();
+      const primary = state.items.find(item => item.trackId === body.targetTrackId)!;
+      const metadata: TrackMetadata | undefined = body.metadata;
       const sources = state.items.flatMap(item => item.selectedSource?.versions ?? []);
       const merged = { ...primary, revision: primary.revision! + 1, trackId: sources.length > 1 ? "recording-merged" : primary.trackId,
         localizedTitles: state.items.filter(item => item !== primary).map(item => ({ language: "und", title: item.title })),
+        ...(metadata && { ...metadata, artists: metadata.artistNames.map(name => ({ artistId: name, name })) }),
         selectedSource: primary.selectedSource && { ...primary.selectedSource, versions: sources } };
       state.items = [merged]; state.albumRevision++; state.matchingRevision++;
       return route.fulfill({ json: merged });
@@ -94,6 +97,8 @@ test("同专辑两首有来源的歌曲可以选择第二首为主曲，合并�
   expect(state.writes.filter(write => write.path.endsWith("/merge-tracks"))).toEqual([{
     path: "/library/albums/one/merge-tracks", method: "POST", key: expect.any(String),
     body: { targetTrackId: "second", expectedMatchingRevision: 8, expectedAlbumRevision: 4,
+      metadata: { title: "Uchiagehanabi", localizedTitles: [{ language: "und", title: "打上花火" }],
+        artistNames: ["米津玄師"], coverPath: null, genre: null, year: null, rating: null },
       tracks: expect.arrayContaining([{ trackId: "first", expectedRevision: 7 }, { trackId: "second", expectedRevision: 11 }]) },
   }]);
 });
@@ -115,6 +120,63 @@ test("无来源曲目可在专辑内合并到有来源曲目", async ({ page }) 
   expect(state.writes.filter(write => write.path.endsWith("/merge-tracks")).map(write => write.body)).toEqual([
     expect.objectContaining({ targetTrackId: "first" }),
   ]);
+});
+
+test("合并逐字段取值并编辑，切换主曲保留显式选择，一次提交最终资料", async ({ page }) => {
+  const state = await catalog(page, { grey: true });
+  Object.assign(state.items[0], { genre: "J-pop", rating: 5 });
+  Object.assign(state.items[1], { year: 2017, artists: [{ artistId: "daoko", name: "DAOKO" }],
+    localizedTitles: [{ language: "en", title: "Fireworks" }] });
+  await page.goto(albumDetail());
+  await choose(page, "打上花火"); await choose(page, "Uchiagehanabi");
+  await mergeButton(page).click();
+  const dialog = mergeDialog(page);
+  await expect(dialog.getByLabel("年份", { exact: true })).toHaveValue("2017");
+  await expect(dialog.getByLabel("歌手", { exact: true })).toHaveValue("米津玄師\nDAOKO");
+  const titleSource = dialog.getByRole("combobox", { name: "曲名取值来源", exact: true });
+  await titleSource.selectOption("track:second");
+  await expect(dialog.getByLabel("曲名", { exact: true })).toHaveValue("Uchiagehanabi");
+  await dialog.getByLabel("音乐风格", { exact: true }).fill("流行");
+  await dialog.getByLabel("评分", { exact: true }).selectOption("");
+  await dialog.getByRole("radio", { name: /Uchiagehanabi/ }).check();
+  await expect(dialog.getByLabel("音乐风格", { exact: true })).toHaveValue("流行");
+  await dialog.getByLabel("歌手取值来源").selectOption("track:first");
+  const title = dialog.getByLabel("曲名", { exact: true });
+  await title.fill("");
+  await expect(dialog.getByRole("button", { name: "确认合并" })).toBeDisabled();
+  await title.fill("打ち上げ花火");
+  expect(state.writes.filter(write => write.path.endsWith("/merge-tracks"))).toHaveLength(0);
+  await dialog.getByRole("button", { name: "确认合并" }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByRole("checkbox", { name: "选择 打ち上げ花火" })).toBeVisible();
+  expect(state.writes.filter(write => write.path.endsWith("/merge-tracks")).map(write => write.body)).toEqual([
+    expect.objectContaining({ targetTrackId: "second", metadata: { title: "打ち上げ花火", artistNames: ["米津玄師"],
+      genre: "流行", rating: null, year: 2017, coverPath: null, localizedTitles: expect.arrayContaining([
+        { language: "en", title: "Fireworks" }, { language: "und", title: "Uchiagehanabi" }, { language: "und", title: "打上花火" },
+      ]) } }),
+  ]);
+});
+
+test("结果未知时锁定最终资料，并用相同请求重试合并", async ({ page }) => {
+  const state = await catalog(page);
+  let firstRequest: { body: unknown; key: string } | undefined;
+  await page.route("**/albums/one/merge-tracks", async route => {
+    if (firstRequest) return route.fallback();
+    const req = route.request();
+    firstRequest = { body: req.postDataJSON(), key: req.headers()["idempotency-key"] };
+    return route.fulfill({ status: 503, json: { error: { code: "UNAVAILABLE", message: "Service unavailable" } } });
+  });
+  await page.goto(albumDetail());
+  await choose(page, "打上花火"); await choose(page, "Uchiagehanabi");
+  await mergeButton(page).click();
+  const dialog = mergeDialog(page);
+  await dialog.getByLabel("年份", { exact: true }).fill("2018");
+  await dialog.getByRole("button", { name: "确认合并" }).click();
+  await expect(dialog.getByLabel("年份", { exact: true })).toBeDisabled();
+  await expect(dialog.getByLabel("年份取值来源")).toBeDisabled();
+  await dialog.getByRole("button", { name: "重试确认保存" }).click();
+  await expect(dialog).toBeHidden();
+  expect(state.writes.filter(write => write.path.endsWith("/merge-tracks")).map(({ body, key }) => ({ body, key }))).toEqual([firstRequest]);
 });
 
 test("歌手列表跨专辑勾选有来源与无来源曲目，无法启动专辑内合并", async ({ page }) => {

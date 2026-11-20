@@ -30,6 +30,15 @@ export interface MusicTrack {
   playlistEntryId?: string;
   playbackSelection?: { trackId: string; forcedSourceTrackId: string | null };
 }
+export interface TrackMetadata {
+  title: string;
+  localizedTitles: LocalizedTitle[];
+  artistNames: string[];
+  coverPath: string | null;
+  genre: string | null;
+  year: number | null;
+  rating: number | null;
+}
 export interface MusicTrackPage {
   items: MusicTrack[];
   nextAfter: string | null;
@@ -114,18 +123,35 @@ export class MusicCatalogApi {
     return page as unknown as MusicTrackPage;
   }
 
-  async updateTrackTitles(track: MusicTrack, localizedTitles: LocalizedTitle[], key: string): Promise<void> {
-    if (!Number.isSafeInteger(track.revision) || !track.revision)
+  async updateTrackMetadata(trackId: string, expectedRevision: number, metadata: TrackMetadata, key: string): Promise<MusicTrack> {
+    if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 1)
       throw new ApiError("INVALID_RESPONSE", "Missing music track revision");
-    const value = await this.client.request<unknown>(`/library/tracks/${encodeURIComponent(track.trackId)}`, {
-      method: "PUT", idempotencyKey: key, body: {
-        expectedRevision: track.revision, title: track.title, localizedTitles,
-        artistNames: track.artists.map(artist => artist.name), albumIds: track.albums.map(album => album.albumId),
-        coverPath: track.coverPath, genre: track.genre, year: track.year, rating: track.rating,
+    const value = await this.client.request<unknown>(`/library/tracks/${encodeURIComponent(trackId)}`, {
+      method: "PUT", idempotencyKey: key, body: { ...metadata, expectedRevision },
+    });
+    if (!musicTrack(value) || value.trackId !== trackId || !Number.isSafeInteger(value.revision) || Number(value.revision) < expectedRevision)
+      throw new ApiError("INVALID_RESPONSE", "Invalid updated music track");
+    return value;
+  }
+
+  async updateTrackTitles(track: MusicTrack, localizedTitles: LocalizedTitle[], key: string): Promise<void> {
+    await this.updateTrackMetadata(track.trackId, track.revision ?? 0, {
+      title: track.title, localizedTitles, artistNames: track.artists.map(artist => artist.name),
+      coverPath: track.coverPath, genre: track.genre, year: track.year, rating: track.rating,
+    }, key);
+  }
+
+  async mergeAlbumTracks(albumId: string, albumRevision: number, matchingRevision: number, targetTrackId: string,
+    tracks: MusicTrack[], key: string, metadata?: TrackMetadata): Promise<MusicTrack> {
+    const result = await this.client.request<unknown>(`/library/albums/${encodeURIComponent(albumId)}/merge-tracks`, {
+      method: "POST", idempotencyKey: key, body: {
+        expectedAlbumRevision: albumRevision, expectedMatchingRevision: matchingRevision, targetTrackId,
+        tracks: tracks.map(track => ({ trackId: track.trackId, expectedRevision: track.revision })), metadata,
       },
     });
-    if (!musicTrack(value) || value.trackId !== track.trackId || !value.revision || value.revision <= track.revision)
-      throw new ApiError("INVALID_RESPONSE", "Invalid updated music track");
+    if (!musicTrack(result) || (tracks.filter(track => track.selectedSource).length < 2 && result.trackId !== targetTrackId))
+      throw new ApiError("INVALID_RESPONSE", "Invalid merged track");
+    return result;
   }
 
   async createTrack(title: string, artistNames: string[], idempotencyKey: string): Promise<MusicTrack> {

@@ -116,10 +116,10 @@ test("a catalog-only track accepts platform titles and manual language edits wit
   await modal.getByRole("button", { name: "保存为曲目别名" }).click();
   await expect(modal).toHaveCount(0);
   expect(track.localizedTitles).toEqual([{ language: "zh-Hans", title: "烟花" }, { language: "ja-Latn", title: "Uchiagehanabi" }]);
-  await more.click(); await page.getByRole("menuitem", { name: "编辑多语言曲名" }).click();
+  await more.click(); await page.getByRole("menuitem", { name: "编辑曲目元数据" }).click();
   await modal.getByRole("button", { name: "添加名称" }).click();
   await modal.getByLabel("语言标签").last().fill("en");
-  await modal.getByLabel("曲名", { exact: true }).last().fill("Fireworks");
+  await modal.getByLabel("别名", { exact: true }).last().fill("Fireworks");
   await modal.getByRole("button", { name: "保存", exact: true }).click();
   await expect(modal).toHaveCount(0);
   expect(track.localizedTitles.at(-1)).toEqual({ language: "en", title: "Fireworks" });

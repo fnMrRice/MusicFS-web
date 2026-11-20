@@ -197,27 +197,47 @@ test("artists, albums and genres open scoped track lists, including unknown cate
 });
 
 test("a folder track menu edits the linked catalog track", async ({ page }) => {
-  let saved = false;
+  const attempts: string[] = [];
   const canonical = { ...musicTrack(tracks[0]), trackId: "catalog-1", title: "Library title", revision: 2 };
   await mockApi(page, async (route, url) => {
     if (url.pathname.endsWith("/library/sources/Alpha/track")) await route.fulfill({ json: canonical });
     else if (url.pathname.endsWith("/library/tracks/catalog-1")) {
       expect(route.request().method()).toBe("PUT");
-      expect(route.request().postDataJSON()).toMatchObject({ expectedRevision: 2, title: "Library title", localizedTitles: [{ language: "und", title: "Alias" }] });
-      saved = true; await route.fulfill({ json: { ...canonical, revision: 3 } });
+      const metadata = { title: "Edited title", localizedTitles: [{ language: "und", title: "Alias" }],
+        artistNames: ["AC/DC", "Earth, Wind & Fire"], genre: "Rock", year: 1980, rating: 4, coverPath: "/covers/rock.jpg" };
+      expect(route.request().postDataJSON()).toEqual({ expectedRevision: 2, ...metadata });
+      attempts.push(route.request().headers()["idempotency-key"]);
+      if (attempts.length === 1) await route.fulfill({ status: 503, json: { error: { code: "UNAVAILABLE" } } });
+      else await route.fulfill({ json: { ...canonical, ...metadata,
+        artists: metadata.artistNames.map(name => ({ artistId: name, name })), revision: 3 } });
     } else return false;
     return true;
   });
   await page.goto(`${origin}/#/library?category=${encodeURIComponent("文件夹")}&categoryId=folder-child`);
   await page.getByRole("button", { name: "Alpha 的更多操作", exact: true }).click();
-  await page.getByRole("menuitem", { name: "编辑多语言曲名" }).click();
+  await page.getByRole("menuitem", { name: "编辑曲目元数据" }).click();
   const modal = page.getByRole("dialog");
-  await expect(modal.getByText("Library title")).toBeVisible();
+  const title = modal.getByLabel("曲名", { exact: true });
+  const save = modal.getByRole("button", { name: "保存", exact: true });
+  await expect(title).toHaveValue("Library title");
+  await expect(save).toBeDisabled();
+  await title.fill("Edited title");
+  await modal.getByLabel("歌手", { exact: true }).fill("AC/DC\nEarth, Wind & Fire");
+  await modal.getByLabel("年份", { exact: true }).fill("10000");
+  await expect(save).toBeDisabled();
+  await modal.getByLabel("年份", { exact: true }).fill("1980");
+  await modal.getByLabel("音乐风格", { exact: true }).fill("Rock");
+  await modal.getByLabel("评分", { exact: true }).selectOption("4");
+  await modal.getByLabel("封面路径", { exact: true }).fill("/covers/rock.jpg");
   await modal.getByRole("button", { name: "添加名称" }).click();
-  await modal.getByLabel("曲名", { exact: true }).fill("Alias");
-  await modal.getByRole("button", { name: "保存", exact: true }).click();
+  await modal.getByLabel("别名", { exact: true }).fill("Alias");
+  await save.click();
+  await expect(title).toBeDisabled();
+  await modal.getByRole("button", { name: "重试确认保存" }).click();
   await expect(modal).toHaveCount(0);
-  expect(saved).toBe(true);
+  expect(attempts).toHaveLength(2);
+  expect(attempts[0]).toBeTruthy();
+  expect(attempts[1]).toBe(attempts[0]);
 });
 
 test("all tracks links each artist and album by catalog ID and shows providers in the expanded versions", async ({ page }) => {

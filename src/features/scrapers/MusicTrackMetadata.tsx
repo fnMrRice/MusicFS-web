@@ -9,11 +9,11 @@ import { useResource } from "../../components/query";
 import { ErrorNotice } from "../../components/ui";
 import { useSourceName } from "../../components/use-source-name";
 import { tr } from "../../i18n";
-import { LocalizedNamesForm } from "../library/LocalizedNamesForm";
+import { TrackMetadataEditor } from "../library/TrackMetadataEditor";
 import { ScraperSearch } from "./ScraperSearch";
 
 export function MusicTrackMetadata({ trackId, bySource, mode, close, applied }: {
-  trackId: string; bySource: boolean; mode: "search" | "names"; close: () => void; applied?: () => void;
+  trackId: string; bySource: boolean; mode: "search" | "edit"; close: () => void; applied?: () => void;
 }) {
   const services = useServices();
   const [saving, setSaving] = useState(false);
@@ -26,15 +26,14 @@ export function MusicTrackMetadata({ trackId, bySource, mode, close, applied }: 
   function finish() {
     services.invalidateLibraries(); applied?.(); close();
   }
-  return <Modal title={tr(mode === "search" ? "搜索在线资料" : "编辑多语言曲名")} close={() => { if (!saving) close(); }}>
+  return <Modal title={tr(mode === "search" ? "搜索在线资料" : "编辑曲目元数据")} close={() => { if (!saving) close(); }}>
     {track.loading && <p role="status">{tr("正在加载…")}</p>}
     <ErrorNotice error={track.error} retry={track.reload} />
     {track.data && <>
-      <p><strong>{track.data.title}</strong></p>
-      {mode === "names" ? <LocalizedNamesForm names={track.data.localizedTitles ?? []} titleLabel={tr("曲名")}
-        save={(names, key) => services.musicCatalog.updateTrackTitles(track.data!, names, key)}
+      {mode === "edit" ? <TrackMetadataEditor key={track.data.revision} track={track.data}
         busyChanged={setSaving} applied={finish} refresh={track.reload} />
-        : <MusicTrackSearch track={track.data} finished={finish} refresh={track.reload} savingChanged={setSaving} />}
+        : <><p><strong>{track.data.title}</strong></p>
+          <MusicTrackSearch track={track.data} finished={finish} refresh={track.reload} savingChanged={setSaving} /></>}
     </>}
   </Modal>;
 }

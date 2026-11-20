@@ -67,7 +67,7 @@ export function TrackTable({
   const favorites = useStore(s.favorites);
   const [add, setAdd] = useState<{items: TrackItem[]; pinned?: string; selection?: TrackSelection} | null>(null);
   const [cover, setCover] = useState<SourceTrack | null>(null);
-  const [metadata, setMetadata] = useState<{ trackId: string; bySource: boolean; mode: "search" | "names" } | null>(null);
+  const [metadata, setMetadata] = useState<{ trackId: string; bySource: boolean; mode: "search" | "edit" } | null>(null);
   const [favoriteSource, setFavoriteSource] = useState<FavoriteEntry | null>(null);
   const [merge, setMerge] = useState<{ tracks: SourceTrack[]; revision?: number; selection?: TrackSelection } | null>(null);
   const [albumMerge, setAlbumMerge] = useState<MusicTrack[] | null>(null);
@@ -126,7 +126,7 @@ export function TrackTable({
   }
   const menuItems = menu?.selection ? selection.chosen : menu?.items ?? [];
   const singleTrack = !menu?.version && (!menu?.selection || !selection.needsComplete) && menuItems.length === 1 ? menuItems[0] : null;
-  function openTrackMetadata(mode: "search" | "names") {
+  function openTrackMetadata(mode: "search" | "edit") {
     if (singleTrack) setMetadata({ trackId: trackKey(singleTrack), bySource: !("trackId" in singleTrack), mode });
   }
   const menuSources = menu?.version ? [menu.version] : menuItems.map(displaySource);
@@ -280,7 +280,7 @@ export function TrackTable({
           { label: tr("添加到歌单"), icon: "plus", disabled: busy, run: () => menu.selection ? addSelected() : setAdd({ items: menu.items, pinned: menu.version?.sourceTrackId }) },
           ...(singleTrack ? [
             { label: tr("搜索在线资料"), icon: "search", run: () => openTrackMetadata("search") },
-            { label: tr("编辑多语言曲名"), icon: "settings", run: () => openTrackMetadata("names") },
+            { label: tr("编辑曲目元数据"), icon: "settings", run: () => openTrackMetadata("edit") },
           ] : []),
           ...(menu.coverTrack ? [{ label: tr("选择封面"), icon: "album", run: () => setCover(menu.coverTrack!) }] : []),
         ]} />}
