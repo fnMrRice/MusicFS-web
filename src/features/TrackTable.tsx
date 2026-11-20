@@ -1,7 +1,7 @@
 import { tr, useLocale, statusText } from "../i18n";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { SourceTrack, Provider } from "../api/types";
-import { displaySource, tableRowKey, trackKey, trackTitle, type TrackItem } from "../api/music-catalog";
+import { displaySource, tableRowKey, trackKey, trackTitle, type MusicTrack, type TrackItem } from "../api/music-catalog";
 import { UnavailableMusicRow } from "./library/UnavailableMusicRow";
 import { FavoriteSource } from "./library/FavoriteSource";
 import type { FavoriteEntry } from "../api/favorites";
@@ -13,6 +13,8 @@ import { AddToPlaylist } from "./playlists/AddToPlaylist";
 import { useSourceName } from "../components/use-source-name";
 import { MergeSongs } from "./matching/MergeSongs";
 import { TrackRow } from "./library/TrackRow";
+import { MusicTrackMetadata } from "./scrapers/MusicTrackMetadata";
+import { MergeMusicTracks } from "./library/MergeMusicTracks";
 import { RecordingCover } from "./matching/RecordingCover";
 import { useTrackSelection, type TrackPagination } from "./library/use-track-selection";
 import { useTrackBatchActions } from "./library/use-track-batch-actions";
@@ -33,6 +35,7 @@ export function TrackTable({
   onMatchingChange,
   toolbarActions,
   hideEmptyTable = false,
+  albumScope,
 }: {
   tracks: readonly TrackItem[];
   providers?: Provider[];
@@ -45,6 +48,7 @@ export function TrackTable({
   onMatchingChange?: () => void;
   toolbarActions?: ReactNode;
   hideEmptyTable?: boolean;
+  albumScope?: { albumId: string; revision: number; reload: () => void };
 }) {
   useLocale();
   const sourceName = useSourceName();
@@ -60,8 +64,10 @@ export function TrackTable({
   const favorites = useStore(s.favorites);
   const [add, setAdd] = useState<{items: TrackItem[]; pinned?: string; selection?: TrackSelection} | null>(null);
   const [cover, setCover] = useState<SourceTrack | null>(null);
+  const [metadata, setMetadata] = useState<{ trackId: string; bySource: boolean; mode: "search" | "names" } | null>(null);
   const [favoriteSource, setFavoriteSource] = useState<FavoriteEntry | null>(null);
   const [merge, setMerge] = useState<{ tracks: SourceTrack[]; revision?: number; selection?: TrackSelection } | null>(null);
+  const [albumMerge, setAlbumMerge] = useState<MusicTrack[] | null>(null);
   const [message, setMessage] = useState("");
   const [favoriteBusy, setFavoriteBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -85,8 +91,10 @@ export function TrackTable({
     setError(null);
     setMenu(null);
     setCover(null);
+    setMetadata(null);
     setAdd(null);
     setMerge(null);
+    setAlbumMerge(null);
   }, [queryKey]);
   useEffect(() => { void s.favorites.load(); }, [s]);
   const chosen = selection.chosen;
@@ -114,6 +122,10 @@ export function TrackTable({
     else setMessage(value ? "已收藏" : "已取消收藏");
   }
   const menuItems = menu?.selection ? selection.chosen : menu?.items ?? [];
+  const singleTrack = !menu?.version && (!menu?.selection || !selection.needsComplete) && menuItems.length === 1 ? menuItems[0] : null;
+  function openTrackMetadata(mode: "search" | "names") {
+    if (singleTrack) setMetadata({ trackId: trackKey(singleTrack), bySource: !("trackId" in singleTrack), mode });
+  }
   const menuSources = menu?.version ? [menu.version] : menuItems.map(displaySource);
   const menuPlayable = menuSources.filter((track): track is SourceTrack => track?.availability === "available");
   const menuFavorite = (!menu?.selection || !selection.needsComplete) && menuItems.every((track) => s.favorites.has(trackKey(track)));
@@ -132,7 +144,9 @@ export function TrackTable({
             <strong>{selection.label}</strong>
             <button disabled={busy || (!chosenSources.some((t) => t.availability === "available") && !selection.needsComplete)} onClick={() => runSelected((items) => enqueue(sources(items)), (value) => batch.resolve(value, enqueue))}>{tr("加入队列")}</button>
             <button disabled={busy} onClick={addSelected}>{tr("添加到歌单")}</button>
-            {onMatchingChange && <button disabled={busy || (chosen.length < 2 && !selection.needsComplete) || chosenSources.length !== chosen.length || matchingPending.length > 0}
+            {albumScope && <button disabled={busy || matchingRevision === undefined || chosen.length < 2 && !selection.needsComplete}
+              onClick={() => runSelected(items => { if (items.every(item => "trackId" in item)) setAlbumMerge(items); })}>{tr("合并歌曲")}</button>}
+            {onMatchingChange && !albumScope && <button disabled={busy || (chosen.length < 2 && !selection.needsComplete) || chosenSources.length !== chosen.length || matchingPending.length > 0}
               onClick={() => runSelected((items) => setMerge({ tracks: sources(items), revision: matchingRevision }),
                 (value) => setMerge({ tracks: chosenSources, revision: matchingRevision, selection: value }))}>{tr("合并歌曲")}</button>}
             <button disabled={favoriteDisabled} onClick={() => runSelected((items) => void favorite(items, true), (value) => batch.favorite(value, true))}>
@@ -222,6 +236,7 @@ export function TrackTable({
               <TrackRow
                 key={tableRowKey(item)}
                 track={t}
+                localizedTitles={"trackId" in item ? item.localizedTitles : undefined}
                 number={i + 1}
                 provider={sourceName(
                   providers.find((p) => p.id === t.providerInstanceId) ??
@@ -262,14 +277,22 @@ export function TrackTable({
             run: () => menu.selection ? runSelected((items) => void favorite(items, !menuFavorite), (value) => batch.favorite(value, !menuFavorite)) : void favorite(menu.items, !menuFavorite, menu.version?.sourceTrackId) },
           ...(favoriteEntry ? [{ label: tr("编辑收藏来源"), icon: "heart", run: () => setFavoriteSource(favoriteEntry) }] : []),
           { label: tr("添加到歌单"), icon: "plus", disabled: busy, run: () => menu.selection ? addSelected() : setAdd({ items: menu.items, pinned: menu.version?.sourceTrackId }) },
+          ...(singleTrack ? [
+            { label: tr("搜索在线资料"), icon: "search", run: () => openTrackMetadata("search") },
+            { label: tr("编辑多语言曲名"), icon: "settings", run: () => openTrackMetadata("names") },
+          ] : []),
           ...(menu.coverTrack ? [{ label: tr("选择封面"), icon: "album", run: () => setCover(menu.coverTrack!) }] : []),
         ]} />}
+      {metadata && <MusicTrackMetadata {...metadata} close={() => setMetadata(null)} applied={onMatchingChange} />}
       {cover?.recordingId && <RecordingCover recordingId={cover.recordingId} tracks={cover.versions ?? [cover]} close={() => setCover(null)}
         changed={(result) => s.recordingCoverChanged(result.recordingId, result.coverObjectId, result.candidates.map((candidate) => candidate.sourceTrackId))} />}
       {add && <AddToPlaylist tracks={add.items} pinned={add.pinned} selection={add.selection} close={() => setAdd(null)} />}
       {favoriteSource && <FavoriteSource entry={favoriteSource} close={() => setFavoriteSource(null)} />}
       {merge && onMatchingChange && <MergeSongs tracks={merge.tracks} revision={merge.revision} selection={merge.selection}
         close={() => setMerge(null)} refresh={() => { selection.clear(); onMatchingChange(); }} />}
+      {albumMerge && albumScope && matchingRevision !== undefined && <MergeMusicTracks albumId={albumScope.albumId} albumRevision={albumScope.revision}
+        matchingRevision={matchingRevision} tracks={albumMerge} close={() => setAlbumMerge(null)}
+        applied={() => { setAlbumMerge(null); selection.clear(); albumScope.reload(); }} />}
     </>
   );
 }

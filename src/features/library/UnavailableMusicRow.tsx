@@ -1,6 +1,7 @@
 import { coverObject, type MusicTrack } from "../../api/music-catalog";
 import { Cover, Icon, IconButton } from "../../components/ui";
 import { tr } from "../../i18n";
+import { OtherTrackTitles } from "./OtherTrackTitles";
 
 interface Props {
   track: MusicTrack; number: number; checked: boolean; isFavorite: boolean; favoriteDisabled: boolean;
@@ -14,9 +15,9 @@ export function UnavailableMusicRow({ track, number, checked, toggle, isFavorite
     <td className="row-number">{number}</td>
     <td><div className="track-title">
       <Cover objectId={coverObject(track.coverPath)} />
-      <button className="track-play" disabled aria-label={tr("播放 {0}", { 0: track.title })}>
+      <div><button className="track-play" disabled aria-label={tr("播放 {0}", { 0: track.title })}>
         <Icon name="play" size={14} /><span>{track.title}</span>
-      </button>
+      </button><OtherTrackTitles title={track.title} names={track.localizedTitles} /></div>
     </div></td>
     <td>{track.artists.map((artist) => artist.name).join(" / ") || "—"}</td>
     <td>{track.albums.map((album) => album.name).join(" / ") || "—"}</td>

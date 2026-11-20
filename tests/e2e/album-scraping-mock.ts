@@ -3,10 +3,11 @@ import { routeApi } from "../fixtures/control-mock";
 import { musicPage, musicTrack } from "../fixtures/music-catalog";
 import { track } from "../fixtures/dto";
 import type { SavedScrapedField, ScrapedItem } from "../../src/api/scrapers";
+import type { AlbumSourceLink } from "../../src/api/music-catalog";
 
 export const album = { albumId: "one", originalName: "原始夜间专辑", name: "夜间专辑", revision: 1, externalId: null,
   isExternal: false, coverPath: null, publisher: null as string | null, releaseDate: null as string | null,
-  sourceUrl: null as string | null, sourcePluginId: null as string | null };
+  sourceLinks: [] as AlbumSourceLink[] };
 export const candidate = { id: "release-one", title: "夜间专辑发行版", sourceUrl: "https://example.org/release/one",
   artist: "河图", album: album.name, date: "2013-04-02T07:00:00Z", publisher: "星河唱片",
   genre: "Mandopop", description: "适合夜间聆听的作品。" };
@@ -66,8 +67,8 @@ export async function mock(page: Page, { empty = false, coverPath = "/api/v1/med
       state.saved = [{ field: "albumDetails", pluginId: body.pluginId, item: candidate },
         { field: "albumTracks", pluginId: body.pluginId, item: completeCandidate }];
       state.applied = true;
-      state.album.sourceUrl = candidate.sourceUrl;
-      state.album.sourcePluginId = body.pluginId;
+      state.album.sourceLinks = [...state.album.sourceLinks.filter(link => link.pluginId !== body.pluginId),
+        { url: candidate.sourceUrl, pluginId: body.pluginId }];
       state.album.revision++;
       return route.fulfill({ json: { revision: state.album.revision } });
     }

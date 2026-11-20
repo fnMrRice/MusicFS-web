@@ -1,14 +1,21 @@
 import type { ScrapedItem } from "../../api/scrapers";
+import { languageLabel } from "../../api/localized-titles";
 import { useState } from "react";
 import { duration } from "../../components/ui";
-import { tr } from "../../i18n";
+import { tr, useLocale } from "../../i18n";
 import { externalLink } from "./fields";
 
 export function ScrapedPreview({ item }: { item: ScrapedItem }) {
+  const { locale } = useLocale();
   const image = externalLink(item.imageUrl);
   const source = externalLink(item.sourceUrl);
   const [unavailable, setUnavailable] = useState("");
   return <div className="scraped-preview">
+    {[{ label: "曲名", names: item.localizedTitles }, { label: "歌手名称", names: item.localizedArtistNames }]
+      .map(({ label, names }) => names?.length ? <dl key={label} className="scraped-names">
+        {names.map(({ language, title }, index) => <div key={index}>
+          <dt>{tr(label)} · {languageLabel(language, locale)}</dt><dd>{title}</dd>
+        </div>)}</dl> : null)}
     <div className="scraped-byline">{[item.artist, item.album, item.date, item.duration ? duration(item.duration * 1000) : ""]
       .filter(Boolean).join(" · ")}</div>
     {item.description && <p>{item.description}</p>}

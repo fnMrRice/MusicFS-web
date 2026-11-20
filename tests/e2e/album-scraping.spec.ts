@@ -20,7 +20,7 @@ test("album browsing previews the complete release and saves metadata and missin
   const modal = dialog(page);
   await expect(modal.getByLabel("专辑名称", { exact: true })).toHaveValue(album.originalName);
   await expect(modal.getByRole("combobox", { name: "刮削内容", exact: true })).toHaveCount(0);
-  await expect(modal.getByRole("combobox", { name: "资料来源", exact: true }).locator("option")).toHaveText(["专辑资料源"]);
+  await expect(modal.getByRole("group", { name: "资料来源", exact: true }).getByRole("checkbox", { name: "专辑资料源" })).toBeChecked();
   await modal.getByRole("button", { name: "搜索", exact: true }).click();
   await expect(modal.getByRole("button", { name: "选用这张专辑", exact: true })).toHaveCount(0);
   await modal.getByRole("button", { name: "预览完整专辑", exact: true }).click();
@@ -82,8 +82,8 @@ test("a failed complete track lookup never partially saves the release and can b
   expect(state.writes).toEqual([]);
   state.trackSearchFailure = false;
   await dialog(page).getByRole("button", { name: "预览完整专辑", exact: true }).click();
-  await expect(dialog(page).getByText("未收录曲目", { exact: true })).toBeVisible();
-  await dialog(page).getByRole("button", { name: "选用这张专辑", exact: true }).click();
+  await dialog(page).getByRole("checkbox", { name: "曲目表", exact: true }).check();
+  await dialog(page).getByRole("button", { name: "合并选中资料", exact: true }).click();
   await expect(dialog(page)).toHaveCount(0);
   expect(state.writes).toHaveLength(1);
   expect(state.saved.map((field) => field.field)).toEqual(["albumDetails", "albumTracks"]);
@@ -98,6 +98,47 @@ test("a manually supplied platform album page is sent to the selected server scr
   await expect(dialog(page).getByRole("button", { name: "预览完整专辑", exact: true })).toBeVisible();
   expect(state.searches).toEqual([{ field: "albumDetails", query: { sourceUrl: candidate.sourceUrl } }]);
   expect(state.writes).toEqual([]);
+});
+
+test("multiple platforms can be searched and linked together, then refreshed one at a time", async ({ page }) => {
+  const state = await mock(page);
+  const secondQueries: { field: string; query: Record<string, string> }[] = [];
+  const second = { ...candidate, id: "other-edition", title: "第二个平台版本", sourceUrl: "https://second.example.org/other-edition" };
+  let failSecond = true;
+  await page.route("**/api/v1/scrapers", route => route.fulfill({ json: { items: ["album-source", "second-source"].map((pluginId, index) =>
+    ({ pluginId, name: index ? "第二平台" : "第一平台", type: "scraper", available: true, fields: ["albumDetails", "albumTracks"] })) } }));
+  await page.route("**/api/v1/scrapers/second-source/search", route => {
+    const input = route.request().postDataJSON();
+    secondQueries.push(input);
+    if (failSecond) return route.fulfill({ status: 503, json: { error: { code: "SOURCE_UNAVAILABLE" } } });
+    return route.fulfill({ json: { items: [{ ...second, candidateToken: input.field + "-second",
+      ...(input.field === "albumTracks" ? { tracks: [{ title: "另一发行版第一首" }] } : {}) }] } });
+  });
+  await openAlbum(page);
+  const modal = dialog(page);
+  await modal.getByRole("checkbox", { name: "第二平台" }).check();
+  await modal.getByRole("button", { name: "搜索", exact: true }).click();
+  await expect(modal.getByRole("region", { name: "第二平台" }).getByRole("alert")).toBeVisible();
+  await expect(modal.getByRole("region", { name: "第一平台" }).getByText(candidate.title)).toBeVisible();
+  failSecond = false;
+  await modal.getByRole("button", { name: "搜索", exact: true }).click();
+  for (const platform of ["第一平台", "第二平台"]) {
+    await modal.getByRole("region", { name: platform }).getByRole("checkbox", { name: "关联此页面" }).check();
+  }
+  await modal.getByRole("button", { name: "保存选中平台链接" }).click();
+  await expect(modal).toHaveCount(0);
+  expect(state.album.sourceLinks).toEqual([{ pluginId: "album-source", url: candidate.sourceUrl }, { pluginId: "second-source", url: second.sourceUrl }]);
+  expect(state.saved).toEqual([]);
+  await details(page).getByRole("button", { name: "刷新资料" }).click();
+  const panel = page.getByRole("dialog", { name: "对比专辑资料" });
+  await expect(panel.getByRole("button", { name: "读取平台资料" })).toBeDisabled();
+  const before = state.searches.length;
+  await panel.getByLabel("资料平台").selectOption("second-source");
+  await panel.getByRole("button", { name: "读取平台资料" }).click();
+  await expect(panel.getByRole("checkbox", { name: "曲目表" })).toBeVisible();
+  expect(state.searches).toHaveLength(before);
+  expect(secondQueries.slice(-2)).toEqual([{ field: "albumDetails", query: { sourceUrl: second.sourceUrl } },
+    { field: "albumTracks", query: { externalId: second.id, sourceUrl: second.sourceUrl } }]);
 });
 
 test("editing the display name preserves the immutable original album name and saved metadata", async ({ page }) => {
@@ -138,8 +179,7 @@ test("album details stay collapsed and the scraping action remains beside sortin
   const state = await mock(page);
   state.saved = [{ field: "albumDetails", pluginId: "album-source", item: candidate }];
   await page.emulateMedia({ colorScheme: "dark" });
-  state.album.sourceUrl = candidate.sourceUrl;
-  state.album.sourcePluginId = "album-source";
+  state.album.sourceLinks = [{ url: candidate.sourceUrl, pluginId: "album-source" }];
   await openAlbum(page, false);
   await expect(details(page)).toHaveCount(0);
   const heading = await page.getByRole("heading", { name: album.name, exact: true }).boundingBox();
@@ -158,7 +198,8 @@ test("album details stay collapsed and the scraping action remains beside sortin
   await expect(detailsToggle(page)).toHaveAttribute("aria-expanded", "true");
   const panel = details(page);
   expect(await detailsToggle(page).getAttribute("aria-controls")).toBe(await panel.getAttribute("id"));
-  for (const label of ["显示名", "原名", "平台专辑名", "艺人", "发行日期", "发行商", "音乐风格", "补充信息"]) {
+  await expect(panel.getByText("平台专辑名", { exact: true })).toHaveCount(0);
+  for (const label of ["显示名", "原名", "艺人", "发行日期", "发行商", "音乐风格", "补充信息"]) {
     await expect(panel.getByText(label, { exact: true })).toBeVisible();
   }
   await expect(panel.getByText(candidate.artist, { exact: true })).toBeVisible();
@@ -169,7 +210,7 @@ test("album details stay collapsed and the scraping action remains beside sortin
   await expect(panel).not.toContainText(candidate.date);
   await expect(panel).not.toContainText("album-source");
   await expect(panel).not.toContainText("专辑资料源");
-  await expect(panel.getByRole("link", { name: "在平台查看", exact: true })).toHaveAttribute("href", candidate.sourceUrl);
+  await expect(panel.getByRole("link", { name: "example.org", exact: true })).toHaveAttribute("href", candidate.sourceUrl);
   await page.screenshot({ path: info.outputPath("album-desktop-dark-expanded.png") });
   await detailsToggle(page).click();
   await expect(panel).toHaveCount(0);

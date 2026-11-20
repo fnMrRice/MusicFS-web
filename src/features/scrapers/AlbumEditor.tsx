@@ -1,11 +1,12 @@
 import { useMemo, useRef, useState } from "react";
 import { ApiError, errorMessage } from "../../api/client";
-import { MusicCatalogApi, type MusicAlbum } from "../../api/music-catalog";
+import { MusicCatalogApi, type AlbumSourceLink, type MusicAlbum } from "../../api/music-catalog";
 import { ScrapersApi } from "../../api/scrapers";
 import { useServices } from "../../app/services";
 import { useResource } from "../../components/query";
 import { ErrorNotice } from "../../components/ui";
 import { tr, useLocale } from "../../i18n";
+import { externalLink } from "./fields";
 
 export function AlbumEditor({ album, initialPublisher, initialReleaseDate, applied, refresh, savingChanged }: {
   album: MusicAlbum; applied: () => void; refresh: () => void; savingChanged: (busy: boolean) => void;
@@ -20,20 +21,23 @@ export function AlbumEditor({ album, initialPublisher, initialReleaseDate, appli
   const [name, setName] = useState(album.name);
   const [publisher, setPublisher] = useState(initialPublisher ?? album.publisher ?? "");
   const [releaseDate, setReleaseDate] = useState((initialReleaseDate ?? album.releaseDate ?? "").match(/^\d{4}-\d{2}-\d{2}(?=$|T)/)?.[0] ?? "");
-  const [sourceUrl, setSourceUrl] = useState(album.sourceUrl ?? "");
-  const [sourcePluginId, setSourcePluginId] = useState(album.sourcePluginId ?? "");
+  const [links, setLinks] = useState(album.sourceLinks);
+  const validLinks = links.every(link => !!link.pluginId && !!externalLink(link.url.trim()));
+  const nextSource = sources.find(source => !links.some(link => link.pluginId === source.pluginId));
+  const update = (index: number, patch: Partial<AlbumSourceLink>) =>
+    setLinks(current => current.map((link, i) => i === index ? { ...link, ...patch } : link));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pendingKey, setPendingKey] = useState<string>();
   const [conflict, setConflict] = useState(false);
   const lock = useRef(false);
   async function save() {
-    if (lock.current || conflict || !name.trim()) return;
+    if (lock.current || conflict || !name.trim() || !validLinks) return;
     const key = pendingKey ?? crypto.randomUUID();
     lock.current = true; setSaving(true); savingChanged(true); setError(null);
     try {
       await api.updateAlbum(album, { name: name.trim(), publisher: publisher.trim(), releaseDate,
-        sourceUrl: sourceUrl.trim(), sourcePluginId }, key);
+        sourceLinks: links.map(link => ({ ...link, url: link.url.trim() })) }, key);
       applied();
     } catch (cause) {
       const uncertain = cause instanceof ApiError && (cause.status === 0 || cause.status >= 500 || cause.code === "INVALID_RESPONSE");
@@ -51,21 +55,24 @@ export function AlbumEditor({ album, initialPublisher, initialReleaseDate, appli
         <label>{tr("发行商")}<input value={publisher} maxLength={256} onChange={(event) => setPublisher(event.target.value)} /></label>
         <label>{tr("发行日期")}<input type="date" value={releaseDate} onChange={(event) => setReleaseDate(event.target.value)} /></label>
       </div>
-      <div className="album-editor-grid">
-        <label>{tr("资料平台")}<select value={sourcePluginId} required={!!sourceUrl.trim()}
-          onChange={(event) => setSourcePluginId(event.target.value)}>
-          <option value="">{tr("未关联平台")}</option>
-          {sourcePluginId && !sources.some((source) => source.pluginId === sourcePluginId) && <option value={sourcePluginId}>{tr("当前关联平台")}</option>}
-          {sources.map((source) => <option key={source.pluginId} value={source.pluginId}>{source.name}</option>)}
+      {links.map((link, index) => <div className="album-editor-link" key={index}>
+        <label>{tr("资料平台")}<select value={link.pluginId} required
+          onChange={event => update(index, { pluginId: event.target.value })}>
+          {!sources.some(source => source.pluginId === link.pluginId) &&
+            <option value={link.pluginId}>{externalLink(link.url) ? new URL(link.url).hostname : tr("当前关联平台")}</option>}
+          {sources.filter(source => source.pluginId === link.pluginId || !links.some(other => other.pluginId === source.pluginId))
+            .map(source => <option key={source.pluginId} value={source.pluginId}>{source.name}</option>)}
         </select></label>
-        <label>{tr("平台专辑页面")}<input type="url" value={sourceUrl} maxLength={4096} placeholder="https://…"
-          onChange={(event) => setSourceUrl(event.target.value)} /></label>
-      </div>
-      <p className="muted">{tr("保存不会自动读取平台资料；点击「刷新资料」后，可对比并选择需要合并的内容。")}</p>
+        <label>{tr("平台专辑页面")}<input type="url" value={link.url} maxLength={4096} placeholder="https://…" required
+          onChange={event => update(index, { url: event.target.value })} /></label>
+        <button type="button" onClick={() => setLinks(current => current.filter((_, i) => i !== index))}>{tr("移除链接")}</button>
+      </div>)}
+      <button type="button" className="album-add-link" disabled={!nextSource || links.length >= 32}
+        onClick={() => { if (nextSource) setLinks(current => [...current, { pluginId: nextSource.pluginId, url: "" }]); }}>{tr("添加平台链接")}</button>
     </fieldset>
     <ErrorNotice error={plugins.error} retry={plugins.reload} />
     <ErrorNotice error={error} />
     {conflict ? <button type="button" onClick={refresh}>{tr("刷新资料")}</button>
-      : <button className="primary" type="submit" disabled={saving || !name.trim()}>{tr(pendingKey ? "重试确认保存" : "保存")}</button>}
+      : <button className="primary" type="submit" disabled={saving || !name.trim() || !validLinks}>{tr(pendingKey ? "重试确认保存" : "保存")}</button>}
   </form>;
 }

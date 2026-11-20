@@ -25,7 +25,6 @@ function MetadataFields({ album, item }: { album: MusicAlbum; item?: ScrapedItem
   const values = [
     ["显示名", album.name],
     ["原名", album.originalName],
-    ["平台专辑名", item?.album || item?.title],
     ["艺人", item?.artist],
     ["发行日期", albumDate(album.releaseDate || item?.date, locale)],
     ["发行商", album.publisher || item?.publisher],
@@ -43,7 +42,8 @@ export function AlbumMetadata({ album, fields }: { album: MusicAlbum; fields: Sa
   const details = fields.find((entry) => entry.field === "albumDetails");
   return <>
     <article className="album-metadata-section">
-      <header><h3>{tr("专辑资料")}</h3><PlatformLink value={album.sourceUrl ?? undefined} /></header>
+      <header><h3>{tr("专辑资料")}</h3><div className="album-platform-links">{album.sourceLinks.map(link =>
+        <PlatformLink key={link.pluginId} value={link.url} showHost />)}</div></header>
       <MetadataFields album={album} item={details?.item} />
       {!fields.length && <p className="muted album-metadata-empty">{tr("尚无在线专辑资料，可通过「刮削」补充。")}</p>}
     </article>
@@ -69,9 +69,9 @@ export function AlbumMetadata({ album, fields }: { album: MusicAlbum; fields: Sa
   })}</>;
 }
 
-function PlatformLink({ value }: { value?: string }) {
+function PlatformLink({ value, showHost }: { value?: string; showHost?: boolean }) {
   const source = externalLink(value);
   return source ? <a href={source} target="_blank" rel="noreferrer" title={new URL(source).hostname}>
-    {tr("在平台查看")} <span aria-hidden="true">↗</span>
+    {showHost ? new URL(source).hostname : tr("在平台查看")} <span aria-hidden="true">↗</span>
   </a> : null;
 }

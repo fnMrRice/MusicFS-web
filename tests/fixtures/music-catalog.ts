@@ -3,7 +3,7 @@ import type { SourceTrack } from "../../src/api/types";
 
 export function musicTrack(source: SourceTrack): MusicTrack {
   return {
-    trackId: source.recordingId || source.sourceTrackId, title: source.title || source.displayName,
+    trackId: source.recordingId || source.sourceTrackId, title: source.title || source.displayName, revision: 1,
     artists: (source.artists || []).map((name) => ({ artistId: name, name })),
     albums: source.album ? [{ albumId: source.album, name: source.album }] : [],
     coverPath: null, genre: source.genre ?? null, year: null, rating: null,
