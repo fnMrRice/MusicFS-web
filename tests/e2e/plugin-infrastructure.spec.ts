@@ -59,7 +59,7 @@ test("builtin algorithms show configuration and purpose without fake instances",
     const item = entry(card, plugin.pluginId);
     await expect(item.locator("summary")).toContainText("服务端内置");
     await item.locator("summary").click();
-    await expect(item).toContainText("不表示依赖工具已就绪或任务正在运行");
+    await expect(item).not.toContainText("内置能力已装配到服务端主进程");
     await expect(item.locator(".plugin-properties")).toContainText(plugin.builtin?.configured ? "已配置" : "未配置");
     await expect(item.getByText("暂无插件实例。", { exact: true })).toHaveCount(0);
     await expect(item.getByRole("button")).toHaveCount(0);

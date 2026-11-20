@@ -26,7 +26,6 @@ export function InfrastructurePluginBadges({ plugin }: { plugin: ManagedPlugin }
 export function InfrastructurePluginDetails({ plugin }: { plugin: ManagedPlugin }) {
   return <div className="plugin-infrastructure">
     {plugin.builtin && <>
-      <p>{tr("内置能力已装配到服务端主进程，按对应业务配置使用；这里不表示依赖工具已就绪或任务正在运行。")}</p>
       <dl className="plugin-properties">
         <div><dt>{tr("运行方式")}</dt><dd>{tr("服务端内置")}</dd></div>
         <div><dt>{tr("业务配置")}</dt><dd>{tr(plugin.builtin.configured ? "已配置" : "未配置")}</dd></div>

@@ -86,7 +86,7 @@ test("plugin groups show identity, separate rows and expandable instances with r
   await expect(ncm.locator(".plugin-count")).toHaveCount(0);
   await expect(scraper.locator(".plugin-count")).toHaveCount(0);
   await expectRefreshBesideSearch(card);
-  expect(await card.locator(".plugin-entry").evaluateAll(entries => entries.slice(1).every((entry, index) =>
+  expect(await card.locator(".plugin-entry-row").evaluateAll(entries => entries.slice(1).every((entry, index) =>
     parseFloat(getComputedStyle(entry).borderTopWidth) > 0 ||
     parseFloat(getComputedStyle(entries[index]!).borderBottomWidth) > 0,
   ))).toBe(true);

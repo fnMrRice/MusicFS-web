@@ -3,9 +3,10 @@ import { useServices, useStore } from "../app/services";
 import { useResource } from "../components/query";
 import { ErrorNotice, Icon } from "../components/ui";
 import { Tooltip } from "../components/Tooltip";
+import { Modal } from "../components/Modal";
 import { tr, useLocale } from "../i18n";
 import { Link } from "react-router-dom";
-import type { PluginDisplayCount, PluginSnapshot } from "../api/directories";
+import type { ManagedPlugin, PluginDisplayCount, PluginSnapshot } from "../api/directories";
 import { localizedPluginText, pluginName, sourceName } from "../components/source-name";
 import { matchesPlugin, pluginPurposes, pluginPurposeLabel, pluginScrapedFields } from "./plugin-filters";
 import { scrapedFieldName } from "./scrapers/fields";
@@ -36,6 +37,8 @@ export function PluginStatus() {
   const [query, setQuery] = useState("");
   const [purposes, setPurposes] = useState<Set<string>>(() => new Set());
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
+  const [configuring, setConfiguring] = useState<ManagedPlugin | null>(null);
+  const [configBusy, setConfigBusy] = useState(false);
   const typeLabelId = useId();
   const typeHelp = tr("可多选；按住 Shift 点击可仅选择该类型；未选择时显示全部。");
   const showAllUsers = auth.session?.user.role === "admin" && allUsers;
@@ -104,7 +107,8 @@ export function PluginStatus() {
       {plugins.loading && <p className="muted" role="status">{tr("正在读取插件…")}</p>}
       <div className="plugin-list">
         {filtered.map((p) => (
-          <details className="plugin-entry" key={p.pluginId} open={expanded.has(p.pluginId)}
+          <div className={`plugin-entry-row${p.settingsAvailable ? " has-settings" : ""}`} key={p.pluginId}>
+          <details className="plugin-entry" open={expanded.has(p.pluginId)}
             onToggle={(event) => {
               const open = event.currentTarget.open;
               setExpanded((previous) => {
@@ -160,12 +164,25 @@ export function PluginStatus() {
               ))}
               {p.instances.length === 0 && <p className="muted">{tr("暂无插件实例。")}</p>}
             </div>}
-            {p.settingsAvailable && expanded.has(p.pluginId) && <PluginSettings pluginId={p.pluginId} />}
           </details>
+          {p.settingsAvailable && <div className="plugin-configuration-action">
+            <button type="button" aria-label={tr("配置 {0}", { 0: pluginName(p.plugin, locale) })}
+              onClick={() => { setConfigBusy(false); setConfiguring(p); }}>
+              <Icon name="settings" size={16} /><span>{tr("配置")}</span>
+            </button>
+          </div>}
+          </div>
         ))}
       </div>
       {plugins.data?.items.length === 0 && <p>{tr("未发现已安装插件。")}</p>}
       {items.length > 0 && filtered.length === 0 && <p role="status">{tr("没有符合筛选条件的插件。")}</p>}
+      {configuring && <Modal title={tr("配置 {0}", { 0: pluginName(configuring.plugin, locale) })}
+        close={() => { if (!configBusy) setConfiguring(null); }}>
+        <div className="plugin-configuration">
+          <PluginSettings key={configuring.pluginId} pluginId={configuring.pluginId} busyChanged={setConfigBusy}
+            cancel={() => { if (!configBusy) setConfiguring(null); }} />
+        </div>
+      </Modal>}
     </div>
   );
 }

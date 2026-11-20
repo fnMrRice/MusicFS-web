@@ -72,8 +72,9 @@ test('plugin settings drive duplicate recognition while candidates still require
   await page.getByRole('button', { name: '设置', exact: true }).click();
   await page.getByRole('navigation', { name: '设置分类', exact: true }).getByRole('button', { name: '插件管理', exact: true }).click();
   const entry = page.locator('details.plugin-entry').filter({ hasText: plugin });
-  await entry.locator('summary').click();
-  const form = entry.locator('section');
+  await entry.locator('..').getByRole('button', { name: /^配置 / }).click();
+  const dialog = page.getByRole('dialog', { name: /^配置 / });
+  const form = dialog.locator('section');
   await expect(form.getByRole('checkbox')).toHaveCount(1);
   await form.getByRole('spinbutton').fill('100');
   await expect(form.getByRole('button', { name: '保存设置', exact: true })).toBeEnabled();
@@ -94,6 +95,9 @@ test('plugin settings drive duplicate recognition while candidates still require
   expect(candidates.items.every((candidate: { requiresConfirmation: boolean; score: number }) => candidate.requiresConfirmation && candidate.score === 100)).toBe(true);
   expect(await groupedTracks(page, server.origin)).toHaveLength(3);
   await page.screenshot({ path: info.outputPath('plugin-declared-settings.png') });
+  await dialog.getByRole('button', { name: '取消', exact: true }).click();
+  const expandLibrary = page.getByRole('button', { name: '展开作品库', exact: true });
+  if (await expandLibrary.isVisible()) await expandLibrary.click();
   await page.getByRole('link', { name: '曲目列表', exact: true }).click();
   await page.getByRole('button', { name: '重复识别', exact: true }).click();
   await expect(page.getByRole('dialog', { name: '重复识别', exact: true })).toContainText('selected.wav');

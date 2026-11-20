@@ -106,7 +106,7 @@ test("arbitrary plugin declarations render all controls and keep an uncertain ac
   }, true);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`${origin}/#/settings?tab=plugins`);
-  await page.locator("summary").filter({ hasText: "自定义工具" }).click();
+  await page.getByRole("button", { name: "配置 自定义工具", exact: true }).click();
   const panel = page.getByRole("region", { name: "自定义识别设置", exact: true });
   await panel.getByLabel("启用自动分析", { exact: true }).uncheck();
   await panel.getByLabel("分析关键字", { exact: true }).fill("live");
@@ -124,7 +124,7 @@ test("arbitrary plugin declarations render all controls and keep an uncertain ac
   expect(await panel.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
   await panel.screenshot({ path: info.outputPath("declarative-plugin-settings-mobile.png") });
   await page.reload();
-  await page.locator("summary").filter({ hasText: "自定义工具" }).click();
+  await page.getByRole("button", { name: "配置 自定义工具", exact: true }).click();
   await expect(panel).toContainText("已处理 2 / 10 首曲目");
   expect(submissions).toHaveLength(2);
 });
