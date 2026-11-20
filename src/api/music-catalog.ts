@@ -3,6 +3,14 @@ import type { SourceTrack } from "./types";
 
 export interface CatalogArtist { artistId: string; name: string }
 export interface CatalogAlbum { albumId: string; name: string }
+export interface MusicAlbum extends CatalogAlbum {
+  revision: number;
+  externalId: string | null;
+  isExternal: boolean;
+  coverPath: string | null;
+  publisher: string | null;
+  releaseDate: string | null;
+}
 export interface MusicTrack {
   trackId: string;
   title: string;
@@ -48,6 +56,15 @@ export function musicTrack(value: unknown): value is MusicTrack {
 
 export class MusicCatalogApi {
   constructor(private client: ApiClient) {}
+
+  async album(albumId: string, signal?: AbortSignal): Promise<MusicAlbum> {
+    const value = await this.client.request<unknown>(`/library/albums/${encodeURIComponent(albumId)}`, { signal });
+    if (!record(value) || value.albumId !== albumId || !text(value.name) ||
+      !Number.isSafeInteger(value.revision) || Number(value.revision) < 1 || typeof value.isExternal !== "boolean" ||
+      !["externalId", "coverPath", "publisher", "releaseDate"].every((key) => nullableText(value[key])))
+      throw new ApiError("INVALID_RESPONSE", "Invalid music album");
+    return value as unknown as MusicAlbum;
+  }
 
   async track(id: string, signal?: AbortSignal, bySource = false): Promise<MusicTrack> {
     const path = bySource ? `/library/sources/${encodeURIComponent(id)}/track` : `/library/tracks/${encodeURIComponent(id)}`;

@@ -34,4 +34,25 @@ describe("Scraper content declarations and selection", () => {
     expect(externalLink("https://a:b@example.org/page")).toBeUndefined();
     expect(externalLink("https://example.org/release/1")).toBe("https://example.org/release/1");
   });
+  it("reads album metadata and saves selections against its own revision and identity", async () => {
+    const field = { field: "albumTracks", pluginId: "plugin", item: { id: "release", title: "Album", tracks: [{ title: "First" }] } };
+    const fetch = vi.fn().mockResolvedValueOnce(reply({ items: [field] })).mockResolvedValueOnce(reply({ revision: 4 }));
+    const client = new ApiClient(fetch);
+    client.csrfToken = "csrf";
+    const api = new ScrapersApi(client);
+    expect(await api.savedAlbum("album/1")).toEqual([field]);
+    await api.applyAlbum("album/1", "albumTracks", 3, "plugin", "token", "album-selection");
+    expect(fetch.mock.calls[0][0]).toBe("/api/v1/library/albums/album%2F1/scraped-fields");
+    const [path, options] = fetch.mock.calls[1];
+    expect(path).toBe("/api/v1/library/albums/album%2F1/scraped-fields/albumTracks");
+    expect(options.headers.get("Idempotency-Key")).toBe("album-selection");
+    expect(JSON.parse(options.body)).toEqual({ expectedRevision: 3, pluginId: "plugin", candidateToken: "token" });
+  });
+  it("rejects unsupported album content and a non-advancing saved revision", async () => {
+    const fetch = vi.fn().mockResolvedValueOnce(reply({ items: [{ field: "lyrics", pluginId: "plugin", item: { id: "release", title: "Album" } }] }))
+      .mockResolvedValueOnce(reply({ revision: 3 }));
+    const api = new ScrapersApi(new ApiClient(fetch));
+    await expect(api.savedAlbum("album")).rejects.toMatchObject({ code: "INVALID_RESPONSE" });
+    await expect(api.applyAlbum("album", "artwork", 3, "plugin", "token", "key")).rejects.toMatchObject({ code: "INVALID_RESPONSE" });
+  });
 });

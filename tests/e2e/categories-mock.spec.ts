@@ -49,6 +49,9 @@ async function mockApi(page: Page, special?: (route: Route, url: URL) => Promise
       await route.fulfill({ contentType: "image/png", body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/lVQAAAAASUVORK5CYII=", "base64") }); return;
     }
     if (path.endsWith("/media/broken")) { await route.fulfill({ status: 404 }); return; }
+    if (path.includes("/library/albums/") && path.endsWith("/scraped-fields")) {
+      await route.fulfill({ json: { items: [] } }); return;
+    }
     let json: unknown = { items: [], nextCursor: null };
     if (path.endsWith("/health/ready")) json = { product: "MusicFS", apiVersion: "1", ready: true, instanceId: "categories-mock" };
     if (path.endsWith("/auth/session")) json = { csrfToken: "fixture", user: { id: "user", role: "admin" } };
@@ -68,7 +71,9 @@ async function mockApi(page: Page, special?: (route: Route, url: URL) => Promise
       }
       if (path.includes(collection + "/")) {
         const item = categories[kind].find((c) => c.categoryId === path.split("/").at(-1));
-        json = item && { [idKey]: item.categoryId, name: item.name };
+        json = item && { [idKey]: item.categoryId, name: item.name,
+          ...(kind === "album" ? { revision: 1, externalId: null, isExternal: false,
+            coverPath: null, publisher: null, releaseDate: null } : {}) };
       }
     }
     if (path.endsWith("/library/categories")) {
