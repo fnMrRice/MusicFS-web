@@ -1,13 +1,24 @@
-# 验证层次
+# Web 测试
 
-| 层次 | 当前命令/结果 | 能证明什么 | 不能证明什么 |
-| --- | --- | --- | --- |
-| 类型/构建 | `npm run build` 通过 | 全部源代码、单元与E2E测试严格类型检查；独立静态制品 | 服务器、实际解码或声音 |
-| 单元测试 | `npm test`，33 项通过 | API 错误／取消、固定修订与游标停滞、播放代次、暂停与音量、时间换算、幂等确认、内容 API 边界 | Mock 媒体事件不能证明编码兼容 |
-| 契约边界 | Web运行时验证公开DTO；Server `docs/contracts` 为权威，真实E2E实际消费 | 双方当前成功协作，错误与必需字段有防护 | Web并未独立运行全部JSON Schema验证器 |
-| 浏览器 | `npm run test:e2e` 包含 14 项，最新结果见 [React 验证](../docs/react-validation.md) | 真实 Server／插件／扫描、鉴权、Range、Edge 解码、原流／处理／NCM、歌单保存与自定义控件；明确标注 Mock 的用例验证千行列表、搜索和用户切换边界 | 页面 Mock 不能证明线上平台成功；未测浏览器及人工听音不在范围内 |
-| 人工听音 | 尚未完成 | 完成后可确认实际音响输出体验 | 不用自动播放进度或PCM采样代替 |
+在 Web 仓库根目录执行 `npm ci` 后，按要验证的行为选择命令。
 
-E2E只使用项目CC0样本与临时凭据，trace关闭，测试报告和运行数据不提交Git。`docs/validation/edge-2026-10-09.json`只保存无凭据的媒体证据摘录。错误文本与文件名通过文本节点显示；bootstrap token只在登录请求中使用，不进入URL或浏览器持久存储。
+| 命令 | 验证范围 |
+| --- | --- |
+| `npm test` | 运行 Vitest 单元测试，覆盖 API 响应、分页、曲库状态、播放队列与音频处理逻辑。 |
+| `npm run build` | 检查源码和测试的 TypeScript 类型，生成浏览器测试需要的 `dist/`。 |
+| `npm run test:e2e` | 使用 Playwright 在 Microsoft Edge 中运行界面测试和服务端联调。 |
 
-单元测试使用单worker复用模式，绕开本机Windows下Vitest 5临时模块文件的隔离清理竞态；测试均显式建立各自的状态对象，没有依赖跨测试全局状态。真实浏览器测试依次执行同一个全新实例的扫描、播放、故障及开发代理场景。正常结束会清理各轮临时运行目录；异常中断可能残留于忽略的 `.e2e-runtime/`。
+## 浏览器测试
+
+先安装 Microsoft Edge，再运行 `npm run build`。全量测试还需要与 Web 同级的 [MusicFS Server](https://github.com/fnMrRice/MusicFS-server)、服务端要求的 Go 工具链，以及 FFmpeg 和 ffprobe。将 `MUSICFS_E2E_FFMPEG` 和 `MUSICFS_E2E_FFPROBE` 分别设为两个可执行文件的绝对路径。
+
+```sh
+npm run test:e2e
+```
+
+要单独运行一组用例，可将测试文件名传给 Playwright。
+
+- `npm run test:e2e -- categories-mock.spec.ts` 使用模拟 API 验证分类浏览、专辑视图切换与曲目封面。
+- `npm run test:e2e -- ncm.spec.ts` 启动隔离的 Server 与插件，以合成 NCM 文件验证扫描、播放和错误处理。
+
+联调用例使用临时凭据、独立数据目录和[合成媒体样本](fixtures/README.md)。Playwright 报告与媒体检测结果保存在 `test-results/`。

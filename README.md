@@ -1,82 +1,44 @@
-# MusicFS-web
+# MusicFS Web
 
-MusicFS 的 TypeScript + React 浏览器界面。已按共享设计重建深色／浅色外壳、曲目列表、搜索、推荐、歌单管理与详情、专辑和设置。Web 顶部右侧依次为服务状态、设置、换肤和账号头像；桌面 Client 独立安排。
+简体中文 · [English](docs/README.en.md)
 
-旧原生 DOM 页面已移除，保留并扩展原有鉴权与播放核心。提供固定播放器、播放／暂停、音量、进度、会话队列与列表循环；支持连续滚动、常驻复选框和添加到歌单。接口缺失的页面保留说明，不使用生产假数据。验证范围见 [React 交付记录](docs/react-validation.md)；人工听音不由自动化结果代替。
+MusicFS 的浏览器播放器。连接自己的 MusicFS Server 后，可以按歌手、专辑、流派或文件夹浏览音乐，整理歌单和收藏，并在切换页面时继续播放。
 
-已接入 Server 的本地 NCM 解密播放：独立合成 MP3/FLAC 封装的真实 Edge 验证通过，页面区分“服务端解密输出”与“服务端解密并转码输出”。启用方式见 [Server NCM 配置](../server/docs/playback/ncm.md)，证据与限制见 [NCM 验证记录](docs/ncm-validation.md)；这不代表在线网易云来源或全部真实 NCM 变体已兼容。
+![深色主题下的曲目列表，底部播放器正在播放示例曲目《清晨的渡口》](docs/screenshots/library.png)
 
-## 启动与构建
+*截图使用演示曲库，曲名、音频和封面均为示例。*
 
-固定环境：Node.js **26.3.1**、npm **11.16.0**。React / React DOM 19.3.0、React Router 7.18.4、TypeScript 5.9.3、Vite 8.3.4；具体依赖由 `package-lock.json` 锁定。
+## 播放第一首曲目
 
-```powershell
+1. 启动 MusicFS Server 并打开它提供的 Web 地址，用服务端配置的管理员令牌登录。[服务端运行指南](https://github.com/fnMrRice/MusicFS-server/blob/main/docs/operations/running.md)
+2. 在「设置 → 音乐源」选择「添加本地目录」，勾选**服务器上的音乐文件夹**，点击「添加所选目录」。保存后会自动扫描。
+3. 打开「作品库 → 曲目列表」，点击曲名播放。底栏可调整进度和音量，也能打开队列。已配置相应服务端插件的实例还可播放本地 NCM 文件。[NCM 配置](https://github.com/fnMrRice/MusicFS-server/blob/main/docs/playback/ncm.md)
+
+在「设置 → 音效与输出」中可试听十段均衡器、增益、压缩和混响。保存后的音效按浏览器、服务端实例和账号保留。[音效与输出设置](docs/dsp-settings.md)
+
+<details>
+<summary>查看十段均衡器截图</summary>
+
+![浅色主题下的本地均衡器，已选用摇滚预设](docs/screenshots/equalizer.png)
+
+</details>
+
+## 本地开发
+
+使用 Node.js 26.3.1 和 npm 11.16.0，在 Web 仓库根目录启动开发服务。
+
+```sh
 npm ci
 npm run dev
 ```
 
-开发页面为 `http://127.0.0.1:5173`，默认代理至 `http://127.0.0.1:8080`。Server 必须显式允许开发页面的 Origin。需要其他 Server 端口时，在启动开发服务前设置 `$env:MUSICFS_DEV_SERVER`；该地址仅用于开发服务器，不写入浏览器制品。
+打开 `http://127.0.0.1:5173`。Vite 默认将 `/api` 代理至 `http://127.0.0.1:8080`。在 Server 的 `allowedOrigins` 中加入开发页面地址。若 Server 使用其他地址，请在运行 Vite 前设置 `MUSICFS_DEV_SERVER`。
 
-Server 配置采用 `configVersion: 1` 的 YAML；插件及实例在 `plugins` 中显式配置并启用，旧 JSON 配置不兼容。配置模型与读写边界见 [Server YAML 配置](../server/docs/operations/configuration.md)。修改后按运行说明重启应用；Web 本期不提供插件动态启停界面。
-
-```powershell
-npm run typecheck
+```sh
 npm test
 npm run build
 ```
 
-交付目录为 `dist/`，包含 `version.json`。所有运行时 API 地址均为同源相对路径；构建不需要 token。生产可使用静态站点加同源 `/api` 反向代理，也可按 [Server README](../server/README.md) 启动时加 `--web-root` 指向 `dist`。
+构建会执行 TypeScript 类型检查并生成 `dist/`。可使用 Server 的 `--web-root` 托管该目录，或将静态文件和 `/api` 部署在同一来源。浏览器集成测试的依赖和命令见[测试指南](tests/README.md)。
 
-## 最短播放步骤
-
-界面默认跟随浏览器语言，支持英文、简体中文、繁体中文和日语。登录页或设置页可手动切换；选择保存在当前浏览器。详见[多语言说明](docs/internationalization.md)。
-
-1. 按 Server 文档配置音乐目录、FFmpeg/插件、鉴权及允许的 Origin，启动 Server。
-2. 在页面输入显式配置的管理员登录令牌。成功后输入会清空，刷新依靠 HttpOnly cookie 恢复；令牌不写浏览器持久存储。
-3. 管理员在「设置 → 音乐来源」点击「本地音乐」标题右侧的「管理目录」，在弹窗目录树中展开允许的根目录并勾选根或子目录。弹窗下方可设置递归查找，启用时默认深度 0；「高级选项」内勾选「限制递归深度」才能编辑数字，未勾选或填写 0 均查找全部子目录。高级选项默认跳过点开头和 Windows 隐藏文件、目录，并遵循 .nomedia 跳过标记所在目录及子树。点击「保存」后，再通过 Server 扫描接口或脚本手动导入。标题下显示已选目录，首次显示「暂无已选择目录」；取消弹窗不改变选择。目录和递归设置持久保存在 Server，配置文件只定义授权范围；清空选择会恢复待配置状态，不删除已有曲库记录。
-4. 点击曲名开始播放，使用底部播放／暂停、音量和进度控件；“停止”释放会话。路由切换不打断播放。
-5. 在设置中勾选“服务端处理”后再次选择曲目，请求 -6 dB 效果。底部进度始终映射整首曲目时间；处理输出的定位仍走服务端串行控制。
-6. 勾选曲目可加入队列或个人歌单。歌单规则保存后，在详情点击“更新歌单快照”；远程歌单需显式导入、同步，再添加聚合规则。
-
-首次运行的完整配置和扫描命令见 [Server 本地运行说明](../server/docs/operations/running.md)；逐项操作及预期见 [手动验收](docs/manual-validation.md)。NCM 播放无需另勾处理选项，配置插件并重新扫描后直接选曲。
-
-## 真实浏览器测试
-
-```powershell
-npm run build
-npm run test:e2e
-```
-
-测试需要同级 Server 仓库、Go、已安装的 Microsoft Edge，以及 FFmpeg/ffprobe。使用 `MUSICFS_E2E_FFMPEG`、`MUSICFS_E2E_FFPROBE` 指定可执行文件；当前机器的已验证默认路径见测试启动器。测试构建自己的 Server 与插件，在 `127.0.0.1:18081` 启动全新实例，使用独立 `.e2e-runtime/` 数据目录、临时 `config.yaml` 与每次随机生成的临时凭据，不访问个人音乐库。YAML 为实际缩进映射和序列；管理员令牌只通过环境变量传给 Server，不写入配置。
-
-样本来自 Server 的 CC0 合成音频；包含中文文件名、损坏/零字节文件、分页副本、600 秒循环 AIFF，以及独立生成的 NCM MP3/FLAC。`playback.spec.ts` 和 `ncm.spec.ts` 读取真实 API 与媒体，记录非零 PCM 信号。`ui.spec.ts` 包含真实歌单／播放器检查，以及名称明确标注 Mock 的 1,000 行列表和在线搜索测试；Mock 不证明平台现网能力。仅运行 NCM 可用 `npm run test:e2e -- ncm.spec.ts`。临时输出忽略于 Git，人工听音需单独验证。
-
-## 当前限制
-
-- 专辑／歌手／歌单搜索、本地关键词搜索、全库组合筛选与排序、收藏和历史尚缺接口，页面保留待支持状态。由 Server 设计接口，见[缺口交接](../server/docs/contracts/web-integration.md)。
-- 在线曲目搜索仅提供资料，不代表音频可播放；推荐和远程歌单受平台可用性限制。
-- 歌单快照只返回来源引用，当前本地详情通过固定修订全库关联展示；大库应由 Server 后续补充批量展示读取能力。远程引用暂不伪造曲目名称和播放。
-- 封面和歌词可在播放器面板读取当前受鉴权选用内容；列表封面仍使用统一占位，歌词不逐句同步。
-- 只消费 Server 已验证的无变速时间映射；恢复预算耗尽或结果不明时要求显式从头播放。
-- Windows Edge 的实测结果不代表 Firefox、Safari 或全部设备支持；见兼容性记录。
-- 页面关闭通知只能尽力发送，Server 负责会话超时与进程回收。
-
-接口现状见 [React UI 接口清单](docs/react-api-readiness.md)。前端使用 hash 路由，静态托管无需额外路径回退；主题默认跟随系统，登录页也会随系统明暗切换，已保存的主题选择继续生效。主题、音量和分组偏好按实例／账号隔离保存，队列只属于当前浏览器会话。
-
-## 设计文档
-
-- [React 界面开发方案](docs/react-development.md)：确认的 Web 差异、TS/React 迁移、组件与路由、动态加载、播放接入和分阶段验收。
-- [React UI 接口清单](docs/react-api-readiness.md)：当前可复用契约、待补接口和能力不足时的界面行为。
-- [分阶段实现计划](docs/implementation.md)：P0—P8 的文件组织、逐步任务、最小页面、鉴权、播放状态和真实媒体验收。
-- [实施记录](docs/progress.md)：稳定步骤编号、验证结果与残留限制。
-- [兼容性记录](docs/compatibility.md)：实际浏览器与媒体链路证据。
-- [手动验收](docs/manual-validation.md)：登录、播放、处理、定位、刷新、错误恢复及退出的操作与预期。
-- [NCM 验证记录](docs/ncm-validation.md)：独立合成样本、配置入口、真实浏览器证据及未测范围。
-- [Web 设计](docs/design.md)：浏览器职责、能力探测、播放与状态适配。
-- [文档导航](../server/docs/README.md)：Go Server、插件与对应联调阶段。
-- [Server YAML 配置](../server/docs/operations/configuration.md)：配置版本、插件/实例模型、读写服务及应用边界。
-- [跨端架构](../docs/architecture.md)：数据语义、API、播放协商、定位和恢复。
-- [Server 音频处理](../server/docs/playback/audio-processing.md)：服务端输出能力与约束。
-- [工作约定](AGENTS.md)：仓库工作约定。
-
-本仓库独立管理，浏览器内部设计放在 `docs/`。跨仓库相对链接以本仓库检出到 MusicFS 根目录的 `web/` 为前提；单独克隆时，本仓库文档仍可阅读，跨仓库跳转需补齐相应目录。
+本项目几乎完全由 AI 生成。[许可证](LICENSE)
