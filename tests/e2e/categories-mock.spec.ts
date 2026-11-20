@@ -68,7 +68,8 @@ async function mockApi(page: Page, special?: (route: Route, url: URL) => Promise
         plugin: { id: "other-plugin", name: "另一来源", localizedNames: {}, features: ["music-source"] } },
     ] };
     if (path.endsWith("/library/tracks")) json = { ...musicPage([]),
-      items: tracks.map((track) => ({ ...musicTrack(track), artists: [artistA], albums: [albumA] })) };
+      items: tracks.filter(track => track.title?.includes(url.searchParams.get("q") || ""))
+        .map((track) => ({ ...musicTrack(track), artists: [artistA], albums: [albumA] })) };
     for (const kind of ["artist", "album", "genre"] as const) {
       const collection = `/library/${kind}s`;
       const idKey = `${kind}Id`;
@@ -175,12 +176,15 @@ test("album queue actions load every page in provider scope and skip unavailable
 
 test("artists, albums and genres open scoped track lists, including unknown categories", async ({ page }) => {
   const { requests } = await mockApi(page);
+  const source = page.getByRole("combobox", { name: "来源", exact: true });
   await page.goto(`${origin}/#/library`);
   for (const [label, name, unknown] of [["歌手", "Artist A", "未知歌手"], ["专辑", "Album A", "未知专辑"], ["流派", "Jazz", "未知流派"]]) {
     await tab(page, label).click();
+    await expect(source).toBeVisible();
     await expect(page.locator(".category-card").filter({ hasText: unknown })).toBeVisible();
     await page.locator(".category-card").filter({ hasText: name }).click();
     await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
+    await expect(source).toHaveCount(label === "专辑" ? 0 : 1);
     await expect(page.getByRole("checkbox", { name: "选择 Alpha", exact: true })).toBeVisible();
     await expect(page.getByRole("columnheader", { name: "来源", exact: true })).toHaveCount(0);
     const row = page.locator(".tracks tbody tr").first();
@@ -189,11 +193,32 @@ test("artists, albums and genres open scoped track lists, including unknown cate
     await page.getByLabel("分类路径").getByRole("button", { name: label, exact: true }).click();
     await page.locator(".category-card").filter({ hasText: unknown }).click();
     await expect(page.getByRole("heading", { name: unknown, exact: true })).toBeVisible();
+    await expect(source).toHaveCount(label === "专辑" ? 0 : 1);
   }
   const filters = requests.filter((url) => url.pathname.endsWith("/library/tracks")).map((url) => url.searchParams);
   for (const field of ["artistId", "albumId", "genre"]) expect(filters.some((query) => query.has(field))).toBe(true);
   for (const kind of ["artist", "album", "genre"]) expect(filters.some((query) => query.get("unknown") === kind)).toBe(true);
   expect(requests.some((url) => url.pathname.endsWith("/source-albums"))).toBe(false);
+});
+
+test("an unknown album with no search results can refresh and clear its track filter", async ({ page }) => {
+  const { requests } = await mockApi(page);
+  await page.goto(`${origin}/#/library?category=${encodeURIComponent("专辑")}&unknownCategory=1&source=local`);
+  const toolbar = page.locator(".list-actions");
+  const search = toolbar.getByRole("textbox", { name: "搜索当前列表" });
+  await search.fill("Unmatched");
+  await toolbar.getByRole("button", { name: "搜索", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "没有找到相关曲目" })).toBeVisible();
+  const reads = () => requests.filter(url => url.pathname.endsWith("/library/tracks") &&
+    url.searchParams.get("providerInstanceId") === "local" && url.searchParams.get("unknown") === "album" &&
+    url.searchParams.get("q") === "Unmatched").length;
+  const beforeRefresh = reads();
+  expect(beforeRefresh).toBeGreaterThan(0);
+  await toolbar.getByRole("button", { name: "刷新列表" }).click();
+  await expect.poll(reads).toBeGreaterThan(beforeRefresh);
+  await toolbar.getByRole("button", { name: "清空", exact: true }).click();
+  await expect(search).toHaveValue("");
+  await expect(page.getByRole("checkbox", { name: "选择 Alpha", exact: true })).toBeVisible();
 });
 
 test("a folder track menu edits the linked catalog track", async ({ page }) => {

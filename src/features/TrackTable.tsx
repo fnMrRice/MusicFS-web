@@ -1,5 +1,5 @@
 import { tr, useLocale, statusText } from "../i18n";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { SourceTrack, Provider } from "../api/types";
 import { displaySource, tableRowKey, trackKey, trackTitle, type MusicTrack, type TrackItem } from "../api/music-catalog";
 import { UnavailableMusicRow } from "./library/UnavailableMusicRow";
@@ -35,6 +35,7 @@ export function TrackTable({
   selectionScope,
   matchingRevision,
   onMatchingChange,
+  toolbarActions,
   hideEmptyTable = false,
   albumScope,
 }: {
@@ -48,6 +49,7 @@ export function TrackTable({
   selectionScope?: Omit<TrackSelection, "batch" | "sourceTrackIds" | "exclude">;
   matchingRevision?: number;
   onMatchingChange?: () => void;
+  toolbarActions?: ReactNode;
   hideEmptyTable?: boolean;
   albumScope?: { albumId: string; revision: number; reload: () => void };
 }) {
@@ -185,6 +187,7 @@ export function TrackTable({
           </>
         )}
         <div className="list-actions-end">
+          {toolbarActions}
           <select
               aria-label={tr("曲目排序")}
               disabled

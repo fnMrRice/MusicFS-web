@@ -22,7 +22,10 @@
 .album-cover-heading { width: 76px; height: 76px; }
 .album-cover-preview { width: 160px; height: 160px; }
 .album-cover-preview img { object-fit: contain; }
+.list-actions-end > .filter-end { align-items: center; margin-inline-start: 0; }
 @media (max-width: 520px) {
+  .list-actions-end > .filter-end { flex: 1 1 12rem; }
+  .list-actions-end > .filter-end input { flex: 1 1 5rem; min-width: 0; }
   .album-heading { gap: 12px; margin-top: 16px; }
   .album-cover-heading { width: 64px; height: 64px; }
   .album-heading h2 { font-size: 21px; }

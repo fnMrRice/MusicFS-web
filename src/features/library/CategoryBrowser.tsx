@@ -36,6 +36,7 @@ export function CategoryBrowser({ kind, provider, providers, providerError, relo
   const selected = params.get("categoryId") || "";
   const unknown = kind !== "folder" && params.get("unknownCategory") === "1";
   const inCategory = !!selected || unknown;
+  const albumDetail = kind === "album" && inCategory;
   const unscrapedOnly = kind === "album" && params.get("unscrapedOnly") === "true";
   const query = params.get("categoryQuery") || "";
   const [draft, setDraft] = useState(query);
@@ -50,13 +51,23 @@ export function CategoryBrowser({ kind, provider, providers, providerError, relo
     next.delete("categoryQuery");
     setParams(next);
   };
+  function search(value: string) {
+    const next = new URLSearchParams(params);
+    if (value) next.set("categoryQuery", value); else next.delete("categoryQuery");
+    setParams(next);
+  }
+  const searchForm = <form className="filter-end" onSubmit={event => {
+    event.preventDefault();
+    search(draft.trim());
+  }}>
+    <input value={draft} maxLength={256} onChange={event => setDraft(event.target.value)}
+      aria-label={tr(inCategory ? "搜索当前列表" : "搜索分类")} placeholder={tr(inCategory ? "搜索当前列表" : "搜索分类")} />
+    <button type="submit">{tr("搜索")}</button>
+    {query && <button type="button" onClick={() => search("")}>{tr("清空")}</button>}
+    <IconButton icon="refresh" label={tr("刷新列表")} onClick={() => { reloadProviders(); setRefresh(value => value + 1); }} />
+  </form>;
   return <>
-    <form className="filters" onSubmit={(event) => {
-      event.preventDefault();
-      const next = new URLSearchParams(params);
-      if (draft.trim()) next.set("categoryQuery", draft.trim()); else next.delete("categoryQuery");
-      setParams(next);
-    }}>
+    {!albumDetail && <div className="filters">
       <select aria-label={tr("来源")} value={provider} onChange={(event) => {
         const next = new URLSearchParams(params);
         next.set("source", event.target.value); next.delete("categoryId"); next.delete("unknownCategory"); next.delete("categoryQuery"); setParams(next);
@@ -72,16 +83,11 @@ export function CategoryBrowser({ kind, provider, providers, providerError, relo
         }} /> {tr("仅显示未刮削专辑")}</label>
         <AlbumViewSwitch />
       </>}
-      <div className="filter-end">
-        <input value={draft} maxLength={256} onChange={(event) => setDraft(event.target.value)}
-          aria-label={tr(inCategory ? "搜索当前列表" : "搜索分类")} placeholder={tr(inCategory ? "搜索当前列表" : "搜索分类")} />
-        <button type="submit">{tr("搜索")}</button>
-        {query && <button type="button" onClick={() => { const next = new URLSearchParams(params); next.delete("categoryQuery"); setParams(next); }}>{tr("清空")}</button>}
-        <IconButton icon="refresh" label={tr("刷新列表")} onClick={() => { reloadProviders(); setRefresh((value) => value + 1); }} />
-      </div>
-    </form>
+      {searchForm}
+    </div>}
     <ErrorNotice error={providerError} retry={reloadProviders} />
-    {kind !== "folder" ? <MusicCategoryBrowser key={`${scope}:${unknown}`} kind={kind} provider={provider} providers={providers}
+    {kind !== "folder" ? <MusicCategoryBrowser key={albumDetail ? `album:${provider}:${selected}:${unknown}` : `${scope}:${unknown}`}
+      kind={kind} provider={provider} providers={providers} refresh={refresh} trackSearch={albumDetail ? searchForm : undefined}
       id={selected} unknown={unknown} query={query} unscrapedOnly={unscrapedOnly} navigate={navigate} /> :
       selected ? <CategoryDetail key={`${kind}:${provider}:${selected}`} api={api} kind={kind} provider={provider} id={selected}
       query={query} refresh={refresh} providers={providers} navigate={navigate} /> :

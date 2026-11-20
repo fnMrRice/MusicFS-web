@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useId, useState, type ReactNode } from "react";
 import type { MusicAlbum, MusicCategoryKind, MusicTrackQuery } from "../../api/music-catalog";
 import type { Provider } from "../../api/types";
 import { useServices } from "../../app/services";
@@ -14,7 +14,7 @@ import { ArtistNames, readNamedArtist, type NamedArtist } from "./ArtistNames";
 const labels = { artist: "歌手", album: "专辑", genre: "流派" };
 const unknownLabels = { artist: "未知歌手", album: "未知专辑", genre: "未知流派" };
 type Props = { kind: MusicCategoryKind; provider: string; providers: Provider[]; id: string;
-  unknown: boolean; query: string; unscrapedOnly: boolean; navigate: (id: string | null) => void };
+  unknown: boolean; query: string; unscrapedOnly: boolean; refresh: number; trackSearch?: ReactNode; navigate: (id: string | null) => void };
 
 export function MusicCategoryBrowser(props: Props) {
   return props.id || props.unknown ? <MusicCategoryTracks {...props} /> : <MusicCategoryList {...props} />;
@@ -40,13 +40,14 @@ function MusicCategoryList({ kind, provider, query, unscrapedOnly, navigate }: P
   </>;
 }
 
-function MusicCategoryTracks({ kind, provider, providers, id, unknown, query, navigate }: Props) {
+function MusicCategoryTracks({ kind, provider, providers, id, unknown, query, refresh, trackSearch, navigate }: Props) {
   const services = useServices();
   const api = services.musicCatalog;
   const detailsId = useId();
   const [detailsOpen, setDetailsOpen] = useState(false);
-  const scope = `${kind}:${provider}:${id}:${unknown}:${query}`;
-  const title = useResource<{ name: string; album?: MusicAlbum; artist?: NamedArtist }>(scope, async (signal) => {
+  const categoryKey = `${kind}:${provider}:${id}:${unknown}:${refresh}`;
+  const scope = `${categoryKey}:${query}`;
+  const title = useResource<{ name: string; album?: MusicAlbum; artist?: NamedArtist }>(categoryKey, async (signal) => {
     if (unknown) return { name: tr(unknownLabels[kind]) };
     if (kind === "album") {
       const album = await api.album(id, signal);
@@ -92,8 +93,8 @@ function MusicCategoryTracks({ kind, provider, providers, id, unknown, query, na
     </div>}
     {album && <AlbumScraping album={album} provider={provider} detailsId={detailsId} detailsOpen={detailsOpen}
       applied={finish} refresh={() => { title.reload(); pages.reload(); }} />}
-    {(pages.items.length > 0 || album) && <TrackTable tracks={pages.items} providers={providers} queryKey={scope} libraryProvider={provider}
-      hideEmptyTable
+    {(pages.items.length > 0 || kind === "album") && <TrackTable tracks={pages.items} providers={providers} queryKey={scope} libraryProvider={provider}
+      toolbarActions={trackSearch} hideEmptyTable
       pagination={{ loading: pages.loading, hasMore: !!pages.cursor, error: pages.error, more: pages.more }}
       albumScope={album && { albumId: album.albumId, revision: album.revision, reload: () => { title.reload(); pages.reload(); services.invalidateLibraries(); } }}
       matchingRevision={revision} onMatchingChange={kind === "album" && !unknown && !album ? undefined : pages.reload}

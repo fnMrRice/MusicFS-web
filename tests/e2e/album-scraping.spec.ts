@@ -198,8 +198,19 @@ test("album search opens from expanded details before refresh, including while t
   const heading = await page.getByRole("heading", { name: album.name, exact: true }).boundingBox();
   const toggle = await detailsToggle(page).boundingBox();
   expect(toggle!.x).toBeGreaterThanOrEqual(heading!.x + heading!.width);
-  const toolbarSearch = page.locator(".list-actions").getByRole("button", { name: /^(搜索|刮削|搜索在线资料)$/ });
-  await expect(toolbarSearch).toHaveCount(0);
+  const toolbar = page.locator(".list-actions");
+  const toolbarSearch = toolbar.getByRole("button", { name: "搜索", exact: true });
+  const sort = toolbar.getByRole("combobox", { name: "曲目排序" });
+  await expect(sort).toBeVisible();
+  const sortBox = (await sort.boundingBox())!;
+  for (const control of [toolbar.getByRole("textbox", { name: "搜索当前列表" }), toolbarSearch,
+    toolbar.getByRole("button", { name: "刷新列表" })]) {
+    await expect(control).toBeVisible();
+    const box = (await control.boundingBox())!;
+    expect(box.x + box.width).toBeLessThanOrEqual(sortBox.x);
+    expect(box.y + box.height / 2).toBeGreaterThan(sortBox.y);
+    expect(box.y + box.height / 2).toBeLessThan(sortBox.y + sortBox.height);
+  }
   const search = albumSearchButton(page);
   await expect(search).toHaveCount(0);
   await page.screenshot({ path: info.outputPath("album-desktop-dark-collapsed.png") });
@@ -230,7 +241,7 @@ test("album search opens from expanded details before refresh, including while t
   await expect(panel).toHaveCount(0);
   await page.getByRole("checkbox", { name: "选择 第一曲", exact: true }).check();
   await expect(page.getByRole("button", { name: "添加到歌单", exact: true })).toBeVisible();
-  await expect(toolbarSearch).toHaveCount(0);
+  await expect(toolbarSearch).toBeVisible();
   await expect(search).toHaveCount(0);
   await detailsToggle(page).click();
   await search.click();
