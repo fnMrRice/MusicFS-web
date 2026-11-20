@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ApiError, errorMessage } from "../../api/client";
+import { ApiError, withRequestId } from "../../api/client";
 import type { MusicAlbum } from "../../api/music-catalog";
 import { ScrapersApi, type ScrapeCandidate, type Scraper, type ScraperQuery } from "../../api/scrapers";
 import { useServices } from "../../app/services";
@@ -8,7 +8,7 @@ import { ErrorNotice } from "../../components/ui";
 import { tr, useLocale } from "../../i18n";
 import { AlbumMetadata } from "./AlbumMetadata";
 import { AlbumRefresh, type AlbumEdition } from "./AlbumRefresh";
-import { albumLookupMessage } from "./album-search-errors";
+import { albumLookupMessage, albumSaveMessage } from "./album-search-errors";
 import { externalLink } from "./fields";
 
 type CompleteAlbum = AlbumEdition & { source: Scraper };
@@ -92,7 +92,8 @@ export function AlbumScraperSearch({ album, artist, hasSavedFields, applied, ref
       const uncertain = cause instanceof ApiError && (cause.status === 0 || cause.status >= 500 || cause.code === "INVALID_RESPONSE");
       setPendingKey(uncertain ? key : undefined);
       setConflict(cause instanceof ApiError && (cause.status === 409 || cause.status === 410));
-      setError(uncertain ? tr("保存结果待确认，请重试或关闭后刷新。") : errorMessage(cause));
+      setError(uncertain ? withRequestId("保存结果待确认，请重试或关闭后刷新。", cause)
+        : albumSaveMessage(cause, preview ? "selection" : "links"));
     } finally {
       saveLock.current = false;
       if (mounted.current) { setSaving(false); savingChanged(false); }

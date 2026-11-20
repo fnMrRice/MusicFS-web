@@ -66,6 +66,44 @@ test("album browsing previews the complete release and saves metadata and missin
   await page.screenshot({ path: info.outputPath("album-scraping-mobile.png") });
 });
 
+test("an invalid album selection identifies the failed operation and includes its request ID", async ({ page }) => {
+  const state = await mock(page);
+  let invalidMetadata = true;
+  await page.route("**/api/v1/library/albums/one/scraped-fields", async route => {
+    if (route.request().method() !== "PUT") return route.fallback();
+    expect(route.request().postDataJSON()).toEqual({ expectedRevision: 1, pluginId: "album-source",
+      candidates: { albumDetails: "details-token", albumTracks: "tracks-token" } });
+    await route.fulfill({ status: 400, headers: { "X-Request-ID": "album-validation-14" },
+      json: { error: { code: "INVALID_ARGUMENT",
+        message: invalidMetadata ? "Invalid music library metadata" : "untrusted internal diagnostic" } } });
+  });
+  await openAlbum(page);
+  const modal = dialog(page);
+  await modal.getByRole("button", { name: "搜索", exact: true }).click();
+  await modal.getByRole("button", { name: "预览完整专辑", exact: true }).click();
+  await modal.getByRole("button", { name: "选用这张专辑", exact: true }).click();
+  const alert = modal.getByRole("alert");
+  await expect(alert).toContainText("平台返回的曲名或其他音乐资料格式不符合曲库要求");
+  await expect(alert).toContainText("请求编号：album-validation-14");
+  invalidMetadata = false;
+  await modal.getByRole("button", { name: "返回搜索结果" }).click();
+  await modal.getByRole("button", { name: "预览完整专辑" }).click();
+  await modal.getByRole("button", { name: "选用这张专辑", exact: true }).click();
+  await expect(alert).toContainText("这份专辑资料未通过保存校验");
+  await expect(alert).toContainText("请求编号：album-validation-14");
+  await expect(alert).not.toContainText("untrusted internal diagnostic");
+  expect(state.saved).toEqual([]);
+  await page.evaluate(() => {
+    localStorage.setItem("musicfs:language", "en");
+    window.dispatchEvent(new StorageEvent("storage", { key: "musicfs:language" }));
+  });
+  const englishModal = page.getByRole("dialog", { name: "Search online metadata" });
+  await expect(englishModal.getByRole("alert")).toContainText("The album metadata failed validation.");
+  await expect(englishModal.getByRole("alert")).toContainText("Request ID: album-validation-14");
+  await englishModal.getByRole("button", { name: "Back to results" }).click();
+  await expect(englishModal.getByRole("button", { name: "Preview complete album" })).toBeEnabled();
+});
+
 test("a conflicting album selection refreshes the observed revision before another search", async ({ page }) => {
   const state = await mock(page);
   state.conflict = true;
