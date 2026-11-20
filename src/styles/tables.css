@@ -257,6 +257,9 @@
 .unavailable {
   color: var(--muted);
 }
+.source-missing .track-play {
+  color: inherit;
+}
 .track-row-actions {
   display: flex;
   align-items: center;

@@ -7,7 +7,7 @@ interface Props {
   toggle(): void; favorite(): void; add(): void; openMenu(x: number, y: number, origin: HTMLElement): void;
 }
 export function UnavailableMusicRow({ track, number, checked, toggle, isFavorite, favoriteDisabled, favorite, add, openMenu }: Props) {
-  return <tr className={`unavailable ${checked ? "checked" : ""}`} onContextMenu={(event) => {
+  return <tr className={`unavailable source-missing ${checked ? "checked" : ""}`} onContextMenu={(event) => {
     event.preventDefault(); openMenu(event.clientX, event.clientY, event.currentTarget);
   }}>
     <td><input type="checkbox" aria-label={tr("选择 {0}", { 0: track.title })} checked={checked} onChange={toggle} /></td>

@@ -31,7 +31,7 @@ export interface MusicTrackPage {
   matchingRevision: number;
 }
 export type MusicCategoryKind = "artist" | "album" | "genre";
-export type MusicTrackQuery = { providerInstanceId?: string; artistId?: string; albumId?: string; genre?: string; unknown?: MusicCategoryKind; q?: string };
+export type MusicTrackQuery = { providerInstanceId?: string; artistId?: string; albumId?: string; genre?: string; unknown?: MusicCategoryKind; q?: string; sourceOnly?: boolean };
 export interface MusicCategory { id: string; name: string; trackCount: number }
 const record = (value: unknown): value is Record<string, unknown> => !!value && typeof value === "object";
 const text = (value: unknown): value is string => typeof value === "string";
@@ -76,7 +76,7 @@ export class MusicCatalogApi {
   async tracks(query: MusicTrackQuery, after: string | null, signal?: AbortSignal): Promise<MusicTrackPage> {
     const params = new URLSearchParams({ limit: "100" });
     for (const [key, value] of Object.entries(query)) {
-      if (value && !(key === "providerInstanceId" && value === "all")) params.set(key, value);
+      if (value !== undefined && value !== "" && !(key === "providerInstanceId" && value === "all")) params.set(key, String(value));
     }
     if (after) params.set("after", after);
     const page = await this.client.request<unknown>(`/library/tracks?${params}`, { signal });

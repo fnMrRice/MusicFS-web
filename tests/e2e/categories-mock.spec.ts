@@ -1,4 +1,4 @@
-import { musicPage } from "../fixtures/music-catalog";
+import { musicPage, musicTrack } from "../fixtures/music-catalog";
 import { routeApi } from "../fixtures/control-mock";
 import { test, expect, type Page, type Route } from "@playwright/test";
 import { preview, type PreviewServer } from "vite";
@@ -108,6 +108,44 @@ test("artists, albums and genres open scoped track lists, including unknown cate
   for (const field of ["artistId", "albumId", "genre"]) expect(filters.some((query) => query.has(field))).toBe(true);
   for (const kind of ["artist", "album", "genre"]) expect(filters.some((query) => query.get("unknown") === kind)).toBe(true);
   expect(requests.some((url) => url.pathname.endsWith("/source-albums"))).toBe(false);
+});
+
+test("all tracks requests source records while artist and album views keep gray metadata-only rows", async ({ page }) => {
+  const available = musicTrack(tracks[0]);
+  const offline = musicTrack({ ...tracks[1], availability: "offline" });
+  const missing = { ...available, trackId: "metadata-only", title: "尚无音源的曲目", selectedSource: null };
+  const queries: URLSearchParams[] = [];
+  await mockApi(page, async (route, url) => {
+    if (!url.pathname.endsWith("/library/tracks")) return false;
+    queries.push(url.searchParams);
+    await route.fulfill({ json: { ...musicPage([]), items: url.searchParams.get("sourceOnly") === "true"
+      ? [available, offline] : [available, offline, missing] } });
+    return true;
+  });
+  await page.goto(`${origin}/#/library`);
+  const missingRow = page.locator(".tracks tbody tr").filter({ hasText: missing.title });
+  await expect(page.getByRole("button", { name: "播放 Alpha", exact: true })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "播放 Beta", exact: true })).toBeDisabled();
+  await expect(missingRow).toHaveCount(0);
+  expect(queries[0].get("sourceOnly")).toBe("true");
+  for (const [label, name] of [["歌手", "Artist A"], ["专辑", "Album A"]]) {
+    await tab(page, label).click();
+    await page.locator(".category-card").filter({ hasText: name }).click();
+    await expect(missingRow).toHaveClass(/source-missing/);
+    await expect(missingRow).toContainText("暂无来源");
+    const play = missingRow.getByRole("button", { name: `播放 ${missing.title}`, exact: true });
+    await expect(play).toBeDisabled();
+    const gray = await missingRow.evaluate((element) => getComputedStyle(element).color);
+    await expect(play).toHaveCSS("color", gray);
+    expect(gray).not.toBe(await page.getByRole("button", { name: "播放 Alpha", exact: true })
+      .evaluate((element) => getComputedStyle(element).color));
+    await expect(missingRow.getByRole("checkbox")).toBeEnabled();
+    await expect(missingRow.getByRole("button", { name: `将 ${missing.title} 添加到歌单`, exact: true })).toBeEnabled();
+    expect(queries.at(-1)?.has("sourceOnly")).toBe(false);
+  }
+  await tab(page, "全部曲目").click();
+  await expect(missingRow).toHaveCount(0);
+  expect(queries.at(-1)?.get("sourceOnly")).toBe("true");
 });
 
 test("folder navigation restores breadcrumbs after reload and scopes search to the current subtree", async ({ page }) => {
