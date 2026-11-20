@@ -82,6 +82,8 @@ test("refresh compares current and platform values without writing and cancel pr
   await expect(names).toContainText(album.name);
   await expect(panel.getByRole("checkbox", { name: "显示名", exact: true })).not.toBeChecked();
   await expect(panel.getByRole("checkbox", { name: "曲目表", exact: true })).not.toBeChecked();
+  await expect(panel.getByRole("list", { name: "当前曲目表" }).getByText("第一曲", { exact: true })).toBeVisible();
+  await expect(panel.getByRole("list", { name: "平台曲目表" }).getByText(/未收录曲目/)).toBeVisible();
   await expect(panel.getByRole("checkbox", { name: "发行商", exact: true })).toBeChecked();
   expect(state.searches).toEqual([{ field: "albumDetails", query: { sourceUrl: candidate.sourceUrl } },
     { field: "albumTracks", query: { externalId: candidate.id, sourceUrl: candidate.sourceUrl } }]);

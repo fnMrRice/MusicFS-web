@@ -66,6 +66,9 @@
   .album-compare-mobile-label { display: block; color: var(--muted); font-size: 11px; margin-bottom: 4px; }
 }
 .album-tracklist-wrap { max-height: 18rem; overflow: auto; }
+.album-tracklist-toggle { display: inline-flex; align-items: center; gap: 6px; padding: 4px 0; border: 0; background: transparent; color: inherit; font: inherit; }
+.album-tracklist-toggle[aria-expanded="false"] svg { transform: rotate(-90deg); }
+.album-metadata-section > header:has(.album-tracklist-toggle[aria-expanded="false"]) { margin-bottom: 0; }
 .album-tracklist { width: 100%; border-collapse: collapse; font-size: 13px; text-align: start; }
 .album-tracklist th { color: var(--muted); font-size: 12px; font-weight: 400; }
 .album-tracklist th, .album-tracklist td { padding: 8px; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }

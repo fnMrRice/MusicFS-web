@@ -37,7 +37,7 @@ export function AlbumScraping({ album, artist, detailsId, detailsOpen, applied, 
       </div>
       <ErrorNotice error={saved.error} retry={saved.reload} />
       {saved.loading && <p className="muted" role="status">{tr("正在加载…")}</p>}
-      {saved.data && <AlbumMetadata album={album} fields={saved.data} />}
+      {saved.data && <AlbumMetadata key={album.albumId} album={album} fields={saved.data} collapsibleTrackList />}
     </section>}
     {searchOpen && <Modal title={tr("搜索在线资料")} close={() => { if (!saving) setSearchOpen(false); }}>
       <ErrorNotice error={saved.error} retry={saved.reload} />
