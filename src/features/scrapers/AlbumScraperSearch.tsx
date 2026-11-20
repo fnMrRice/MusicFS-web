@@ -7,6 +7,7 @@ import { useResource } from "../../components/query";
 import { ErrorNotice } from "../../components/ui";
 import { tr, useLocale } from "../../i18n";
 import { AlbumMetadata } from "./AlbumMetadata";
+import { albumLookupMessage } from "./album-search-errors";
 
 type CompleteAlbum = { details: ScrapeCandidate; tracks: ScrapeCandidate };
 
@@ -38,11 +39,11 @@ export function AlbumScraperSearch({ album, artist, applied, refresh, savingChan
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; controller.current?.abort(); }; }, []);
   const reset = () => { setResults(null); setPreview(undefined); setError(null); };
   const disabled = busy || saving || !!pendingKey || conflict;
-  async function load(action: (signal: AbortSignal) => Promise<void>) {
+  async function load(action: (signal: AbortSignal) => Promise<void>, pageLookup = false) {
     if (controller.current || saveLock.current) return;
     const request = new AbortController(); controller.current = request; setBusy(true); setError(null);
     try { await action(request.signal); }
-    catch (cause) { if (!request.signal.aborted) setError(errorMessage(cause)); }
+    catch (cause) { if (!request.signal.aborted) setError(albumLookupMessage(cause, pageLookup)); }
     finally { controller.current = null; if (!request.signal.aborted) setBusy(false); }
   }
   async function search() {
@@ -54,7 +55,7 @@ export function AlbumScraperSearch({ album, artist, applied, refresh, savingChan
     await load(async (signal) => {
       const items = await api.search(source.pluginId, "albumDetails", query, signal);
       if (!signal.aborted) setResults(items);
-    });
+    }, !!query.sourceUrl);
   }
   async function complete(details: ScrapeCandidate) {
     if (!source?.available || disabled) return;
@@ -67,7 +68,7 @@ export function AlbumScraperSearch({ album, artist, applied, refresh, savingChan
       const tracks = items.find((item) => item.id === details.id && item.tracks?.length);
       if (!tracks) { setError(tr("未能读取这张专辑的完整曲目，请重试或更换资料来源。")); return; }
       setPreview({ details, tracks });
-    });
+    }, !!query.sourceUrl);
   }
   async function save() {
     if (!source || !preview || saveLock.current || conflict) return;
@@ -118,7 +119,7 @@ export function AlbumScraperSearch({ album, artist, applied, refresh, savingChan
     </article>)}</div>}
     {preview && <>
       <section className="album-metadata" aria-label={tr("完整专辑预览")}>
-        <AlbumMetadata album={album} fields={[{ field: "albumDetails", pluginId: source!.pluginId, item: preview.details },
+        <AlbumMetadata album={{ ...album, sourceUrl: preview.details.sourceUrl ?? null }} fields={[{ field: "albumDetails", pluginId: source!.pluginId, item: preview.details },
           { field: "albumTracks", pluginId: source!.pluginId, item: preview.tracks }]} />
       </section>
       <p className="muted">{tr("将补齐 {0} 首曲目资料，已有音源保留。", { 0: preview.tracks.tracks!.length })}</p>

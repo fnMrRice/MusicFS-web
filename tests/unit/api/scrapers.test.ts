@@ -67,4 +67,21 @@ describe("Scraper content declarations and selection", () => {
     expect(options.headers.get("Idempotency-Key")).toBe("complete-album");
     expect(JSON.parse(options.body)).toEqual({ expectedRevision: 3, pluginId: "plugin", candidates });
   });
+  it("sends only explicitly selected merge fields with their original candidate pair and revision", async () => {
+    const fetch = vi.fn().mockResolvedValue(reply({ revision: 4 }));
+    const client = new ApiClient(fetch);
+    client.csrfToken = "csrf";
+    const candidates = { albumDetails: "details-token", albumTracks: "tracks-token" };
+    await new ScrapersApi(client).mergeAlbumMetadata("album/1", 3, "plugin", candidates, ["tracks"], "merge-album");
+    expect(fetch).toHaveBeenCalledTimes(1);
+    const [path, options] = fetch.mock.calls[0];
+    expect(path).toBe("/api/v1/library/albums/album%2F1/metadata-merge");
+    expect(options.headers.get("Idempotency-Key")).toBe("merge-album");
+    expect(JSON.parse(options.body)).toEqual({ expectedRevision: 3, pluginId: "plugin", candidates, fields: ["tracks"] });
+  });
+  it("rejects a merge response that does not advance the observed revision", async () => {
+    const api = new ScrapersApi(new ApiClient(vi.fn().mockResolvedValue(reply({ revision: 3 }))));
+    await expect(api.mergeAlbumMetadata("album", 3, "plugin", { albumDetails: "a", albumTracks: "b" }, ["name"], "key"))
+      .rejects.toMatchObject({ code: "INVALID_RESPONSE" });
+  });
 });

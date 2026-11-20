@@ -1,10 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { preview, type PreviewServer } from "vite";
-import { routeApi } from "../fixtures/control-mock";
-import { musicPage, musicTrack } from "../fixtures/music-catalog";
-import { track } from "../fixtures/dto";
-import type { SavedScrapedField } from "../../src/api/scrapers";
-
+import { album, candidate, completeCandidate, artwork, mock, dialog, details, detailsToggle, scraping,
+  openAlbum as openAlbumFixture } from "./album-scraping-mock";
 let server: PreviewServer;
 let origin: string;
 test.beforeAll(async () => {
@@ -15,95 +12,7 @@ test.beforeAll(async () => {
 });
 test.afterAll(async () => { await new Promise<void>((resolve) => server?.httpServer.close(() => resolve())); });
 
-const album = { albumId: "one", originalName: "原始夜间专辑", name: "夜间专辑", revision: 1, externalId: null,
-  isExternal: false, coverPath: null, publisher: null, releaseDate: null };
-const candidate = { id: "release-one", title: "夜间专辑发行版", sourceUrl: "https://example.org/release/one",
-  artist: "河图", album: album.name, date: "2013-04-02T07:00:00Z", publisher: "星河唱片",
-  genre: "Mandopop", description: "适合夜间聆听的作品。" };
-const completeCandidate = { ...candidate, tracks: [{ title: "第一曲", disc: 1, number: 1 },
-  { title: "未收录曲目", disc: 1, number: 3 }] };
-const tracks = ["第一曲", "第二曲"].map((title, index) => ({ ...track, title, displayName: `${title}.flac`,
-  sourceTrackId: `album-track-${index}`, artists: [candidate.artist], album: album.name, codec: "flac", container: "flac" }));
-const artwork = `<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160"><defs><linearGradient id="bg" x2="1" y2="1"><stop stop-color="#233c5d"/><stop offset="1" stop-color="#111f35"/></linearGradient></defs><rect width="160" height="160" fill="url(#bg)"/><circle cx="115" cy="42" r="21" fill="#e2c68b"/><path d="M0 105 Q45 70 85 108 T160 99 V160 H0Z" fill="#3c6982"/><path d="M0 130 Q50 100 92 133 T160 125 V160 H0Z" fill="#243e57"/></svg>`;
-
-async function mock(page: Page, { empty = false, coverPath = "/api/v1/media/album-artwork", brokenCover = false }:
-  { empty?: boolean; coverPath?: string | null; brokenCover?: boolean } = {}) {
-  const state = { album: { ...album, coverPath }, saved: [] as SavedScrapedField[], conflict: false,
-    applied: false, trackSearchFailure: false, reads: [] as string[],
-    searches: [] as Record<string, unknown>[], writes: [] as { path: string; body: Record<string, unknown>; key: string | undefined }[] };
-  await routeApi(page, async (route) => {
-    const request = route.request(), url = new URL(request.url()), path = url.pathname.replace("/api/v1", "");
-    if (request.method() === "GET") state.reads.push(path);
-    if (path === "/media/album-artwork") return brokenCover ? route.fulfill({ status: 404 })
-      : route.fulfill({ contentType: "image/svg+xml", body: artwork });
-    if (path === "/health/ready") return route.fulfill({ json: { product: "MusicFS", ready: true, apiVersion: "1", instanceId: "album-test" } });
-    if (path === "/auth/session") return route.fulfill({ json: { csrfToken: "csrf", user: { id: "listener", role: "user" } } });
-    if (path === "/me/profile") return route.fulfill({ json: { user: { id: "listener", role: "user" }, nickname: "听众" } });
-    if (path === "/me/favorites") return route.fulfill({ json: { items: [], nextCursor: null, revision: "1" } });
-    if (path === "/provider-instances") return route.fulfill({ json: { items: [{ id: track.providerInstanceId,
-      name: "本地音乐", capabilities: [], availability: "available", roots: [] }] } });
-    if (path === "/library/tracks") {
-      const items = musicPage(empty ? [] : tracks).items;
-      if (state.applied) items.push({ ...musicTrack(tracks[0]), trackId: "unavailable-online-track", title: "未收录曲目", selectedSource: null });
-      return route.fulfill({ json: { ...musicPage([]), items } });
-    }
-    if (path === "/library/albums") return route.fulfill({ json: { items: [{ ...state.album,
-      trackCount: (empty ? 0 : 2) + (state.applied ? 1 : 0) }], nextAfter: null } });
-    if (path === "/library/albums/one") {
-      if (request.method() === "PUT") {
-        const body = request.postDataJSON();
-        state.writes.push({ path, body, key: request.headers()["idempotency-key"] });
-        expect(body.expectedRevision).toBe(state.album.revision);
-        expect(body.originalName).toBeUndefined();
-        state.album = { ...state.album, ...body, revision: state.album.revision + 1 };
-      }
-      return route.fulfill({ json: state.album });
-    }
-    if (path === "/library/albums/one/scraped-fields" && request.method() === "GET")
-      return route.fulfill({ json: { items: state.saved } });
-    if (path === "/library/albums/one/scraped-fields" && request.method() === "PUT") {
-      const body = request.postDataJSON();
-      state.writes.push({ path, body, key: request.headers()["idempotency-key"] });
-      if (state.conflict) {
-        state.conflict = false; state.album.revision++;
-        return route.fulfill({ status: 409, json: { error: { code: "CONFLICT" } } });
-      }
-      expect(body.expectedRevision).toBe(state.album.revision);
-      expect(body.candidates).toEqual({ albumDetails: "details-token", albumTracks: "tracks-token" });
-      state.saved = [{ field: "albumDetails", pluginId: body.pluginId, item: candidate },
-        { field: "albumTracks", pluginId: body.pluginId, item: completeCandidate }];
-      state.applied = true;
-      state.album.revision++;
-      return route.fulfill({ json: { revision: state.album.revision } });
-    }
-    if (path === "/scrapers") return route.fulfill({ json: { items: [
-      { pluginId: "album-source", name: "专辑资料源", type: "scraper", available: true, fields: ["albumDetails", "albumTracks", "artwork", "lyrics", "artistImage"] },
-      { pluginId: "lyrics-source", name: "歌词资料源", type: "scraper", available: true, fields: ["lyrics"] },
-      { pluginId: "details-source", name: "仅详情来源", type: "scraper", available: true, fields: ["albumDetails"] },
-    ] } });
-    if (path === "/scrapers/album-source/search") {
-      const body = request.postDataJSON();
-      state.searches.push(body);
-      if (body.field === "albumTracks" && state.trackSearchFailure)
-        return route.fulfill({ status: 503, json: { error: { code: "SOURCE_UNAVAILABLE" } } });
-      return route.fulfill({ json: { items: [{ ...(body.field === "albumTracks" ? completeCandidate : candidate),
-        candidateToken: body.field === "albumTracks" ? "tracks-token" : "details-token" }] } });
-    }
-    return route.fulfill({ json: { items: [], nextAfter: null, nextCursor: null, libraryRevision: "1" } });
-  });
-  return state;
-}
-
-const dialog = (page: Page) => page.getByRole("dialog", { name: "搜索在线资料", exact: true });
-const details = (page: Page) => page.getByRole("region", { name: "专辑详情", exact: true });
-const detailsToggle = (page: Page) => page.getByRole("button", { name: "专辑详情", exact: true });
-const scraping = (page: Page) => page.getByRole("button", { name: "搜索在线资料", exact: true });
-async function openAlbum(page: Page, search = true) {
-  await page.goto(`${origin}/#/library?category=${encodeURIComponent("专辑")}`);
-  await page.getByRole("button", { name: /^夜间专辑 \d+ 首$/ }).click();
-  await expect(detailsToggle(page)).toHaveAttribute("aria-expanded", "false");
-  if (search) await scraping(page).click();
-}
+async function openAlbum(page: Page, search = true) { return openAlbumFixture(page, origin, search); }
 
 test("album browsing previews the complete release and saves metadata and missing tracks together", async ({ page }, info) => {
   const state = await mock(page);
@@ -229,6 +138,8 @@ test("album details stay collapsed and the scraping action remains beside sortin
   const state = await mock(page);
   state.saved = [{ field: "albumDetails", pluginId: "album-source", item: candidate }];
   await page.emulateMedia({ colorScheme: "dark" });
+  state.album.sourceUrl = candidate.sourceUrl;
+  state.album.sourcePluginId = "album-source";
   await openAlbum(page, false);
   await expect(details(page)).toHaveCount(0);
   const heading = await page.getByRole("heading", { name: album.name, exact: true }).boundingBox();

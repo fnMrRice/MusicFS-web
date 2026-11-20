@@ -73,6 +73,7 @@ async function mockApi(page: Page, special?: (route: Route, url: URL) => Promise
         const item = categories[kind].find((c) => c.categoryId === path.split("/").at(-1));
         json = item && { [idKey]: item.categoryId, name: item.name,
           ...(kind === "album" ? { originalName: item.name, revision: 1, externalId: null, isExternal: false,
+            sourceUrl: null, sourcePluginId: null,
             coverPath: null, publisher: null, releaseDate: null } : {}) };
       }
     }
