@@ -1,3 +1,17 @@
+export interface ScraperFailure {
+  pluginId: string;
+  reason: "upstream" | "cooldown" | "busy";
+  upstreamStatus?: number;
+}
+
+function scraperFailure(value: unknown): ScraperFailure | undefined {
+  if (!value || typeof value !== "object" || !("pluginId" in value) || typeof value.pluginId !== "string" ||
+      !("reason" in value) || !(value.reason === "upstream" || value.reason === "cooldown" || value.reason === "busy")) return;
+  const status = "upstreamStatus" in value ? value.upstreamStatus : undefined;
+  return { pluginId: value.pluginId, reason: value.reason,
+    upstreamStatus: typeof status === "number" && Number.isInteger(status) && status >= 100 && status <= 599 ? status : undefined };
+}
+
 export class ApiError extends Error {
   constructor(
     public code: string,
@@ -5,6 +19,7 @@ export class ApiError extends Error {
     public status = 0,
     public requestId?: string,
     public retryAfter?: number,
+    public scraper?: ScraperFailure,
   ) {
     super(message);
     this.name = "ApiError";
@@ -90,6 +105,7 @@ export class ApiClient {
           typeof detail?.retryAfter === "number"
             ? detail.retryAfter
             : undefined,
+          scraperFailure(detail?.scraper),
         );
       }
       if (response.status === 204) return undefined as T;

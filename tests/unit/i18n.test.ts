@@ -28,6 +28,9 @@ describe("Language selection and messages", () => {
     expect(statusText("请求超时，请重试。 请求编号：req-12")).toBe(
       "The request timed out. Please try again. Request ID: req-12",
     );
+    expect(statusText("Apple Music 返回 HTTP 429（请求过多）。 可在 3 秒后重试。 请求编号：req-12")).toBe(
+      "Apple Music returned HTTP 429 (too many requests). You can retry in 3 seconds. Request ID: req-12",
+    );
     setLanguage("ja");
     expect(statusText(message)).toBe("再生可能な 12 曲をキューに追加しました");
     setLanguage("zh-TW");

@@ -26,7 +26,7 @@ export function AlbumRefresh({ album, edition, applied, savingChanged }: {
   const [snapshot, setSnapshot] = useState<AlbumMergeSnapshot>();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | { lookup: unknown } | null>(null);
   const [conflict, setConflict] = useState(false);
   const [retry, setRetry] = useState(0);
   const [pending, setPending] = useState<{ key: string; fields: AlbumMergeField[] }>();
@@ -70,7 +70,7 @@ export function AlbumRefresh({ album, edition, applied, savingChanged }: {
       if (!signal.aborted) setSnapshot({ album: current, saved, currentTracks, details: item, tracks });
     }
     void read().catch((cause) => {
-      if (!signal.aborted) setError(albumLookupMessage(cause, true));
+      if (!signal.aborted) setError({ lookup: cause });
     }).finally(() => { if (!signal.aborted) setLoading(false); });
     return () => controller.abort();
   }, [album.albumId, api, music, retry, reading, edition]);
@@ -107,7 +107,7 @@ export function AlbumRefresh({ album, edition, applied, savingChanged }: {
     </select></label>}
     {!reading && <button type="button" disabled={!sourceId} onClick={() => setReading(sourceId)}>{tr("读取平台资料")}</button>}
     {loading && <p className="muted" role="status">{tr("正在读取平台资料和完整曲目…")}</p>}
-    <ErrorNotice error={error} />
+    <ErrorNotice error={error && typeof error === "object" ? albumLookupMessage(error.lookup, true, plugins.data ?? undefined) : error} />
     {reading && !loading && (conflict || !snapshot) && <button type="button" disabled={saving} onClick={() => setRetry((value) => value + 1)}>{tr("重新读取")}</button>}
     {snapshot && <AlbumMergePreview key={snapshot.details.candidateToken} snapshot={snapshot} saving={saving || conflict}
       locked={!!pending} merge={(fields) => void merge(fields)} />}

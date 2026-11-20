@@ -50,7 +50,7 @@ export function AlbumScraperSearch({ album, artist, hasSavedFields, applied, ref
     if (controller.current || saveLock.current) return;
     const request = new AbortController(); controller.current = request; setBusy(true); setError(null);
     try { await action(request.signal); }
-    catch (cause) { if (!request.signal.aborted) setError(albumLookupMessage(cause, pageLookup)); }
+    catch (cause) { if (!request.signal.aborted) setError(albumLookupMessage(cause, pageLookup, sources)); }
     finally { controller.current = null; if (!request.signal.aborted) setBusy(false); }
   }
   async function search() {
@@ -62,7 +62,7 @@ export function AlbumScraperSearch({ album, artist, hasSavedFields, applied, ref
     await load(async (signal) => {
       const groups = await Promise.all(selected.map(async (source): Promise<PlatformResults> => {
         try { return { source, items: await api.search(source.pluginId, "albumDetails", query, signal) }; }
-        catch (cause) { return { source, items: [], error: albumLookupMessage(cause, !!query.sourceUrl) }; }
+        catch (cause) { return { source, items: [], error: albumLookupMessage(cause, !!query.sourceUrl, sources) }; }
       }));
       if (!signal.aborted) setResults(groups);
     }, !!query.sourceUrl);

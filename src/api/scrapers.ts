@@ -1,5 +1,26 @@
-import { ApiClient, ApiError } from "./client";
+import { ApiClient, ApiError, errorMessage, withRequestId } from "./client";
 import { isLocalizedTitle, type LocalizedTitle } from "./localized-titles";
+
+export function scraperSearchMessage(error: unknown, sources?: readonly Scraper[]): string {
+  if (!(error instanceof ApiError)) return errorMessage(error);
+  const failure = error.scraper;
+  if (!failure && error.status !== 429 && error.code !== "RATE_LIMITED") return errorMessage(error);
+  const platform = sources?.find(item => item.pluginId === failure?.pluginId)?.name || failure?.pluginId || "资料平台";
+  let reason = `资料查询受到限制（HTTP ${error.status}）。`;
+  if (failure?.reason === "busy") reason = `MusicFS 同时进行的资料查询过多，本次未向 ${platform} 发送请求。`;
+  if (failure?.reason === "upstream") {
+    reason = failure.upstreamStatus === 429 ? `${platform} 返回 HTTP 429（请求过多）。`
+      : failure.upstreamStatus === 503 ? `${platform} 返回 HTTP 503（服务暂不可用）。`
+      : failure.upstreamStatus ? `${platform} 返回 HTTP ${failure.upstreamStatus}。` : `${platform} 未能完成资料查询。`;
+  }
+  if (failure?.reason === "cooldown") reason = failure.upstreamStatus
+    ? `${platform} 此前返回 HTTP ${failure.upstreamStatus}，仍在等待期，本次未向平台发送请求。`
+    : `${platform} 仍在等待期，本次未向平台发送请求。`;
+  const wait = error.retryAfter;
+  const hint = wait !== undefined && Number.isSafeInteger(wait) && wait >= 0
+    ? `${reason} 可在 ${wait} 秒后重试。` : reason;
+  return withRequestId(hint, error);
+}
 
 export interface Scraper {
   pluginId: string;

@@ -147,6 +147,26 @@ test("selecting only the track list adds the missing gray track while preserving
   await expect(missing.getByRole("button", { name: "播放 未收录曲目", exact: true })).toBeDisabled();
 });
 
+test("album refresh shows the platform retry delay and lets the user read the linked release again", async ({ page }) => {
+  const state = await linkedAlbum(page);
+  await page.route("**/api/v1/scrapers/album-source/search", route => route.fulfill({ status: 429, json: {
+    error: { code: "RATE_LIMITED", message: "catalog service is temporarily rate limited", retryAfter: 2, requestId: "lookup-429",
+      scraper: { pluginId: "album-source", reason: "upstream", upstreamStatus: 429 } },
+  } }), { times: 1 });
+  await openDetails(page);
+  await page.clock.install();
+  await details(page).getByRole("button", { name: "刷新资料", exact: true }).click();
+  const panel = comparison(page);
+  await panel.getByRole("button", { name: "读取平台资料", exact: true }).click();
+  await expect(panel.getByRole("alert")).toContainText("专辑资料源 返回 HTTP 429（请求过多）。 可在 2 秒后重试。 请求编号：lookup-429");
+  await page.clock.fastForward(3_000);
+  await expect(panel.getByRole("alert")).toBeVisible();
+  expect(state.searches).toEqual([]);
+  await panel.getByRole("button", { name: "重新读取", exact: true }).click();
+  await expect(panel.getByRole("checkbox", { name: "曲目表", exact: true })).toBeVisible();
+  expect(state.writes).toEqual([]);
+});
+
 test("a failed refresh or an empty selection cannot publish metadata", async ({ page }) => {
   const state = await linkedAlbum(page);
   const before = structuredClone({ album: state.album, saved: state.saved });

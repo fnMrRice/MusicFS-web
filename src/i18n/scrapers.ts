@@ -1,4 +1,13 @@
 export default {
+  "{0} 可在 {1} 秒后重试。": ["{0} You can retry in {1} seconds.", "{0} 可在 {1} 秒後重試。", "{0} {1} 秒後に再試行できます。"],
+  "资料查询受到限制（HTTP {0}）。": ["Metadata search was limited (HTTP {0}).", "資料查詢受到限制（HTTP {0}）。", "資料の検索が制限されました（HTTP {0}）。"],
+  "MusicFS 同时进行的资料查询过多，本次未向 {0} 发送请求。": ["MusicFS has too many active searches. It did not send a request to {0}.", "MusicFS 同時進行的資料查詢過多，本次未向 {0} 傳送請求。", "MusicFS で実行中の検索が多すぎるため、{0} にリクエストを送信しませんでした。"],
+  "{0} 返回 HTTP 429（请求过多）。": ["{0} returned HTTP 429 (too many requests).", "{0} 返回 HTTP 429（請求過多）。", "{0} が HTTP 429（リクエスト過多）を返しました。"],
+  "{0} 返回 HTTP 503（服务暂不可用）。": ["{0} returned HTTP 503 (service unavailable).", "{0} 返回 HTTP 503（服務暫不可用）。", "{0} が HTTP 503（サービス利用不可）を返しました。"],
+  "{0} 返回 HTTP {1}。": ["{0} returned HTTP {1}.", "{0} 返回 HTTP {1}。", "{0} が HTTP {1} を返しました。"],
+  "{0} 此前返回 HTTP {1}，仍在等待期，本次未向平台发送请求。": ["{0} previously returned HTTP {1}. Its cooldown is still active, so no request was sent.", "{0} 此前返回 HTTP {1}，仍在等待期，本次未向平台傳送請求。", "{0} が先ほど HTTP {1} を返したため、待機期間中の今回はリクエストを送信しませんでした。"],
+  "{0} 仍在等待期，本次未向平台发送请求。": ["The cooldown for {0} is still active. No request was sent.", "{0} 仍在等待期，本次未向平台傳送請求。", "{0} の待機期間中のため、今回はリクエストを送信しませんでした。"],
+  "{0} 未能完成资料查询。": ["{0} could not complete the search.", "{0} 未能完成資料查詢。", "{0} は資料の検索を完了できませんでした。"],
   "平台返回的曲名或其他音乐资料格式不符合曲库要求。请核对平台资料，或尝试其他发行版。": ["A track title or another metadata field from the platform has a format the library cannot store. Check the platform metadata or try another release.", "平台返回的曲名或其他音樂資料格式不符合曲庫要求。請核對平台資料，或嘗試其他發行版本。", "配信元の曲名または他の音楽情報がライブラリに保存できない形式です。配信元の情報を確認するか、別のリリースを試してください。"],
   "这份专辑资料未通过保存校验。请返回搜索结果，核对发行版和完整曲目表，或改选其他版本。": ["The album metadata failed validation. Return to the results and check the release and its full track list, or select another edition.", "這份專輯資料未通過儲存驗證。請返回搜尋結果，核對發行版本和完整曲目表，或改選其他版本。", "アルバム情報を保存できませんでした。検索結果に戻り、リリースと全曲目を確認するか、別の版を選んでください。"],
   "选中的专辑资料未通过合并校验。请核对勾选的字段和平台曲目表。": ["The selected album metadata failed validation. Check the selected fields and the platform track list.", "選取的專輯資料未通過合併驗證。請核對勾選的欄位和平台曲目表。", "選択したアルバム情報を反映できませんでした。選択項目と配信元の曲目一覧を確認してください。"],

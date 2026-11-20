@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { LocalizedTitle } from "../../api/localized-titles";
 import { ApiError, errorMessage } from "../../api/client";
-import { ScrapersApi, type ScrapeCandidate, type ScraperQuery } from "../../api/scrapers";
+import { ScrapersApi, scraperSearchMessage, type ScrapeCandidate, type ScraperQuery } from "../../api/scrapers";
 import { useServices } from "../../app/services";
 import { useResource } from "../../components/query";
 import { ErrorNotice } from "../../components/ui";
@@ -64,7 +64,7 @@ export function ScraperSearch({ initial, preferredField, externalIds = [], allow
       const items = await api.search(source.pluginId, field, effectiveQuery, request.signal);
       if (!request.signal.aborted) setResults(items);
     } catch (cause) {
-      if (!request.signal.aborted) setError(errorMessage(cause));
+      if (!request.signal.aborted) setError(scraperSearchMessage(cause, sources));
     } finally {
       controller.current = null;
       if (!request.signal.aborted) setSearching(false);

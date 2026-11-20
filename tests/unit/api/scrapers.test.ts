@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { ApiClient } from "../../../src/api/client";
-import { ScrapersApi, type TrackMediaSelection } from "../../../src/api/scrapers";
+import { ApiClient, ApiError } from "../../../src/api/client";
+import { ScrapersApi, scraperSearchMessage, type Scraper, type TrackMediaSelection } from "../../../src/api/scrapers";
 import { externalLink } from "../../../src/features/scrapers/fields";
 
 const reply = (body: unknown) => new Response(JSON.stringify(body));
@@ -8,6 +8,28 @@ const target = { sourceTrackId: "track/1", assetId: "asset", assetVersion: "v1" 
 const selection: TrackMediaSelection = { target, revision: 2 };
 
 describe("Scraper content declarations and selection", () => {
+  it.each([
+    ["upstream", 429, 3, "Apple Music 返回 HTTP 429（请求过多）。 可在 3 秒后重试。"],
+    ["upstream", 503, undefined, "Apple Music 返回 HTTP 503（服务暂不可用）。"],
+    ["upstream", 403, undefined, "Apple Music 返回 HTTP 403。"],
+    ["cooldown", 429, 4, "Apple Music 此前返回 HTTP 429，仍在等待期，本次未向平台发送请求。 可在 4 秒后重试。"],
+    ["busy", undefined, undefined, "MusicFS 同时进行的资料查询过多，本次未向 Apple Music 发送请求。"],
+  ] as const)("reads structured scraper failures (%s, %s) and shows the selected platform", async (reason, upstreamStatus, retryAfter, expected) => {
+    const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: {
+      code: upstreamStatus === 403 ? "SOURCE_UNAVAILABLE" : "RATE_LIMITED", message: "private upstream detail",
+      requestId: "req-1", scraper: { pluginId: "apple", reason, upstreamStatus }, retryAfter,
+    } }), { status: upstreamStatus === 403 ? 503 : 429 }));
+    const sources: Scraper[] = [{ pluginId: "apple", name: "Apple Music", type: "scraper", available: true, fields: ["albumTracks"] }];
+    const result = await new ScrapersApi(new ApiClient(fetch)).search("apple", "albumTracks", { externalId: "1" }).catch(error =>
+      scraperSearchMessage(error, sources));
+    expect(result).toBe(expected + " 请求编号：req-1");
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not expose unrecognized server detail or invent an upstream response", () => {
+    expect(scraperSearchMessage(new ApiError("HTTP_ERROR", "private upstream detail", 429, "req-2")))
+      .toBe("资料查询受到限制（HTTP 429）。 请求编号：req-2");
+  });
   it("rejects a source that does not declare scraper type", async () => {
     const fetch = vi.fn().mockResolvedValue(reply({ items: [{ name: "Source", pluginId: "a", type: "provider", fields: ["lyrics"], available: true }] }));
     await expect(new ScrapersApi(new ApiClient(fetch)).list()).rejects.toMatchObject({ code: "INVALID_RESPONSE" });
