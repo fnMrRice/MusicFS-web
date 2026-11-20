@@ -42,6 +42,8 @@ async function mock(context: BrowserContext, authenticated = true) {
       json = { csrfToken: "mock", user: { id: "test-user", role: "admin" } };
     if (path.endsWith("/library/tracks"))
       json = musicPage([track]);
+    if (path.endsWith("/scrapers/album-auto-settings"))
+      json = { revision: 0, localPluginOrder: ["musicfs.scraper.musicbrainz"] };
     if (path.endsWith("/online-instances"))
       json = {
         items: [

@@ -130,9 +130,12 @@ test('offline music directory retains published library and logout unloads activ
     const job = await waitScan(page.request, server.origin, jobId);
     expect(job.status).toBe('paused'); expect(job.error?.code).toBe('SOURCE_OFFLINE');
     await page.getByRole('button', { name: '刷新列表' }).click();
-    await expect(page.getByRole('region', { name: '音乐文件' })).toContainText('扫描已暂停');
-    await expect(page.getByRole('region', { name: '音乐文件' })).toContainText('重新提交扫描');
     await expect(page.locator('tbody tr')).toHaveCount(100);
+    await page.getByRole('button', { name: '设置', exact: true }).click();
+    const source = page.getByRole('region', { name: '本地音乐', exact: true });
+    await expect(source.getByRole('alert')).toContainText('扫描已暂停');
+    await expect(source).toContainText('音乐来源暂不可用，请检查目录所在磁盘或网络连接后重新扫描。');
+    await page.goBack();
   } finally { renameSync(unavailable, original); }
   await page.getByRole('button', { name: '播放 markers.wav', exact: true }).click(); await waitPlaying(page);
   await logout(page); await expect(page.locator('audio')).toHaveCount(0);
