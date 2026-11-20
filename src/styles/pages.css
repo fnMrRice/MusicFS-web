@@ -29,7 +29,7 @@
   color: var(--muted);
   margin: 0;
 }
-.recommendation-actions { display: flex; justify-content: flex-end; }
+.recommendation-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
 .search-form {
   background: var(--panel);
   border: 1px solid var(--line);

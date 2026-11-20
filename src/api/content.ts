@@ -58,6 +58,11 @@ export interface RecommendationSource {
   lastSuccessAt: string | null;
   error: { code: string; message: string } | null;
 }
+export type RecommendationRead = "current" | "refresh" | { history: number };
+export interface RecommendationPage {
+  sources: RecommendationSource[];
+  historyDepth: number;
+}
 export interface SourceRef {
   trackId?: string | null;
   forcedSourceTrackId?: string | null;
@@ -207,16 +212,15 @@ export class ContentApi {
     );
   }
   async recommendations(
-    refresh: boolean,
+    read: RecommendationRead,
     signal?: AbortSignal,
-  ): Promise<RecommendationSource[]> {
-    const v = await this.client.request<{ sources: RecommendationSource[] }>(
-      `/recommendations?refresh=${refresh}`,
-      { signal },
-    );
+  ): Promise<RecommendationPage> {
+    const query = typeof read === "object" ? `history=${read.history}` : `refresh=${read === "refresh"}`;
+    const v = await this.client.request<RecommendationPage>(`/recommendations?${query}`, { signal });
     return checked(
       v,
       (r) =>
+        Number.isInteger(r.historyDepth) && r.historyDepth >= 0 && r.historyDepth <= 5 &&
         list(r.sources) &&
         r.sources.every(
           (s) =>
@@ -230,7 +234,7 @@ export class ContentApi {
                 string(i.playlist.title),
             ),
         ),
-    ).sources;
+    );
   }
   async accountPlaylists(instance: string, cursor: string | null, signal?: AbortSignal): Promise<AccountPlaylistPage> {
     const query = new URLSearchParams({ limit: "30" });

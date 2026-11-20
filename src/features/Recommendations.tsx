@@ -4,31 +4,49 @@ import { useState } from "react";
 import { useServices, useStore } from "../app/services";
 import type { OnlineInstance } from "../api/content";
 import { useResource } from "../components/query";
-import { Cover, Empty, ErrorNotice, IconButton } from "../components/ui";
+import { Cover, Empty, ErrorNotice, Icon, IconButton } from "../components/ui";
 import { errorMessage } from "../api/client";
 import { useSourceName } from "../components/use-source-name";
 import { OnlinePlaylistTracks } from "./playlists/OnlinePlaylistTracks";
 import { externalLink } from "./scrapers/fields";
+import { useRecommendations } from "./useRecommendations";
+
 export function Recommendations() {
+  const s = useServices();
+  const { ready, session } = useStore(s.auth);
+  const sources = useStore(s.content.onlineInstances);
+  const scope = [ready?.instanceId, session?.user.id, sources.map((source) =>
+    [source.instanceId, source.accountId, source.accountRevision, source.availability])];
+  return <RecommendationFeed key={JSON.stringify(scope)} />;
+}
+
+function RecommendationFeed() {
   useLocale();
   const sourceName = useSourceName();
-  const s = useServices();
-  const [refresh, setRefresh] = useState(0);
-  const query = useResource(`recommendations:${refresh}`, (signal) =>
-    s.content.recommendations(refresh > 0, signal),
-  );
+  const feed = useRecommendations(useServices().content);
   return (
     <section>
       <div className="recommendation-actions">
+        {feed.offset > 0 && (
+          <>
+            <span className="muted" role="status">{tr("历史推荐（{0}/{1}）", { 0: feed.offset, 1: feed.page!.historyDepth })}</span>
+            <button type="button" disabled={feed.loading} onClick={feed.showLatest}>{tr("返回最新推荐")}</button>
+          </>
+        )}
+        <button type="button" disabled={feed.loading || feed.offset >= (feed.page?.historyDepth ?? 0)}
+          onClick={feed.previous}>
+          <Icon name="clock" size={16} />{tr("时光机")}
+        </button>
         <IconButton
           icon="refresh"
           label={tr("刷新推荐")}
-          onClick={() => setRefresh((v) => v + 1)}
+          disabled={feed.loading}
+          onClick={feed.refresh}
         />
       </div>
-      <ErrorNotice error={query.error} retry={query.reload} />
-      {query.loading && <p className="loading">{tr("正在寻找歌单…")}</p>}
-      {query.data?.map((source) => (
+      <ErrorNotice error={feed.error} retry={feed.retry} />
+      {feed.loading && <p className="loading" role="status">{tr("正在寻找歌单…")}</p>}
+      {feed.page?.sources.map((source) => (
         <section key={source.instanceId} className="source-section">
           <div className="section-title">
             <h3>{sourceName(source)}</h3>
@@ -43,7 +61,7 @@ export function Recommendations() {
           {source.error && (
             <p className="notice">
               {source.error.code === "PLATFORM_AUTH_REQUIRED" ? <>请先到<Link to="/settings">设置</Link>登录此音乐平台。</> : tr("此来源暂时无法获取推荐（{0}）。", { 0: source.error.code })}
-              <button onClick={() => setRefresh((v) => v + 1)}>
+              <button disabled={feed.loading} onClick={feed.refresh}>
                 {tr("重试")}
               </button>
             </p>
@@ -74,7 +92,7 @@ export function Recommendations() {
           )}
         </section>
       ))}
-      {query.data?.length === 0 && (
+      {feed.page?.sources.length === 0 && (
         <Empty title={tr("尚未配置可用的推荐来源。")} icon="home">
           <p>
             <Link className="button primary" to="/library">

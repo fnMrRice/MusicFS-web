@@ -71,7 +71,7 @@ async function mock(context: BrowserContext, authenticated = true) {
           },
         ],
       };
-    if (path.endsWith("/recommendations")) json = { sources: [] };
+    if (path.endsWith("/recommendations")) json = { sources: [], historyDepth: 0 };
     return route.fulfill({ json });
   });
 }

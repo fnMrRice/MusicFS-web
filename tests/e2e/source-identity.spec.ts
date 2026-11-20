@@ -62,7 +62,7 @@ async function mock(page: Page, availability = "available", supported = true, mo
     if (path.endsWith(`/online-instances/${instanceIds.custom}/playlists/p1`)) json = {
       playlist: playlist("p1", "Morning mix"), entries: [], complete: true, observedAt: "2026-10-10T08:00:00Z",
     };
-    if (path.endsWith("/recommendations")) json = { sources: [{ instanceId: custom.instanceId, name: "Hidden recommendation alias", items: [], stale: false, expiresAt: null, lastSuccessAt: null, error: null }] };
+    if (path.endsWith("/recommendations")) json = { historyDepth: 0, sources: [{ instanceId: custom.instanceId, name: "Hidden recommendation alias", items: [], stale: false, expiresAt: null, lastSuccessAt: null, error: null }] };
     return route.fulfill({ json });
   });
   return requests;
@@ -111,7 +111,7 @@ test("recommendations show playlist artwork, keep cover fallbacks, and open the 
   await page.route(coverUrl, (route) => route.fulfill({ contentType: "image/png",
     body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/lVQAAAAASUVORK5CYII=", "base64") }));
   await page.route(unavailable.coverUrl, (route) => route.fulfill({ status: 404 }));
-  await page.route("**/api/v1/recommendations?*", (route) => route.fulfill({ json: { sources: [{
+  await page.route("**/api/v1/recommendations?*", (route) => route.fulfill({ json: { historyDepth: 0, sources: [{
     instanceId: custom.instanceId, name: custom.name, stale: false, expiresAt: null, lastSuccessAt: null, error: null,
     items: [available, unavailable, empty].map((playlist, position) => ({ playlist, position, reason: "" })),
   }] } }));
@@ -128,6 +128,56 @@ test("recommendations show playlist artwork, keep cover fallbacks, and open the 
   await morning.click();
   await expect(page.getByRole("heading", { name: "Morning mix" })).toBeVisible();
   await expect.poll(() => page.locator(".detail-heading .cover img").evaluate((img: HTMLImageElement) => img.naturalWidth)).toBe(1);
+});
+
+test("recommendations request daily results on open, refresh explicitly, and rewind up to five times", async ({ page }) => {
+  await mock(page);
+  let latest = 1;
+  const reads: string[] = [];
+  await page.route("**/api/v1/recommendations?*", (route) => {
+    const query = new URL(route.request().url()).searchParams;
+    reads.push(query.toString());
+    if (query.get("refresh") === "true") latest++;
+    const offset = Number(query.get("history") ?? 0);
+    const generation = latest - offset;
+    return route.fulfill({ json: { historyDepth: Math.min(latest - 1, 5), sources: [{
+      instanceId: custom.instanceId, name: custom.name, stale: false, expiresAt: null, lastSuccessAt: null, error: null,
+      items: [{ playlist: playlist(String(generation), `Mix ${generation}`), position: 0, reason: "" }],
+    }] } });
+  });
+
+  const mix = (generation: number) => page.locator(".music-card").getByText(`Mix ${generation}`, { exact: true });
+  const machine = page.getByRole("button", { name: "时光机", exact: true });
+  const refresh = page.getByRole("button", { name: "刷新推荐", exact: true });
+  await page.goto(`${origin}/#/recommendations`);
+  await expect(mix(1)).toBeVisible();
+  await expect(machine).toBeDisabled();
+  expect(reads.every(read => read === "refresh=false")).toBe(true);
+  for (let next = 2; next <= 7; next++) {
+    await refresh.click();
+    await expect(mix(next)).toBeVisible();
+  }
+  const count = reads.length;
+  for (let offset = 1; offset <= 5; offset++) {
+    await machine.click();
+    await expect(mix(7 - offset)).toBeVisible();
+    await expect(page.getByText(`历史推荐（${offset}/5）`, { exact: true })).toBeVisible();
+  }
+  await expect(machine).toBeDisabled();
+  expect(reads.slice(count)).toEqual(["history=1", "history=2", "history=3", "history=4", "history=5"]);
+  await page.getByRole("button", { name: "返回最新推荐" }).click();
+  await expect(mix(7)).toBeVisible();
+  expect(reads).toHaveLength(count + 5);
+  await machine.click();
+  await expect(mix(6)).toBeVisible();
+  await refresh.click();
+  await expect(mix(8)).toBeVisible();
+  await expect(page.getByRole("button", { name: "返回最新推荐" })).toHaveCount(0);
+  const beforeReopen = reads.length;
+  await page.reload();
+  await expect(mix(8)).toBeVisible();
+  expect(reads.slice(beforeReopen)).toContain("refresh=false");
+  expect(reads.slice(beforeReopen).every(read => read === "refresh=false")).toBe(true);
 });
 
 test("sidebar source playlists page reads and paginates the signed-in account without implicit import", async ({ page }) => {
