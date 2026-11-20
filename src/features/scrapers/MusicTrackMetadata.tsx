@@ -9,7 +9,7 @@ import { useResource } from "../../components/query";
 import { ErrorNotice } from "../../components/ui";
 import { useSourceName } from "../../components/use-source-name";
 import { tr } from "../../i18n";
-import { TrackMetadataEditor } from "../library/TrackMetadataEditor";
+import { TrackMetadataEditor, unavailableTrackMessage } from "../library/TrackMetadataEditor";
 import { ScraperSearch } from "./ScraperSearch";
 
 export function MusicTrackMetadata({ trackId, bySource, mode, close, applied }: {
@@ -18,22 +18,33 @@ export function MusicTrackMetadata({ trackId, bySource, mode, close, applied }: 
   const services = useServices();
   const [saving, setSaving] = useState(false);
   const track = useResource(`music-track-metadata:${bySource}:${trackId}`, async signal => {
-    const value = await services.musicCatalog.track(trackId, signal, bySource);
-    if (!Number.isSafeInteger(value.revision) || Number(value.revision) < 1)
-      throw new ApiError("INVALID_RESPONSE", "Missing music track revision");
-    return value;
+    try {
+      const item = await services.musicCatalog.track(trackId, signal, bySource);
+      if (!Number.isSafeInteger(item.revision) || Number(item.revision) < 1)
+        throw new ApiError("INVALID_RESPONSE", "Missing music track revision");
+      return { item, unavailable: null };
+    } catch (cause) {
+      const unavailable = unavailableTrackMessage(cause);
+      if (!unavailable) throw cause;
+      return { item: null, unavailable };
+    }
   });
   function finish() {
     services.invalidateLibraries(); applied?.(); close();
   }
+  const item = track.data?.item;
   return <Modal title={tr(mode === "search" ? "搜索在线资料" : "编辑曲目元数据")} close={() => { if (!saving) close(); }}>
     {track.loading && <p role="status">{tr("正在加载…")}</p>}
     <ErrorNotice error={track.error} retry={track.reload} />
-    {track.data && <>
-      {mode === "edit" ? <TrackMetadataEditor key={track.data.revision} track={track.data}
+    {track.data?.unavailable && <>
+      <ErrorNotice error={track.data.unavailable} />
+      <button type="button" onClick={finish}>{tr("刷新列表并重新选择")}</button>
+    </>}
+    {item && <>
+      {mode === "edit" ? <TrackMetadataEditor key={item.revision} track={item}
         busyChanged={setSaving} applied={finish} refresh={track.reload} />
-        : <><p><strong>{track.data.title}</strong></p>
-          <MusicTrackSearch track={track.data} finished={finish} refresh={track.reload} savingChanged={setSaving} /></>}
+        : <><p><strong>{item.title}</strong></p>
+          <MusicTrackSearch track={item} finished={finish} refresh={track.reload} savingChanged={setSaving} /></>}
     </>}
   </Modal>;
 }

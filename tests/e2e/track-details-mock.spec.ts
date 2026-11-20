@@ -83,6 +83,58 @@ test("the track menu opens a logical track and lyrics use the explicitly selecte
   expect(attempts).toBe(1);
 });
 
+for (const phase of ["load", "save"] as const) {
+  for (const status of [404, 409]) {
+    test(`a merged track on ${phase} (${status}) returns to the refreshed list`, async ({ page }) => {
+      let merged = false, reads = 0, writes = 0;
+      await mockApi(page, async (route, path) => {
+        if (path.endsWith("/library/tracks") && merged) {
+          await route.fulfill({ json: musicPage([{ ...tracks[0], recordingId: "merged-id", title: "Merged track" }]) });
+        } else if (path.endsWith("/library/tracks/recording")) {
+          const writing = route.request().method() === "PUT";
+          if (writing) writes++; else reads++;
+          if (phase === "load" || writing) {
+            merged = true;
+            await route.fulfill({ status, json: { error: { code: status === 404 ? "NOT_FOUND" : "RESOURCE_CHANGED" } } });
+          } else await route.fulfill({ json: musicTrack({ ...tracks[0], versions: tracks }) });
+        } else return false;
+        return true;
+      });
+      await page.getByRole("button", { name: "Alpha 的更多操作", exact: true }).click();
+      await page.getByRole("menuitem", { name: "编辑曲目元数据" }).click();
+      const editor = page.getByRole("dialog", { name: "编辑曲目元数据" });
+      if (phase === "save") {
+        await editor.getByLabel("曲名", { exact: true }).fill("Late edit");
+        await editor.getByRole("button", { name: "保存", exact: true }).click();
+        await expect(editor.getByLabel("曲名", { exact: true })).toBeDisabled();
+      }
+      await expect(editor.getByRole("alert")).toContainText("已被合并或移除");
+      await editor.getByRole("button", { name: "刷新列表并重新选择" }).click();
+      await expect(editor).toHaveCount(0);
+      await expect(page.getByRole("button", { name: "Merged track 的更多操作" })).toBeVisible();
+      expect(reads).toBe(1); expect(writes).toBe(phase === "save" ? 1 : 0);
+    });
+  }
+}
+
+test("a metadata revision conflict reloads the same track in the editor", async ({ page }) => {
+  let reads = 0;
+  await mockApi(page, async (route, path) => {
+    if (!path.endsWith("/library/tracks/recording")) return false;
+    if (route.request().method() === "PUT") await route.fulfill({ status: 409, json: { error: { code: "REVISION_CONFLICT" } } });
+    else await route.fulfill({ json: { ...musicTrack(tracks[0]), revision: ++reads, title: reads === 1 ? "Alpha" : "Current title" } });
+    return true;
+  });
+  await page.getByRole("button", { name: "Alpha 的更多操作", exact: true }).click();
+  await page.getByRole("menuitem", { name: "编辑曲目元数据" }).click();
+  const editor = page.getByRole("dialog", { name: "编辑曲目元数据" });
+  await editor.getByLabel("曲名", { exact: true }).fill("Stale change");
+  await editor.getByRole("button", { name: "保存", exact: true }).click();
+  await editor.getByRole("button", { name: "刷新资料", exact: true }).click();
+  await expect(editor.getByLabel("曲名", { exact: true })).toHaveValue("Current title");
+  expect(reads).toBe(2);
+});
+
 test("a catalog-only track accepts platform titles and manual language edits without an asset", async ({ page }) => {
   const track = { ...musicTrack(tracks[0]), trackId: "unavailable", title: "打上花火", selectedSource: null,
     localizedTitles: [{ language: "zh-Hans", title: "烟花" }], revision: 4 };

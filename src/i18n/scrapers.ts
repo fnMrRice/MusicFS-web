@@ -16,6 +16,7 @@ export default {
   "选择资料平台": ["Choose a platform", "選擇資料平台", "情報源を選択"],
   "读取平台资料": ["Load platform metadata", "讀取平台資料", "配信元の情報を読み込む"],
   "编辑曲目元数据": ["Edit track metadata", "編輯曲目中繼資料", "曲のメタデータを編集"],
+  "这首曲目已被合并或移除，请在刷新后的列表中重新选择。": ["This track was merged or removed. Refresh the list and select a track again.", "這首曲目已被合併或移除，請在重新整理後的清單中重新選擇。", "この曲は統合または削除されました。一覧を更新して曲を選び直してください。"],
   "多语言曲名": ["Multilingual titles", "多語言曲名", "多言語の曲名"],
   "别名": ["Alternate title", "別名", "別名"],
   "年份": ["Year", "年份", "年"],
