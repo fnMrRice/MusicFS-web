@@ -153,7 +153,7 @@ export function PlaylistEditor({
         </button>
         <p className="muted">
           {tr(
-            "保存时检查修订；冲突后请关闭并刷新歌单。编辑仅影响本地聚合，不写回平台。",
+            "保存时检查修订。遇到冲突，请关闭并刷新歌单。",
           )}
         </p>
         <ErrorNotice error={error || remote.error} />

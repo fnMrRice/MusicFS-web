@@ -1,23 +1,28 @@
 import type { AccountPlaylistPage, OnlineInstance } from "../api/content";
-import { ApiError } from "../api/client";
+import { ApiError, errorMessage } from "../api/client";
+import { withRateLimitRetry } from "../api/rate-limit";
 import { Store } from "./store";
 
-/** Account lists are scoped to one Services session, with independent request lifetimes. */
+export const supportsAccountPlaylists = (instance: OnlineInstance) =>
+  instance.availability === "available" &&
+  (!instance.plugin || instance.plugin.features?.includes("music-source")) &&
+  instance.capabilities.some((capability) => capability.name === "playlist.list" && capability.supported);
+
+/** 侧栏、歌单管理和来源浏览共享当前账号的分页结果和请求。 */
 export class SourcePlaylistCatalog {
   readonly pages = new Store<Record<string, AccountPlaylistPage>>({});
+  readonly status = new Store<Record<string, { loading: boolean; error: string | null }>>({});
   readonly revisions = new Store<Record<string, number>>({});
   private sources = new Map<string, string>();
   private epoch = 0;
   private blocked = new Set<string>();
   private requests = new Map<string, { controller: AbortController; promise: Promise<AccountPlaylistPage> }>();
-  constructor(private load: (instance: string, signal: AbortSignal) => Promise<AccountPlaylistPage>) {}
+  private cursors = new Map<string, Set<string>>();
+  constructor(private load: (instance: string, signal: AbortSignal, cursor: string | null) => Promise<AccountPlaylistPage>) {}
 
   update(instances: readonly OnlineInstance[]): void {
-    const eligible = new Map(instances.filter((instance) =>
-      instance.availability === "available" &&
-      (!instance.plugin || instance.plugin.features?.includes("music-source")) &&
-      instance.capabilities.some((capability) => capability.name === "playlist.list" && capability.supported),
-    ).map((instance) => [instance.instanceId, JSON.stringify([instance.accountId ?? "", instance.accountRevision ?? "", instance.plugin?.id ?? ""])]));
+    const eligible = new Map(instances.filter(supportsAccountPlaylists)
+      .map((instance) => [instance.instanceId, JSON.stringify([instance.accountId ?? "", instance.accountRevision ?? "", instance.plugin?.id ?? ""])]));
     for (const id of this.sources.keys()) {
       if (!eligible.has(id)) {
         this.invalidate(id);
@@ -38,10 +43,14 @@ export class SourcePlaylistCatalog {
   invalidate(instance: string): void {
     this.requests.get(instance)?.controller.abort();
     this.requests.delete(instance);
+    this.cursors.delete(instance);
     this.blocked.add(instance);
     const pages = { ...this.pages.value };
     delete pages[instance];
     this.pages.set(pages);
+    const status = { ...this.status.value };
+    delete status[instance];
+    this.status.set(status);
     this.revisions.set({ ...this.revisions.value, [instance]: (this.revisions.value[instance] ?? 0) + 1 });
   }
 
@@ -49,13 +58,37 @@ export class SourcePlaylistCatalog {
     this.invalidate(instance);
     this.blocked.delete(instance);
     if (!this.sources.has(instance)) return;
+    this.fetch(instance, null);
+  }
+
+  more(instance: string): void {
+    const cursor = this.pages.value[instance]?.nextCursor;
+    if (cursor && !this.requests.has(instance)) this.fetch(instance, cursor);
+  }
+
+  private fetch(instance: string, cursor: string | null): void {
     const controller = new AbortController();
     const generation = this.generation(instance);
-    const promise = this.loadFirst(instance, controller.signal).then((page) => {
+    this.status.set({ ...this.status.value, [instance]: { loading: true, error: null } });
+    const promise = withRateLimitRetry(() => this.load(instance, controller.signal, cursor), controller.signal).then((page) => {
       if (controller.signal.aborted || generation !== this.generation(instance))
         throw new ApiError("CANCELLED", "Account changed");
-      this.accept(instance, page, generation);
-      return page;
+      const seen = this.cursors.get(instance) ?? new Set<string>();
+      if (cursor) seen.add(cursor);
+      if (page.nextCursor && seen.has(page.nextCursor))
+        throw new ApiError("PAGINATION_STALLED", "Playlist pagination stalled");
+      this.cursors.set(instance, seen);
+      const previous = cursor ? this.pages.value[instance].items : [];
+      const items = new Map(previous.map((item) => [item.externalId, item]));
+      for (const item of page.items) items.set(item.externalId, item);
+      const combined = { ...page, items: [...items.values()] };
+      this.accept(instance, combined, generation);
+      this.status.set({ ...this.status.value, [instance]: { loading: false, error: null } });
+      return combined;
+    }).catch((error) => {
+      if (!controller.signal.aborted && generation === this.generation(instance))
+        this.status.set({ ...this.status.value, [instance]: { loading: false, error: errorMessage(error) } });
+      throw error;
     }).finally(() => {
       if (this.requests.get(instance)?.controller === controller) this.requests.delete(instance);
     });
@@ -70,22 +103,6 @@ export class SourcePlaylistCatalog {
     if (this.pages.value[instance]) return Promise.resolve(this.pages.value[instance]);
     if (!this.requests.has(instance)) this.refresh(instance);
     return this.requests.get(instance)!.promise;
-  }
-
-  private async loadFirst(instance: string, signal: AbortSignal): Promise<AccountPlaylistPage> {
-    for (let attempt = 0; ; ++attempt) {
-      try { return await this.load(instance, signal); }
-      catch (error) {
-        if (!(error instanceof ApiError) || error.code !== "RATE_LIMITED" || attempt >= 2 ||
-          signal.aborted || (error.retryAfter ?? 1) > 10) throw error;
-        await new Promise<void>((resolve, reject) => {
-          const cancel = () => { clearTimeout(timer); reject(new ApiError("CANCELLED", "Request cancelled")); };
-          const timer = setTimeout(() => { signal.removeEventListener("abort", cancel); resolve(); }, Math.max(error.retryAfter ?? 1, 1) * 1000);
-          signal.addEventListener("abort", cancel, { once: true });
-          if (signal.aborted) cancel();
-        });
-      }
-    }
   }
 
   accept(instance: string, page: AccountPlaylistPage, generation: string): void {
@@ -105,8 +122,10 @@ export class SourcePlaylistCatalog {
     this.requests.forEach((request) => request.controller.abort());
     this.requests.clear();
     this.sources.clear();
+    this.cursors.clear();
     this.blocked.clear();
     this.pages.set({});
+    this.status.set({});
     this.revisions.set({});
   }
 }

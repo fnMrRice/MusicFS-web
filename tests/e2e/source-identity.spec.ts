@@ -1,4 +1,4 @@
-import { instanceIds } from "../fixtures/plugins";
+import { instanceIds, neteasePlugin } from "../fixtures/plugins";
 import { expect, test, type Page } from "@playwright/test";
 import { preview, type PreviewServer } from "vite";
 
@@ -120,7 +120,7 @@ test("recommendations show playlist artwork, keep cover fallbacks, and open the 
   } }));
 
   await page.goto(`${origin}/#/recommendations`);
-  const morning = page.getByRole("link", { name: /Morning mix/ });
+  const morning = page.locator("#page-scroll").getByRole("link", { name: /Morning mix/ });
   await expect.poll(() => morning.locator("img").evaluate((img: HTMLImageElement) => img.naturalWidth)).toBe(1);
   await expect(page.getByRole("link", { name: /Evening mix/ }).locator(".cover svg")).toBeVisible();
   await expect(page.getByRole("link", { name: /Night mix/ }).locator(".cover svg")).toBeVisible();
@@ -220,4 +220,95 @@ test("empty and failed plugin playlist reads do not create sidebar categories", 
     await expect(page.getByRole("link", { name: "目录音乐 的歌单", exact: true })).toHaveCount(0);
     await expect(page.getByRole("link", { name: "未知来源 的歌单", exact: true })).toHaveCount(0);
   }
+});
+
+test("NetEase playlists appear in management and navigation, link once, accept track additions and unlink", async ({ page }) => {
+  const instanceId = instanceIds.netease;
+  const accountId = "listener";
+  const source = { instanceId, accountId, name: "小林", platform: "netease", availability: "available", plugin: neteasePlugin,
+    capabilities: ["playlist.list", "playlist.addTracks", "search.tracks"].map((name) => ({ name, supported: true, reason: "" })) };
+  const second = { ...source, instanceId: instanceIds.neteaseSecond, name: "另一实例" };
+  const own = { ...playlist("100", "通勤"), writable: true };
+  const collected = { ...playlist("200", "睡前"), writable: false };
+  const track = { externalId: "21", title: "序曲", artists: ["音乐人"], album: "", durationMs: 60000, sourceUrl: "" };
+  const local = { playlistId: "local-1", name: "开车听", bindings: [], ruleRevision: 1, snapshotRevision: 0, hideRevision: 0, stale: true };
+  let created = false, linked = false, additions = 0, linkAttempts = 0, referenceAttempts = 0;
+  const link = () => ({ platform: "netease", instanceId, accountId, externalId: own.externalId, playlistId: local.playlistId, pendingCount: additions });
+  await page.route("**/api/v1/**", async (route) => {
+    const req = route.request(), path = new URL(req.url()).pathname;
+    let json: unknown = { items: [], nextAfter: null, nextCursor: null };
+    if (path.endsWith("/health/ready")) json = { product: "MusicFS", ready: true, apiVersion: "1", instanceId: "playlist-test" };
+    if (path.endsWith("/auth/session")) json = { csrfToken: "csrf", user: { id: "user", role: "user" } };
+    if (path.endsWith("/online-instances")) json = { items: [source, second] };
+    if ([instanceId, second.instanceId].some((id) => path.endsWith(`/online-instances/${id}/playlists`))) json = {
+      items: [own, collected], nextCursor: null, consistency: "unversioned", observedAt: "2026-11-19T00:00:00Z",
+    };
+    if (path.endsWith(`/playlists/${own.externalId}`)) json = { playlist: own, complete: true, observedAt: "", entries: [{ position: 0, externalTrackId: track.externalId }] };
+    if (path.endsWith(`/playlists/${own.externalId}/tracks`)) json = { playlist: own, items: [{ position: 0, track, externalId: track.externalId, errorCode: null }], nextCursor: null, complete: true };
+    if (path.endsWith("/search")) json = { tracks: [track], nextCursor: null, truncated: false };
+    if (path === "/api/v1/playlists") {
+      if (req.method() === "POST") {
+        expect(req.postDataJSON()).toEqual({ name: local.name, bindings: [] });
+        created = true;
+        json = local;
+      } else json = { items: created ? [local] : [], nextAfter: null };
+    }
+    if (path.endsWith(`/playlists/${local.playlistId}`)) {
+      if (req.method() === "PUT") {
+        expect(req.postDataJSON().bindings.at(-1)).toEqual({ kind: "local", entries: [{ source: { remoteSourceId: "ref-21", sourceTrackId: null } }] });
+        expect(linked).toBe(true);
+        additions++;
+      }
+      json = local;
+    }
+    if (path.endsWith("/playlist-track-sources")) {
+      expect(req.postDataJSON()).toEqual({ accountId, externalIds: [track.externalId] });
+      if (++referenceAttempts === 1) return route.fulfill({ status: 429, json: { error: { code: "RATE_LIMITED", retryAfter: 1 } } });
+      json = { items: [{ remoteSourceId: "ref-21" }] };
+    }
+    if (path.endsWith("/playlist-links")) json = { items: linked ? [link()] : [] };
+    if (path.endsWith(`/playlists/${own.externalId}/link`)) {
+      expect(path).toContain(instanceId);
+      expect(req.postDataJSON()).toEqual({ accountId, playlistId: local.playlistId });
+      if (++linkAttempts === 1) return route.fulfill({ status: 429, json: { error: { code: "RATE_LIMITED", retryAfter: 1 } } });
+      linked = req.method() === "PUT";
+      if (!linked) return route.fulfill({ status: 204 });
+      json = link();
+    }
+    return route.fulfill({ json });
+  });
+  await page.goto(`${origin}/#/playlists`);
+  const group = page.getByRole("region", { name: "网易云音乐 · 小林 的歌单" });
+  const mirror = page.getByRole("region", { name: "网易云音乐 · 另一实例 的歌单" });
+  const sidebar = page.getByRole("complementary", { name: "侧栏" });
+  const sidebarLink = sidebar.locator(`a[href="#/discover/${instanceId}/100"]`);
+  await expect(sidebarLink).toHaveAccessibleName("网易云音乐-通勤");
+  await expect(sidebar.getByRole("link", { name: "网易云音乐-睡前" })).toHaveCount(2);
+  await expect(group.getByText("只读")).toHaveCount(1);
+  await expect(group.getByRole("button", { name: "关联本地歌单" })).toHaveCount(1);
+  await group.getByRole("button", { name: "关联本地歌单" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("歌单名称").fill(local.name);
+  await dialog.getByRole("button", { name: "关联本地歌单" }).click();
+  await expect(group.getByRole("link", { name: "已关联：开车听" })).toBeVisible();
+  await expect(mirror.getByRole("link", { name: "已关联：开车听" })).toBeVisible();
+  await expect(group.getByRole("button", { name: "关联本地歌单", exact: true })).toHaveCount(0);
+  await sidebarLink.click();
+  const add = page.getByRole("button", { name: "将 序曲 添加到歌单" });
+  async function saveTrack() {
+    await add.click();
+    await dialog.getByLabel("目标歌单").selectOption(local.playlistId);
+    await dialog.getByRole("button", { name: "保存", exact: true }).click();
+    await expect(dialog.getByRole("status")).toContainText("曲目已保存");
+    await dialog.getByRole("button", { name: "完成" }).click();
+  }
+  await saveTrack();
+  await page.goto(`${origin}/#/search?q=序曲&source=${instanceId}`);
+  await saveTrack();
+  await page.goto(`${origin}/#/playlists`);
+  await expect(group.getByText("2 首待同步", { exact: false })).toBeVisible();
+  await mirror.getByRole("button", { name: "解除关联" }).click();
+  await dialog.getByRole("button", { name: "解除关联" }).click();
+  await expect(group.getByRole("button", { name: "关联本地歌单" })).toBeEnabled();
+  expect(linked).toBe(false);
 });

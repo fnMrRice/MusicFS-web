@@ -1,7 +1,8 @@
 import { tr, useLocale, formatDate, statusText } from "../i18n";
 import { Link, useParams } from "react-router-dom";
 import { useState } from "react";
-import { useServices } from "../app/services";
+import { useServices, useStore } from "../app/services";
+import type { OnlineInstance } from "../api/content";
 import { useResource } from "../components/query";
 import { Cover, Empty, ErrorNotice, IconButton } from "../components/ui";
 import { errorMessage } from "../api/client";
@@ -89,6 +90,20 @@ export function DiscoveryPlaylist() {
   useLocale();
   const { instance = "", external = "" } = useParams();
   const s = useServices();
+  const instances = useResource("source-playlist-instances", (signal) => s.content.online(signal));
+  const source = useStore(s.content.onlineInstances).find((item) => item.instanceId === instance);
+  if (!source) {
+    if (instances.error) return <ErrorNotice error={instances.error} retry={instances.reload} />;
+    return <p className="muted">{tr(instances.loading ? "正在读取来源…" : "此来源不可用，请刷新来源或检查服务端配置。")}</p>;
+  }
+  if (source.availability === "loginRequired" || (!source.accountId && source.authentication !== "anonymous"))
+    return <p className="notice">{tr("请先在设置中登录此音乐平台，再读取账号歌单。")}{" "}<Link to="/settings">{tr("设置")}</Link></p>;
+  if (source.availability !== "available") return <p className="notice">{tr("来源暂时离线，请稍后重试。")}</p>;
+  return <DiscoveryDetails key={JSON.stringify([instance, external, source.accountId, source.accountRevision])} source={source} external={external} />;
+}
+function DiscoveryDetails({ source, external }: { source: OnlineInstance; external: string }) {
+  const s = useServices();
+  const instance = source.instanceId;
   const query = useResource(`${instance}:${external}`, (signal) =>
     s.content.observation(instance, external, signal),
   );
@@ -154,7 +169,7 @@ export function DiscoveryPlaylist() {
             {query.data.observedAt &&
               tr("观测时间：{0}", { "0": formatDate(query.data.observedAt) })}
           </p>
-          <OnlinePlaylistTracks instance={instance} external={external} />
+          <OnlinePlaylistTracks source={source} external={external} />
         </>
       )}
       {message && (

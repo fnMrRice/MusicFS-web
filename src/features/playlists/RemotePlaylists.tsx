@@ -63,7 +63,7 @@ export function RemotePlaylists() {
         <button onClick={() => setOpen(true)}>{tr("导入远程歌单")}</button>
       </div>
       <p className="muted">
-        {tr("显式同步后保留本地快照；聚合编辑不会写回远程平台。")}
+        {tr("点击同步可以更新已导入歌单的本地快照。")}
       </p>
       <ErrorNotice error={page.error} retry={page.retry} />
       {page.items.map((p) => (

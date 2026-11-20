@@ -7,6 +7,8 @@ import { Cover, Empty, ErrorNotice, Icon, Sentinel } from "../../components/ui";
 import { Modal } from "../../components/Modal";
 import { errorMessage } from "../../api/client";
 import { RemotePlaylists } from "./RemotePlaylists";
+import { AccountPlaylistLists } from "./AccountPlaylistList";
+import { supportsAccountPlaylists } from "../../app/source-playlists";
 export function Playlists() {
   useLocale();
   const s = useServices();
@@ -15,6 +17,7 @@ export function Playlists() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const sidebar = useStore(s.playlists);
+  const sources = useStore(s.content.onlineInstances).filter(supportsAccountPlaylists);
   const page = usePages(
     `playlists:${sidebar.map((p) => `${p.playlistId}:${p.ruleRevision}`).join(",")}`,
     async (after, signal) => {
@@ -70,7 +73,7 @@ export function Playlists() {
       </div>
       <ErrorNotice error={page.error} retry={page.retry} />
       {page.loading && <p className="loading">{tr("正在读取歌单…")}</p>}
-      {!page.loading && !page.items.length && !page.error && (
+      {!page.loading && !page.items.length && !page.error && !sources.length && (
         <Empty title={tr("创建你的第一张歌单")} icon="folder">
           {tr("在曲目列表中勾选音乐，即可添加到歌单。")}
         </Empty>
@@ -79,6 +82,7 @@ export function Playlists() {
         active={!!page.cursor && !page.loading && !page.error}
         load={page.more}
       />
+      <AccountPlaylistLists sources={sources} prefix />
       <RemotePlaylists />
       {params.get("new") && (
         <Modal title={tr("新建歌单")} close={close}>

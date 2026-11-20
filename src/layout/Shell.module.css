@@ -75,6 +75,11 @@
   color: var(--muted);
   padding: 0 16px;
 }
+.morePlaylists {
+  margin-inline-start: 16px;
+  color: var(--muted);
+  font-size: 12px;
+}
 .account {
   display: flex;
   align-items: center;
@@ -262,6 +267,7 @@
     display: none;
   }
   .groupToggle { display: flex; font-size: 0; padding: 3px; flex: 0; }
+  .morePlaylists { margin-inline-start: 0; }
   .nav {
     padding: 12px;
     justify-content: center;

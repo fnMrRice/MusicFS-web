@@ -12,6 +12,7 @@ import { ServiceStatus } from "./ServiceStatus";
 import { TaskQueue } from "./TaskQueue";
 import { LibraryNavigation } from "./LibraryNavigation";
 import { useWorkTypes, workSectionTitle } from "../features/works/navigation";
+import { remotePlaylistLabel, remotePlaylistPath } from "../features/playlists/AccountPlaylistList";
 
 const links = [
   ["/search", "search", "搜索"],
@@ -19,7 +20,7 @@ const links = [
   ["/playlists", "folder", "歌单管理"],
 ];
 export function AppShell() {
-  useLocale();
+  const { locale } = useLocale();
   const s = useServices();
   const auth = useStore(s.auth);
   const profile = useStore(s.profile.state);
@@ -27,6 +28,8 @@ export function AppShell() {
   const playlists = useStore(s.playlists);
   const sources = useMusicSources();
   const sourcePlaylists = useStore(s.sourcePlaylists.pages);
+  const playlistStatus = useStore(s.sourcePlaylists.status);
+  const accountSources = sources.flatMap(({ online }) => online && sourcePlaylists[online.instanceId]?.items.length ? [online] : []);
   const sourceName = useSourceName();
   const location = useLocation();
   const workTypes = useWorkTypes();
@@ -130,6 +133,7 @@ export function AppShell() {
       key={path}
       to={path}
       aria-label={label}
+      title={label}
       end={path !== "/works"}
       className={({ isActive }) =>
         `${styles.nav} ${isActive ? styles.active : ""}`
@@ -186,7 +190,7 @@ export function AppShell() {
               </span>
               {tr("歌单")}
               {!prefs.playlists &&
-                (location.pathname.startsWith("/playlists/") || location.pathname.startsWith("/sources/")) && (
+                (location.pathname.startsWith("/playlists/") || location.pathname.startsWith("/sources/") || location.pathname.startsWith("/discover/")) && (
                   <span className={styles.dot} />
                 )}
             </button>
@@ -205,14 +209,21 @@ export function AppShell() {
                   p.name,
                 ),
               )
-            ) : (
+            ) : !accountSources.length && (
               <p className={styles.hint}>{tr("歌单列表为空")}</p>
             ))}
-          {prefs.playlists && sources.filter((source) => sourcePlaylists[source.id]?.items.length).map((source) => nav(
-            `/sources/${encodeURIComponent(source.id)}/playlists`,
-            "folder",
-            tr("{0} 的歌单", { 0: sourceName(source.online ?? source.provider!) }),
-          ))}
+          {prefs.playlists && accountSources.map((source) => {
+            const page = sourcePlaylists[source.instanceId];
+            const label = tr("{0} 的歌单", { 0: sourceName(source) });
+            return <div key={source.instanceId}>
+              {nav(`/sources/${encodeURIComponent(source.instanceId)}/playlists`, "folder", label)}
+              {page.items.map((item) => nav(remotePlaylistPath(source.instanceId, item.externalId), "album", remotePlaylistLabel(source, item, locale)))}
+              {page.nextCursor && <button className={styles.morePlaylists} disabled={playlistStatus[source.instanceId]?.loading}
+                aria-label={tr("显示更多：{0}", { 0: label })} onClick={() => s.sourcePlaylists.more(source.instanceId)}>
+                {tr("加载更多歌单")}
+              </button>}
+            </div>;
+          })}
         </nav>
       </aside>
       <section className={styles.main}>

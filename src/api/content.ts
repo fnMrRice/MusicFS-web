@@ -1,5 +1,6 @@
 import { ApiClient, ApiError, type RequestOptions } from "./client";
 import { Store } from "../app/store";
+import { withRateLimitRetry } from "./rate-limit";
 import type { PluginIdentity } from "./types";
 export type { PluginIdentity } from "./types";
 
@@ -29,6 +30,7 @@ export interface OnlinePlaylist {
   sourceUrl: string;
   coverUrl: string | null;
   trackCount: number | null;
+  writable?: boolean;
 }
 export interface AccountPlaylistPage {
   items: OnlinePlaylist[];
@@ -188,10 +190,10 @@ export class ContentApi {
     const query = new URLSearchParams({ q, limit: "30" });
     if (cursor) query.set("cursor", cursor);
     return checked(
-      await this.client.request<SearchPage>(
+      await withRateLimitRetry(() => this.client.request<SearchPage>(
         `/online-instances/${id(instance)}/search?${query}`,
         { signal },
-      ),
+      ), signal),
       (r) =>
         list(r.tracks) &&
         r.tracks.every(
@@ -245,10 +247,10 @@ export class ContentApi {
     signal?: AbortSignal,
   ): Promise<Observation> {
     return checked(
-      await this.client.request<Observation>(
+      await withRateLimitRetry(() => this.client.request<Observation>(
         `/online-instances/${id(instance)}/playlists/${id(external)}`,
         { signal },
-      ),
+      ), signal),
       (r) => object(r.playlist) && string(r.playlist.title) && list(r.entries),
     );
   }

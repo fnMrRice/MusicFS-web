@@ -97,6 +97,12 @@
 .remote-row p {
   margin: 8px 0;
 }
+.account-playlist > div { min-width: 0; }
+.account-playlist-link { display: flex; align-items: center; gap: 12px; text-decoration: none; }
+.account-playlist-link strong { overflow-wrap: anywhere; }
+.account-playlist-link svg, .account-playlist button { flex-shrink: 0; }
+.account-playlist-link small { white-space: nowrap; color: var(--muted); }
+.account-playlist-link:hover strong { text-decoration: underline; }
 .settings-page {
   max-width: 900px;
 }

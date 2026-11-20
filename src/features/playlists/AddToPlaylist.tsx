@@ -1,5 +1,5 @@
 import { tr, useLocale } from "../../i18n";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useServices, useStore } from "../../app/services";
 import { trackKey, type TrackItem } from "../../api/music-catalog";
 import { PlaylistSourceSelect } from "./PlaylistSourceSelect";
@@ -8,15 +8,18 @@ import { errorMessage } from "../../api/client";
 import { Modal } from "../../components/Modal";
 import { ErrorNotice } from "../../components/ui";
 import { TrackSelectionApi, type TrackSelection } from "../../api/track-selection";
+import { remotePlaylistEntries, playlistLinks, type OnlinePlaylistSelection } from "../../api/playlist-links";
 export function AddToPlaylist({
   tracks,
   pinned,
   selection,
+  online,
   close,
 }: {
   tracks: TrackItem[];
   pinned?: string;
   selection?: TrackSelection;
+  online?: OnlinePlaylistSelection;
   close: () => void;
 }) {
   useLocale();
@@ -26,10 +29,15 @@ export function AddToPlaylist({
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+  const links = useResource("add-playlist-links", (signal) => playlistLinks(s.client, signal));
+  const linked = links.data?.some((link) => link.playlistId === target);
   const [choices, setChoices] = useState<Record<string, string>>({});
   const pending = useRef<{ identity: string; key: string; revision?: number } | null>(null);
+  const submit = useRef<AbortController | null>(null);
+  useEffect(() => () => submit.current?.abort(), []);
   const resolved = useResource(JSON.stringify(tracks.map(trackKey)), async (signal) => {
-    if (selection) return [];
+    if (selection || online) return [];
     const result = [];
     for (const item of tracks) {
       result.push("trackId" in item ? item : await s.musicCatalog.track(item.sourceTrackId, signal, true));
@@ -38,6 +46,8 @@ export function AddToPlaylist({
   });
   const save = async () => {
     if (!selection && !resolved.data) return;
+    const controller = new AbortController();
+    submit.current = controller;
     setBusy(true);
     setError(null);
     try {
@@ -51,19 +61,19 @@ export function AddToPlaylist({
           await api.appendPlaylist(target, selection, pending.current.revision, pending.current.key);
         } else await api.createPlaylist(selection, name.trim(), pending.current.key);
       } else {
-      const binding = {
-        kind: "local" as const,
-        entries: resolved.data!.map((t, i) => ({
+        const entries = online ? await remotePlaylistEntries(s.client, online, controller.signal) : resolved.data!.map((t, i) => ({
           source: { trackId: t.trackId, forcedSourceTrackId: (choices[i] ?? pinned) || null, sourceTrackId: null, remoteSourceId: null },
-        })),
-      };
-      if (target) {
-        const p = await s.content.playlist(target);
-        await s.content.edit(p, p.name, [...p.bindings, binding]);
-      } else await s.content.create(name.trim(), [binding]);
+        }));
+        const binding = { kind: "local" as const, entries };
+        if (target) {
+          const p = await s.content.playlist(target, controller.signal);
+          await s.content.edit(p, p.name, [...p.bindings, binding]);
+        } else await s.content.create(name.trim(), [binding]);
       }
-      await s.reloadPlaylists();
-      close();
+      if (controller.signal.aborted) return;
+      void s.reloadPlaylists().catch(() => {});
+      if (linked) setSaved(true);
+      else close();
     } catch (e) {
       setError(errorMessage(e));
     } finally {
@@ -71,9 +81,13 @@ export function AddToPlaylist({
     }
   };
   return (
-    <Modal title={tr("添加到歌单")} close={close}>
+    <Modal title={tr("添加到歌单")} close={() => { if (!busy) close(); }}>
+      {saved ? <>
+        <p role="status">{tr("曲目已保存。同平台的新曲目将在后台同步到关联的远程歌单。")}</p>
+        <button className="primary" onClick={close}>{tr("完成")}</button>
+      </> : <>
       <p className="muted">
-        {selection ? tr("全部选中曲目") : tr("将 {0} 首曲目保存为歌单引用。", { 0: tracks.length })}
+        {selection ? tr("全部选中曲目") : tr("将 {0} 首曲目保存为歌单引用。", { 0: online?.tracks.length ?? tracks.length })}
       </p>
       <form
         onSubmit={(e) => {
@@ -92,6 +106,7 @@ export function AddToPlaylist({
             ))}
           </select>
         </label>
+        {linked && <p className="muted">{tr("同平台的新曲目会同步到关联的远程歌单。")}</p>}
         {!target && (
           <label>
             {tr("歌单名称")}
@@ -114,6 +129,7 @@ export function AddToPlaylist({
           {busy ? tr("正在保存…") : tr("保存")}
         </button>
       </form>
+      </>}
     </Modal>
   );
 }

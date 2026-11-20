@@ -8,6 +8,7 @@ import { errorMessage } from "../../api/client";
 import { TrackTable } from "../TrackTable";
 import { PlaylistEditor } from "./PlaylistEditor";
 import { resolvePlaylistTracks } from "./playlist-tracks";
+import { RemotePlaylistEntries } from "./RemotePlaylistEntries";
 
 export function PlaylistDetail() {
   useLocale();
@@ -118,6 +119,8 @@ function PlaylistTracks({ id, revision }: { id: string; revision: number }) {
   );
   const tracks = pages.items.flatMap((e) => e.track ? [e.track] : []);
   const unresolved = pages.items.filter((e) => !e.track);
+  const remote = unresolved.filter((entry) => entry.source.remoteSourceId);
+  const unavailable = unresolved.length - remote.length;
   return (
     <>
       {confirmation && (
@@ -149,11 +152,12 @@ function PlaylistTracks({ id, revision }: { id: string; revision: number }) {
           pagination={{ loading: pages.loading, hasMore: !!pages.cursor, error: pages.error, more: pages.more }}
         />
       )}
-      {unresolved.length > 0 && (
+      {!!remote.length && <RemotePlaylistEntries entries={remote} />}
+      {unavailable > 0 && (
         <p className="notice">
           {tr(
-            "此快照另有 {0} 个远程或暂不可读取的来源引用；当前接口不提供这些曲目的播放和完整展示信息。",
-            { 0: unresolved.length },
+            "有 {0} 个来源暂时无法读取。",
+            { 0: unavailable },
           )}
         </p>
       )}
