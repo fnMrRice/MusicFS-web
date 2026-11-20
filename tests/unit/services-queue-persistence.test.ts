@@ -25,7 +25,7 @@ afterEach(() => {
 async function connect() {
   const services = new Services({} as HTMLElement);
   instances.push(services);
-  vi.spyOn(services.authApi, "ready").mockResolvedValue({ product: "MusicFS", instanceId: "server", apiVersion: "1", ready: true });
+  vi.spyOn(services.authApi, "ready").mockResolvedValue({ product: "MusicFS", instanceId: "server", serverVersion: "0.1.0", apiVersion: "1", ready: true });
   vi.spyOn(services.authApi, "restore").mockResolvedValue({ user: { id: "user", role: "owner" }, csrfToken: "csrf", expiresAt: "2099-01-01" });
   vi.spyOn(services.content, "online").mockResolvedValue([]);
   vi.spyOn(services.libraryApi, "providers").mockResolvedValue([]);
@@ -78,7 +78,7 @@ describe("temporary queue lifecycle", () => {
     services.queue.commitSelection();
     services.setPlaybackMode("shuffle");
     services.playNext([next]);
-    vi.mocked(services.authApi.ready).mockResolvedValue({ product: "MusicFS", instanceId: "restarted", apiVersion: "1", ready: true });
+    vi.mocked(services.authApi.ready).mockResolvedValue({ product: "MusicFS", instanceId: "restarted", serverVersion: "0.1.0", apiVersion: "1", ready: true });
     await services.connect();
     expect(services.queue.snapshot().priority).toEqual([1]);
     expect(services.queue.value.items).toEqual([track, next]);

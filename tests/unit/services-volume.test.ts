@@ -24,7 +24,7 @@ afterEach(() => {
 async function connect({ instanceId = "server:a" } = {}) {
   const services = new Services({} as HTMLElement);
   instances.push(services);
-  vi.spyOn(services.authApi, "ready").mockResolvedValue({ product: "MusicFS", instanceId, apiVersion: "1", ready: true });
+  vi.spyOn(services.authApi, "ready").mockResolvedValue({ product: "MusicFS", instanceId, serverVersion: "0.1.0", apiVersion: "1", ready: true });
   vi.spyOn(services.authApi, "restore").mockResolvedValue({ user: { id: "user:b", role: "owner" }, csrfToken: "csrf", expiresAt: "2099-01-01" });
   vi.spyOn(services.content, "online").mockResolvedValue([]);
   vi.spyOn(services.libraryApi, "providers").mockResolvedValue([]);

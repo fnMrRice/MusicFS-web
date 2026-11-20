@@ -85,6 +85,8 @@ export default {
   "插件管理仅对管理员开放。": ["Plugin management is only available to administrators.", "外掛管理僅對管理員開放。", "プラグイン管理は管理者のみ利用できます。"],
   "连接与账号": ["Connection & account", "連線與帳號", "接続とアカウント"],
   "音乐服务": ["Music service", "音樂服務", "音楽サービス"],
+  "服务端版本": ["Server version", "伺服器版本", "サーバーバージョン"],
+  "Web 版本": ["Web version", "Web 版本", "Web バージョン"],
   "实例": ["Instance", "執行個體", "インスタンス"],
   "协议": ["Protocol", "通訊協定", "プロトコル"],
   "当前账号": ["Current account", "目前帳號", "現在のアカウント"],

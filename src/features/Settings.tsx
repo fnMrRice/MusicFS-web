@@ -1,4 +1,5 @@
 import { useState, type CSSProperties } from "react";
+import { version as webVersion } from "../../package.json";
 import { tr, useLocale } from "../i18n";
 import { useServices, useStore } from "../app/services";
 import { LanguageSelect } from "../i18n/LanguageSelect";
@@ -134,6 +135,14 @@ function AboutSettings() {
           <div>
             <dt>{tr("音乐服务")}</dt>
             <dd>{window.location.origin}</dd>
+          </div>
+          <div>
+            <dt>{tr("服务端版本")}</dt>
+            <dd>{auth.ready?.serverVersion}</dd>
+          </div>
+          <div>
+            <dt>{tr("Web 版本")}</dt>
+            <dd>{webVersion}</dd>
           </div>
           <div>
             <dt>{tr("实例")}</dt>

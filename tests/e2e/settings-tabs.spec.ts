@@ -34,7 +34,7 @@ async function mock(page: Page, role = "admin") {
     let json: unknown = { items: [], nextCursor: null, nextAfter: null, libraryRevision: "1" };
     if (path.endsWith('/scan-status')) json = { job: null };
     if (path.endsWith('/root-statistics')) json = { roots: [] };
-    if (path.endsWith("/health/ready")) json = { product: "MusicFS", ready: true, apiVersion: "1", instanceId: "settings-test" };
+    if (path.endsWith("/health/ready")) json = { product: "MusicFS", ready: true, serverVersion: "2.4.1", apiVersion: "1", instanceId: "settings-test" };
     if (path.endsWith("/auth/session")) json = { csrfToken: "fixture", user: { id: "listener", role } };
     if (path.endsWith("/provider-instances")) json = { items: [local] };
     if (path.endsWith("/scrapers")) json = { items: scrapers };
@@ -84,6 +84,25 @@ async function expectAnchor(page: Page, name: string) {
 async function navigate(page: Page, name: string) {
   await navigation(page).getByRole("button", { name, exact: true }).click();
   await expectAnchor(page, name);
+}
+
+for (const [language, sectionName, serverLabel, webLabel, width] of [
+  ["zh-CN", "关于", "服务端版本", "Web 版本", 1200],
+  ["en", "About", "Server version", "Web version", 390],
+] as const) {
+  test(`about shows the server and web versions in ${language} at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 844 });
+    await page.addInitScript(language => localStorage.setItem("musicfs:language", language), language);
+    await mock(page, "user");
+    await page.goto(`${origin}/#/settings?tab=about`);
+    const about = section(page, sectionName);
+    const manifest = await page.request.get(`${origin}/version.json`);
+    const { webVersion } = await manifest.json();
+    await expect(about.getByText(serverLabel, { exact: true }).locator("+ dd")).toHaveText("2.4.1");
+    await expect(about.getByText(webLabel, { exact: true }).locator("+ dd")).toHaveText(webVersion);
+    await expect(about.getByText(webVersion, { exact: true })).toBeInViewport();
+    expect(await about.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+  });
 }
 
 test("listeners can save and reload the local album scraper order", async ({ page }) => {
