@@ -241,13 +241,16 @@ export function Sentinel({
   }, [active]);
   return <div ref={ref} className="sentinel" aria-hidden="true" />;
 }
-export function Cover({ large = false, objectId, alt = "" }: { large?: boolean; objectId?: string | null; alt?: string }) {
+export function Cover({ large = false, objectId, src, alt = "" }: {
+  large?: boolean; objectId?: string | null; src?: string; alt?: string;
+}) {
   const s = useServices();
+  const source = objectId ? s.client.url(`/media/${encodeURIComponent(objectId)}`) : src;
   const [failed, setFailed] = useState<string | null>(null);
   return (
     <span className={`cover ${large ? "large" : ""}`}>
-      {objectId && objectId !== failed ? <img key={objectId} src={s.client.url(`/media/${encodeURIComponent(objectId)}`)} alt={alt}
-        loading="lazy" decoding="async" onError={() => setFailed(objectId)} /> : <Icon name="music" size={large ? 46 : 22} />}
+      {source && source !== failed ? <img key={source} src={source} alt={alt}
+        loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={() => setFailed(source)} /> : <Icon name="music" size={large ? 46 : 22} />}
     </span>
   );
 }

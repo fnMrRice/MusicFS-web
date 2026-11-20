@@ -102,6 +102,34 @@ test("one music-source settings section uses arbitrary plugin translations and k
   await expect(page.getByText("Hidden recommendation alias")).toHaveCount(0);
 });
 
+test("recommendations show playlist artwork, keep cover fallbacks, and open the illustrated preview", async ({ page }) => {
+  await mock(page);
+  const coverUrl = "https://p1.music.126.net/playlist-cover.png";
+  const available = { ...playlist("p1", "Morning mix"), coverUrl };
+  const unavailable = { ...playlist("p2", "Evening mix"), coverUrl: "https://p1.music.126.net/missing.png" };
+  const empty = { ...playlist("p3", "Night mix"), coverUrl: null };
+  await page.route(coverUrl, (route) => route.fulfill({ contentType: "image/png",
+    body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/lVQAAAAASUVORK5CYII=", "base64") }));
+  await page.route(unavailable.coverUrl, (route) => route.fulfill({ status: 404 }));
+  await page.route("**/api/v1/recommendations?*", (route) => route.fulfill({ json: { sources: [{
+    instanceId: custom.instanceId, name: custom.name, stale: false, expiresAt: null, lastSuccessAt: null, error: null,
+    items: [available, unavailable, empty].map((playlist, position) => ({ playlist, position, reason: "" })),
+  }] } }));
+  await page.route(`**/api/v1/online-instances/${custom.instanceId}/playlists/p1`, (route) => route.fulfill({ json: {
+    playlist: available, entries: [], complete: true, observedAt: "2026-10-10T08:00:00Z",
+  } }));
+
+  await page.goto(`${origin}/#/recommendations`);
+  const morning = page.getByRole("link", { name: /Morning mix/ });
+  await expect.poll(() => morning.locator("img").evaluate((img: HTMLImageElement) => img.naturalWidth)).toBe(1);
+  await expect(page.getByRole("link", { name: /Evening mix/ }).locator(".cover svg")).toBeVisible();
+  await expect(page.getByRole("link", { name: /Night mix/ }).locator(".cover svg")).toBeVisible();
+  await expect(page.getByText("平台推荐 · 需登录")).toHaveCount(0);
+  await morning.click();
+  await expect(page.getByRole("heading", { name: "Morning mix" })).toBeVisible();
+  await expect.poll(() => page.locator(".detail-heading .cover img").evaluate((img: HTMLImageElement) => img.naturalWidth)).toBe(1);
+});
+
 test("sidebar source playlists page reads and paginates the signed-in account without implicit import", async ({ page }) => {
   const requests = await mock(page);
   await page.goto(`${origin}/#/settings`);

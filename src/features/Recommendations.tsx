@@ -7,6 +7,7 @@ import { Cover, Empty, ErrorNotice, IconButton } from "../components/ui";
 import { errorMessage } from "../api/client";
 import { useSourceName } from "../components/use-source-name";
 import { OnlinePlaylistTracks } from "./playlists/OnlinePlaylistTracks";
+import { externalLink } from "./scrapers/fields";
 export function Recommendations() {
   useLocale();
   const sourceName = useSourceName();
@@ -30,7 +31,6 @@ export function Recommendations() {
         <section key={source.instanceId} className="source-section">
           <div className="section-title">
             <h3>{sourceName(source)}</h3>
-            <span className="muted">{"平台推荐 · 需登录"}</span>
           </div>
           {source.stale && (
             <p className="notice">
@@ -54,7 +54,7 @@ export function Recommendations() {
                 key={item.playlist.externalId}
                 to={`/discover/${encodeURIComponent(source.instanceId)}/${encodeURIComponent(item.playlist.externalId)}`}
               >
-                <Cover large />
+                <Cover large src={externalLink(item.playlist.coverUrl ?? undefined)} />
                 <strong>{item.playlist.title}</strong>
                 <small>
                   {item.playlist.trackCount === null
@@ -118,7 +118,7 @@ export function DiscoveryPlaylist() {
       {query.data && (
         <>
           <div className="detail-heading">
-            <Cover large />
+            <Cover large src={externalLink(query.data.playlist.coverUrl ?? undefined)} />
             <div>
               <p className="eyebrow">{tr("在线歌单 · 只读预览")}</p>
               <h2>{query.data.playlist.title}</h2>

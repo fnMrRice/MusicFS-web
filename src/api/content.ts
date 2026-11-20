@@ -27,6 +27,7 @@ export interface OnlinePlaylist {
   externalId: string;
   title: string;
   sourceUrl: string;
+  coverUrl: string | null;
   trackCount: number | null;
 }
 export interface AccountPlaylistPage {

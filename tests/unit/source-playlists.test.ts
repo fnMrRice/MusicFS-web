@@ -9,7 +9,7 @@ const instance: OnlineInstance = {
   plugin: { id: "example.radio", name: "Example", localizedNames: {}, features: ["music-source"] },
   capabilities: [{ name: "playlist.list", supported: true, reason: "Supported" }],
 };
-const page: AccountPlaylistPage = { items: [{ externalId: "one", title: "First", sourceUrl: "", trackCount: 2 }], nextCursor: null, consistency: "unversioned", observedAt: "2026-10-10T08:00:00Z" };
+const page: AccountPlaylistPage = { items: [{ externalId: "one", title: "First", sourceUrl: "", coverUrl: null, trackCount: 2 }], nextCursor: null, consistency: "unversioned", observedAt: "2026-10-10T08:00:00Z" };
 
 describe("Source playlist navigation categories", () => {
   afterEach(() => vi.useRealTimers());
