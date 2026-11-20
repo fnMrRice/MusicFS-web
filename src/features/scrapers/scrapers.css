@@ -31,8 +31,8 @@
 .album-add-link { justify-self: start; }
 .album-platform-links, .album-search .album-platforms { display: flex; flex-wrap: wrap; gap: 8px 16px; }
 .album-platforms legend { margin-bottom: 6px; font-size: 13px; }
-.album-search .album-platforms label { display: inline-flex; align-items: center; gap: 5px; }
-.album-search .album-platforms input { width: auto; }
+.album-search .album-platforms label { display: inline-flex; flex-direction: row; align-items: center; gap: 6px; margin: 0; min-height: 26px; }
+.album-search .album-platforms input { width: 16px; height: 16px; margin: 0; padding: 0; accent-color: var(--accent); }
 .album-refresh > label { display: grid; gap: 6px; }
 .album-refresh > button { justify-self: start; }
 @media (max-width: 520px) { .album-editor-link { grid-template-columns: 1fr auto; } .album-editor-link > label:first-child { grid-column: 1 / -1; } }
