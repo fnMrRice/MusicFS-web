@@ -1,4 +1,8 @@
 export default {
+  "自动刮削": ["Auto-scrape", "自動刮削", "メタデータの自動取得"],
+  "这张专辑已有刮削资料。": ["This album already has scraped metadata.", "這張專輯已有刮削資料。", "このアルバムのメタデータは取得済みです。"],
+  "正在保存专辑资料…": ["Saving album metadata…", "正在儲存專輯資料…", "アルバム情報を保存中…"],
+  "已采用 {0} 的《{1}》。": ["Applied “{1}” from {0}.", "已採用 {0} 的《{1}》。", "{0} の「{1}」を適用しました。"],
   "清空刮削资料": ["Clear scraped metadata", "清空刮削資料", "取得済みのメタデータを消去"],
   "清空《{0}》从各平台保存的专辑资料、封面记录和曲目表？": ["Clear the album metadata, artwork records and track list saved from all platforms for “{0}”?", "清空《{0}》從各平台儲存的專輯資料、封面記錄和曲目表？", "「{0}」について各配信元から保存したアルバム情報、カバー画像の記録、曲目一覧を消去しますか？"],
   "一并移除仅由这张专辑刮削补建且未被使用的曲目。音源、平台链接和已合并到曲库的资料会保留。": ["Unused tracks created solely by scraping this album will also be removed. Audio sources, platform links and metadata merged into the library are kept.", "一併移除僅由這張專輯刮削補建且未被使用的曲目。音源、平台連結和已合併到曲庫的資料會保留。", "このアルバムの情報取得でのみ作成され、使われていない曲も削除します。音源、配信元へのリンク、ライブラリに反映済みの情報は保持します。"],

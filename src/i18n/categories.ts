@@ -1,4 +1,6 @@
 export default {
+  "仅显示未刮削专辑": ["Only show unscraped albums", "僅顯示未刮削專輯", "未取得のアルバムのみ表示"],
+  "没有符合条件的未刮削专辑": ["No unscraped albums match these filters", "沒有符合條件的未刮削專輯", "条件に一致する未取得のアルバムはありません"],
   "音乐目录": ["Music folder", "音樂目錄", "音楽フォルダー"],
   "搜索分类": ["Search categories", "搜尋分類", "カテゴリを検索"],
   "未知专辑": ["Unknown album", "未知專輯", "不明なアルバム"],

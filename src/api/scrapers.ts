@@ -74,6 +74,7 @@ export interface ScrapedItem {
   tracks?: ScrapedTrack[];
 }
 export interface ScrapeCandidate extends ScrapedItem { candidateToken: string }
+export interface RankedAlbumCandidate extends ScrapeCandidate { pluginId: string }
 export interface SavedScrapedField { field: string; pluginId: string; item: ScrapedItem }
 export type AlbumMergeField = "name" | "artist" | "releaseDate" | "publisher" | "genre" | "description" | "cover" | "tracks";
 export interface TrackMediaSelection {
@@ -148,6 +149,15 @@ export class ScrapersApi {
     return items(result, (entry): entry is SavedScrapedField => record(entry) && nonempty(entry.field) &&
       ["albumDetails", "albumTracks", "artwork"].includes(entry.field) &&
       nonempty(entry.pluginId) && isItem(entry.item));
+  }
+  async autoAlbumCandidates(albumId: string, provider: string, signal?: AbortSignal): Promise<RankedAlbumCandidate[]> {
+    const result = await this.client.request<unknown>(`/library/albums/${encodeURIComponent(albumId)}/auto-scrape`, {
+      method: "POST", body: provider === "all" ? {} : { providerInstanceId: provider }, signal, timeoutMs: 120_000,
+    });
+    const candidates = items(result, (entry): entry is RankedAlbumCandidate => isItem(entry) &&
+      "candidateToken" in entry && nonempty(entry.candidateToken) && "pluginId" in entry && nonempty(entry.pluginId));
+    if (candidates.length > 3) throw new ApiError("INVALID_RESPONSE", "Too many ranked album candidates");
+    return candidates;
   }
   async clearAlbum(albumId: string, expectedRevision: number, key: string): Promise<void> {
     const result = await this.client.request<unknown>(`/library/albums/${encodeURIComponent(albumId)}/scraped-fields`, {

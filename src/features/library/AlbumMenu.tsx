@@ -22,9 +22,10 @@ interface Props {
   close: () => void;
   provider: string;
   openAlbum: (id: string) => void;
+  autoScrape: (album: MusicCategory) => void;
 }
 
-export function AlbumMenu({ menu, close, provider, openAlbum }: Props) {
+export function AlbumMenu({ menu, close, provider, openAlbum, autoScrape }: Props) {
   useLocale();
   const services = useServices();
   const active = useRef<LibraryState | null>(null);
@@ -102,6 +103,7 @@ export function AlbumMenu({ menu, close, provider, openAlbum }: Props) {
     {menu && <ContextMenu x={menu.x} y={menu.y} origin={menu.origin} label={menu.item.name || tr("未知专辑")} close={close}
       actions={[
         { label: tr("查看曲目"), icon: "album", run: () => openAlbum(menu.item.id) },
+        ...(menu.item.id ? [{ label: tr("自动刮削"), icon: "search", run: () => autoScrape(menu.item) }] : []),
         trackAction(menu.item, "播放全部", "play", "play"),
         trackAction(menu.item, "下一首播放", "next", "next"),
         trackAction(menu.item, "加入队列", "queue", "queue"),

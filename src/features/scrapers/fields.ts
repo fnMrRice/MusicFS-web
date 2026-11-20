@@ -10,6 +10,18 @@ export function scrapedFieldName(field: string) {
   return Object.hasOwn(labels, field) ? tr(labels[field]) : field;
 }
 
+const albumPlatforms: Record<string, string> = {
+  "musicfs.scraper.musicbrainz": "MusicBrainz",
+  "musicfs.scraper.itunes": "Apple Music (iTunes)",
+  "musicfs.scraper.netease": "网易云音乐",
+  "musicfs.scraper.qqmusic": "QQ 音乐",
+  "musicfs.scraper.bangumi": "Bangumi",
+};
+
+export function albumScraperName(pluginId: string, descriptorName?: string) {
+  return tr(albumPlatforms[pluginId] ?? descriptorName ?? pluginId);
+}
+
 export function externalLink(value?: string): string | undefined {
   if (!value) return undefined;
   try {

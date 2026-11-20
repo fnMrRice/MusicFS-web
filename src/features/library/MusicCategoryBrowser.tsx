@@ -14,17 +14,18 @@ import { ArtistNames, readNamedArtist, type NamedArtist } from "./ArtistNames";
 const labels = { artist: "歌手", album: "专辑", genre: "流派" };
 const unknownLabels = { artist: "未知歌手", album: "未知专辑", genre: "未知流派" };
 type Props = { kind: MusicCategoryKind; provider: string; providers: Provider[]; id: string;
-  unknown: boolean; query: string; navigate: (id: string | null) => void };
+  unknown: boolean; query: string; unscrapedOnly: boolean; navigate: (id: string | null) => void };
 
 export function MusicCategoryBrowser(props: Props) {
   return props.id || props.unknown ? <MusicCategoryTracks {...props} /> : <MusicCategoryList {...props} />;
 }
 
-function MusicCategoryList({ kind, provider, query, navigate }: Props) {
+function MusicCategoryList({ kind, provider, query, unscrapedOnly, navigate }: Props) {
   const api = useServices().musicCatalog;
-  const pages = usePages(`${kind}:${provider}:${query}`, (after, signal) => api.categories(kind, provider, query, after, signal), (item) => item.id);
+  const pages = usePages(`${kind}:${provider}:${query}:${unscrapedOnly}`,
+    (after, signal) => api.categories(kind, provider, query, after, signal, unscrapedOnly), (item) => item.id);
   return <>
-    {kind === "album" ? <AlbumCollection items={pages.items} provider={provider} openAlbum={navigate} /> : <div className="category-cards">
+    {kind === "album" ? <AlbumCollection items={pages.items} provider={provider} openAlbum={navigate} reload={pages.reload} /> : <div className="category-cards">
       {pages.items.map((item) => <button type="button" key={item.id} className="category-card" onClick={() => navigate(item.id)}>
         <span className="category-icon"><Icon name={kind === "artist" ? "user" : "music"} size={25} /></span>
         <span className="category-card-text"><strong>{item.name || tr(unknownLabels[kind])}</strong>
@@ -34,7 +35,7 @@ function MusicCategoryList({ kind, provider, query, navigate }: Props) {
     </div>}
     <ErrorNotice error={pages.error} retry={pages.retry} />
     {pages.loading && <p className="loading" role="status">{tr("正在加载…")}</p>}
-    {!pages.loading && !pages.error && !pages.items.length && <Empty title={tr("暂无可浏览的分类")} />}
+    {!pages.loading && !pages.error && !pages.items.length && <Empty title={tr(unscrapedOnly ? "没有符合条件的未刮削专辑" : "暂无可浏览的分类")} />}
     <Sentinel active={!!pages.cursor && !pages.loading && !pages.error} load={pages.more} />
   </>;
 }
@@ -89,7 +90,7 @@ function MusicCategoryTracks({ kind, provider, providers, id, unknown, query, na
         {!pages.cursor && !pages.error && !pages.loading && <span className="muted">{tr("{0} 首", { 0: pages.items.length })}</span>}
       </div>
     </div>}
-    {album && <AlbumScraping album={album} detailsId={detailsId} detailsOpen={detailsOpen}
+    {album && <AlbumScraping album={album} provider={provider} detailsId={detailsId} detailsOpen={detailsOpen}
       applied={finish} refresh={() => { title.reload(); pages.reload(); }} />}
     {(pages.items.length > 0 || album) && <TrackTable tracks={pages.items} providers={providers} queryKey={scope} libraryProvider={provider}
       hideEmptyTable

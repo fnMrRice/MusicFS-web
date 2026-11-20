@@ -1,4 +1,10 @@
 export default {
+  "本地专辑刮削顺序": ["Local album scraper order", "本機專輯刮削順序", "ローカルアルバムの検索順序"],
+  "按以下顺序查找本地专辑。网易云音乐和 QQ 音乐的专辑优先使用各自的平台。": ["Local albums use the sources below in order. NetEase Cloud Music and QQ Music albums use their own platforms first.", "按以下順序查找本機專輯。網易雲音樂和 QQ 音樂的專輯優先使用各自的平台。", "ローカルアルバムは以下の順序で検索します。NetEase Cloud Music と QQ Music のアルバムはそれぞれのサービスを優先します。"],
+  "添加刮削来源": ["Add a metadata source", "新增刮削來源", "検索元を追加"],
+  "移除 {name}": ["Remove {name}", "移除 {name}", "{name} を削除"],
+  "网易云音乐": ["NetEase Cloud Music", "網易雲音樂", "NetEase Cloud Music"],
+  "QQ 音乐": ["QQ Music", "QQ 音樂", "QQ Music"],
   "插件设置": ["Plugin settings", "外掛程式設定", "プラグイン設定"],
   "正在读取设置…": ["Loading settings…", "正在讀取設定…", "設定を読み込み中…"],
   "保存设置": ["Save settings", "儲存設定", "設定を保存"],

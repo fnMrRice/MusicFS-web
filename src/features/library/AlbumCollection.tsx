@@ -4,6 +4,7 @@ import { useServices, useStore } from "../../app/services";
 import { IconButton } from "../../components/ui";
 import { tr, useLocale } from "../../i18n";
 import { albumDate } from "../scrapers/AlbumMetadata";
+import { AutoAlbumScrape } from "../scrapers/AutoAlbumScrape";
 import { AlbumCover } from "./AlbumCover";
 import { AlbumMenu, type AlbumMenuTarget } from "./AlbumMenu";
 import "./album-collection.css";
@@ -19,12 +20,13 @@ export function AlbumViewSwitch() {
   </div>;
 }
 
-export function AlbumCollection({ items, provider, openAlbum }: {
-  items: MusicCategory[]; provider: string; openAlbum: (id: string) => void;
+export function AlbumCollection({ items, provider, openAlbum, reload }: {
+  items: MusicCategory[]; provider: string; openAlbum: (id: string) => void; reload: () => void;
 }) {
   const { locale } = useLocale();
   const { albumView } = useStore(useServices().preferences);
   const [menu, setMenu] = useState<AlbumMenuTarget | null>(null);
+  const [scrapeTarget, setScrapeTarget] = useState<MusicCategory | null>(null);
 
   function showMenu(item: MusicCategory, origin: HTMLElement) {
     const { left, bottom } = origin.getBoundingClientRect();
@@ -50,7 +52,9 @@ export function AlbumCollection({ items, provider, openAlbum }: {
   }
 
   return <>
-    <AlbumMenu menu={menu} close={() => setMenu(null)} provider={provider} openAlbum={openAlbum} />
+    <AlbumMenu menu={menu} close={() => setMenu(null)} provider={provider} openAlbum={openAlbum} autoScrape={setScrapeTarget} />
+    {scrapeTarget && <AutoAlbumScrape albumId={scrapeTarget.id} name={scrapeTarget.name} provider={provider}
+      close={changed => { setScrapeTarget(null); if (changed) reload(); }} />}
     {albumView === "cards" ? <div className="category-cards album-cards">
       {items.map(item => {
         const name = item.name || tr("未知专辑");

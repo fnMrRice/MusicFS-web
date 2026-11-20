@@ -45,6 +45,29 @@
 .settings-user > button {
   margin-top: 18px;
 }
+.album-auto-settings fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  max-width: 38rem;
+}
+.album-auto-settings ol {
+  padding-inline-start: 1.8rem;
+  margin-block: 12px;
+}
+.album-scraper-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-block: 4px;
+}
+.album-scraper-row span {
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+.album-auto-settings select {
+  margin-inline-end: 10px;
+}
 @media (max-width: 600px) {
   .settings-page .settings-navigation {
     gap: 16px;

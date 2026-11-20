@@ -162,10 +162,11 @@ export class MusicCatalogApi {
     return result;
   }
 
-  async categories(kind: MusicCategoryKind, provider: string, q: string, after: string | null, signal?: AbortSignal) {
+  async categories(kind: MusicCategoryKind, provider: string, q: string, after: string | null, signal?: AbortSignal, unscrapedOnly = false) {
     const params = new URLSearchParams({ limit: "100" });
     if (provider !== "all") params.set("providerInstanceId", provider);
     if (q) params.set("q", q);
+    if (kind === "album" && unscrapedOnly) params.set("unscrapedOnly", "true");
     if (after) params.set("after", after);
     const page = await this.client.request<unknown>(`/library/${kind}s?${params}`, { signal });
     if (!record(page) || !Array.isArray(page.items) || !(page.nextAfter === null || id(page.nextAfter)))

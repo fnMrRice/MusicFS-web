@@ -36,10 +36,11 @@ export function CategoryBrowser({ kind, provider, providers, providerError, relo
   const selected = params.get("categoryId") || "";
   const unknown = kind !== "folder" && params.get("unknownCategory") === "1";
   const inCategory = !!selected || unknown;
+  const unscrapedOnly = kind === "album" && params.get("unscrapedOnly") === "true";
   const query = params.get("categoryQuery") || "";
   const [draft, setDraft] = useState(query);
   const [refresh, setRefresh] = useState(0);
-  const scope = `${kind}:${provider}:${selected}:${query}:${refresh}`;
+  const scope = `${kind}:${provider}:${selected}:${query}:${refresh}:${unscrapedOnly}`;
   useEffect(() => { setDraft(query); }, [query, selected, kind, provider]);
   useEffect(() => { document.querySelector("#page-scroll")?.scrollTo({ top: 0 }); }, [scope]);
   const navigate: Navigate = (id) => {
@@ -63,7 +64,14 @@ export function CategoryBrowser({ kind, provider, providers, providerError, relo
         <option value="all">{tr("全部来源")}</option>
         {providers.map((item) => <option key={item.id} value={item.id}>{sourceName(item)}</option>)}
       </select>
-      {kind === "album" && !inCategory && <AlbumViewSwitch />}
+      {kind === "album" && !inCategory && <>
+        <label className="check-label"><input type="checkbox" checked={unscrapedOnly} onChange={event => {
+          const next = new URLSearchParams(params);
+          if (event.target.checked) next.set("unscrapedOnly", "true"); else next.delete("unscrapedOnly");
+          setParams(next);
+        }} /> {tr("仅显示未刮削专辑")}</label>
+        <AlbumViewSwitch />
+      </>}
       <div className="filter-end">
         <input value={draft} maxLength={256} onChange={(event) => setDraft(event.target.value)}
           aria-label={tr(inCategory ? "搜索当前列表" : "搜索分类")} placeholder={tr(inCategory ? "搜索当前列表" : "搜索分类")} />
@@ -74,7 +82,7 @@ export function CategoryBrowser({ kind, provider, providers, providerError, relo
     </form>
     <ErrorNotice error={providerError} retry={reloadProviders} />
     {kind !== "folder" ? <MusicCategoryBrowser key={`${scope}:${unknown}`} kind={kind} provider={provider} providers={providers}
-      id={selected} unknown={unknown} query={query} navigate={navigate} /> :
+      id={selected} unknown={unknown} query={query} unscrapedOnly={unscrapedOnly} navigate={navigate} /> :
       selected ? <CategoryDetail key={`${kind}:${provider}:${selected}`} api={api} kind={kind} provider={provider} id={selected}
       query={query} refresh={refresh} providers={providers} navigate={navigate} /> :
       <CategoryCollection key={scope} api={api} kind={kind} provider={provider} query={query} providers={providers} navigate={navigate} />}

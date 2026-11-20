@@ -11,12 +11,13 @@ import { AlbumScraperSearch } from "./AlbumScraperSearch";
 import { AlbumEditor } from "./AlbumEditor";
 import { AlbumScrapeClear } from "./AlbumScrapeClear";
 import { AlbumRefresh } from "./AlbumRefresh";
+import { AutoAlbumScrape } from "./AutoAlbumScrape";
 import { AlbumPreviews } from "./album-previews";
 import { externalLink } from "./fields";
 import "./scrapers.css";
 
-export function AlbumScraping({ album, artist, detailsId, detailsOpen, applied, refresh }: {
-  album: MusicAlbum; artist?: string; detailsId: string; detailsOpen: boolean;
+export function AlbumScraping({ album, provider, artist, detailsId, detailsOpen, applied, refresh }: {
+  album: MusicAlbum; provider: string; artist?: string; detailsId: string; detailsOpen: boolean;
   applied: () => void; refresh: () => void;
 }) {
   useLocale();
@@ -28,6 +29,7 @@ export function AlbumScraping({ album, artist, detailsId, detailsOpen, applied, 
   const saved = useResource(`album-scraped:${album.albumId}:${album.revision}`, (signal) => api.savedAlbum(album.albumId, signal));
   const [saving, setSaving] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [autoOpen, setAutoOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [clearTarget, setClearTarget] = useState<MusicAlbum | null>(null);
@@ -36,6 +38,8 @@ export function AlbumScraping({ album, artist, detailsId, detailsOpen, applied, 
   return <>
     {detailsOpen && <section id={detailsId} className="album-metadata" aria-label={tr("专辑详情")}>
       <div className="album-metadata-actions">
+        <button type="button" disabled={saved.loading || !!saved.data?.length} onClick={() => setAutoOpen(true)}
+          title={saved.data?.length ? tr("这张专辑已有刮削资料。") : undefined}>{tr("自动刮削")}</button>
         <button type="button" onClick={() => setSearchOpen(true)}>{tr("搜索")}</button>
         <button type="button" disabled={saved.loading || !linked} onClick={() => setRefreshing(true)}
           title={linked ? undefined : tr("请先在编辑资料中关联平台专辑页面。")}>{tr("刷新资料")}</button>
@@ -46,6 +50,8 @@ export function AlbumScraping({ album, artist, detailsId, detailsOpen, applied, 
       {saved.loading && <p className="muted" role="status">{tr("正在加载…")}</p>}
       {saved.data && <AlbumMetadata key={album.albumId} album={album} fields={saved.data} collapsibleTrackList />}
     </section>}
+    {autoOpen && <AutoAlbumScrape albumId={album.albumId} name={album.name} provider={provider}
+      close={changed => { setAutoOpen(false); if (changed) refresh(); }} />}
     {searchOpen && <Modal title={tr("搜索在线资料")} close={() => { if (!saving) setSearchOpen(false); }}>
       <ErrorNotice error={saved.error} retry={saved.reload} />
       {saved.loading && <p role="status">{tr("正在加载…")}</p>}

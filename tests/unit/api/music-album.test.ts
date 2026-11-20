@@ -7,6 +7,17 @@ const album = { albumId: "album/1", originalName: "Original album", name: "Album
 const reply = (body: unknown) => new Response(JSON.stringify(body));
 
 describe("Music album list", () => {
+  it("retains the unscraped filter, source and search on subsequent album pages", async () => {
+    const fetch = vi.fn().mockImplementation(async () => reply({ items: [], nextAfter: null }));
+    const api = new MusicCatalogApi(new ApiClient(fetch));
+    await api.categories("album", "source", "Album", "cursor", undefined, true);
+    const query = (index: number) => new URL(fetch.mock.calls[index][0], "https://example.org").searchParams;
+    expect(Object.fromEntries(query(0))).toEqual({
+      limit: "100", providerInstanceId: "source", q: "Album", after: "cursor", unscrapedOnly: "true",
+    });
+    await api.categories("artist", "source", "", null, undefined, true);
+    expect(query(1).has("unscrapedOnly")).toBe(false);
+  });
   it("includes release information and accepts albums with missing metadata", async () => {
     const items = [
       { ...album, publisher: "Label", releaseDate: "2025-06", trackCount: 2 },

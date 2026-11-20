@@ -3,6 +3,7 @@ import { tr, useLocale } from "../i18n";
 import { useServices, useStore } from "../app/services";
 import { LanguageSelect } from "../i18n/LanguageSelect";
 import { MusicSources } from "./MusicSources";
+import { AlbumAutoSettings } from "./scrapers/AlbumAutoSettings";
 import { PluginStatus } from "./PluginStatus";
 import { DSPSettings } from "./dsp/DSPSettings";
 import { VolumeSlider } from "../player/VolumeControl";
@@ -45,7 +46,7 @@ export function Settings() {
           tabIndex={-1}
         >
           <h2 id={`settings-heading-${tab.id}`} className="settings-section-title">{tr(tab.label)}</h2>
-          {tab.id === "sources" && <MusicSources />}
+          {tab.id === "sources" && <><MusicSources /><AlbumAutoSettings /></>}
           {tab.id === "plugins" && (
             auth.session?.user.role === "admin" ? <PluginStatus />
               : <div className="settings-card">

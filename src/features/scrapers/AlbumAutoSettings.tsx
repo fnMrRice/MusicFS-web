@@ -1,0 +1,108 @@
+import { useEffect, useRef, useState } from "react";
+import { albumAutoSettings, type AlbumAutoSettings as Preferences } from "../../api/album-auto-settings";
+import { ApiError, errorMessage } from "../../api/client";
+import { ScrapersApi, type Scraper } from "../../api/scrapers";
+import { useServices, useStore } from "../../app/services";
+import { useResource } from "../../components/query";
+import { ErrorNotice } from "../../components/ui";
+import { tr, useLocale } from "../../i18n";
+import { albumScraperName } from "./fields";
+
+export function AlbumAutoSettings() {
+  useLocale();
+  const services = useServices();
+  const auth = useStore(services.auth);
+  const key = `album-auto-settings:${auth.ready?.instanceId}:${auth.session?.user.id}`;
+  const resource = useResource(key, async signal => {
+    const [settings, scrapers] = await Promise.all([
+      albumAutoSettings(services.client, signal), new ScrapersApi(services.client).list(signal),
+    ]);
+    return { settings, scrapers: scrapers.filter(source => !source.requiresExternalId &&
+      source.fields.includes("albumDetails") && source.fields.includes("albumTracks")) };
+  });
+  return <section className="settings-card album-auto-settings" aria-labelledby="album-scraper-priority">
+    <h3 id="album-scraper-priority">{tr("本地专辑刮削顺序")}</h3>
+    <p className="muted">{tr("按以下顺序查找本地专辑。网易云音乐和 QQ 音乐的专辑优先使用各自的平台。")}</p>
+    {resource.loading && <p role="status">{tr("正在读取设置…")}</p>}
+    <ErrorNotice error={resource.error} retry={resource.reload} />
+    {resource.data && <SourceOrder key={key} initial={resource.data.settings} scrapers={resource.data.scrapers} reload={resource.reload} />}
+  </section>;
+}
+
+function SourceOrder({ initial, scrapers, reload }: { initial: Preferences; scrapers: Scraper[]; reload: () => void }) {
+  const { client } = useServices();
+  const [saved, setSaved] = useState(initial);
+  const [order, setOrder] = useState(initial.localPluginOrder);
+  const [saving, setSaving] = useState(false);
+  const [conflict, setConflict] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [confirmed, setConfirmed] = useState(false);
+  const operation = useRef<AbortController | null>(null);
+  const requestKey = useRef<string | null>(null);
+  useEffect(() => () => operation.current?.abort(), []);
+  const dirty = order.length !== saved.localPluginOrder.length || order.some((id, i) => id !== saved.localPluginOrder[i]);
+  const available = scrapers.filter(source => source.available && !order.includes(source.pluginId));
+  function edit(next: string[]) {
+    requestKey.current = null;
+    setOrder(next);
+    setError(null);
+    setConfirmed(false);
+  }
+  function move(from: number, to: number) {
+    const next = [...order];
+    [next[from], next[to]] = [next[to], next[from]];
+    edit(next);
+  }
+  async function save() {
+    if (operation.current || !dirty || conflict) return;
+    const controller = new AbortController();
+    operation.current = controller;
+    requestKey.current ??= crypto.randomUUID();
+    setSaving(true);
+    setError(null);
+    try {
+      const result = await albumAutoSettings(client, controller.signal, {
+        settings: { revision: saved.revision, localPluginOrder: order }, key: requestKey.current,
+      });
+      if (controller.signal.aborted) return;
+      requestKey.current = null;
+      setSaved(result);
+      setOrder(result.localPluginOrder);
+      setConfirmed(true);
+    } catch (cause) {
+      if (controller.signal.aborted) return;
+      const stale = cause instanceof ApiError && (cause.status === 409 || cause.status === 412);
+      setConflict(stale);
+      setError(stale ? "内容已发生变化，请刷新后重新编辑。" : errorMessage(cause));
+    } finally {
+      operation.current = null;
+      if (!controller.signal.aborted) setSaving(false);
+    }
+  }
+  function name(id: string) {
+    return albumScraperName(id, scrapers.find(source => source.pluginId === id)?.name);
+  }
+  return <>
+    <fieldset disabled={saving || conflict} aria-labelledby="album-scraper-priority">
+      <ol>{order.map((id, index) => <li key={id}><div className="album-scraper-row">
+        <span>{name(id)}</span>
+        <button type="button" aria-label={tr("上移 {name}", { name: name(id) })} disabled={index === 0}
+          onClick={() => move(index, index - 1)}>↑</button>
+        <button type="button" aria-label={tr("下移 {name}", { name: name(id) })} disabled={index === order.length - 1}
+          onClick={() => move(index, index + 1)}>↓</button>
+        <button type="button" aria-label={tr("移除 {name}", { name: name(id) })} disabled={order.length === 1}
+          onClick={() => edit(order.filter(value => value !== id))}>{tr("移除")}</button>
+      </div></li>)}</ol>
+      {available.length > 0 && <select aria-label={tr("添加刮削来源")} value="" onChange={e => edit([...order, e.target.value])}>
+        <option value="" disabled>{tr("添加刮削来源")}</option>
+        {available.map(source => <option key={source.pluginId} value={source.pluginId}>{name(source.pluginId)}</option>)}
+      </select>}
+      <button type="button" className="primary" disabled={!dirty} onClick={() => void save()}>
+        {tr(saving ? "正在保存…" : "保存设置")}
+      </button>
+    </fieldset>
+    {confirmed && <p className="feedback" role="status">{tr("设置已保存。")}</p>}
+    <ErrorNotice error={error} />
+    {conflict && <button type="button" onClick={reload}>{tr("重新加载设置")}</button>}
+  </>;
+}
