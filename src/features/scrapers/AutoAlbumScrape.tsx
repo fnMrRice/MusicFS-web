@@ -10,7 +10,8 @@ import { albumLookupMessage, albumSaveMessage } from "./album-search-errors";
 import { albumScraperName } from "./fields";
 
 type Selection = { edition: AlbumEdition; revision: number; key: string };
-type Feedback = { kind: "progress" | "result" | "error"; message: string };
+type Notice = { kind: "progress" | "result" | "error"; message: string };
+type Feedback = Notice | { kind: "confirm"; message: string; accept: () => void };
 
 export function AutoAlbumScrape({ albumId, name, provider, close }: {
   albumId: string; name: string; provider: string; close: (reload: boolean) => void;
@@ -29,8 +30,20 @@ export function AutoAlbumScrape({ albumId, name, provider, close }: {
     const controller = new AbortController();
     const signal = controller.signal;
     active.current = controller;
-    function show(kind: Feedback["kind"], message: string) {
+    function show(kind: Notice["kind"], message: string) {
       if (!signal.aborted) setFeedback({ kind, message });
+    }
+    function confirmReplacement(edition: AlbumEdition) {
+      return new Promise<boolean>(resolve => {
+        const cancel = () => resolve(false);
+        signal.addEventListener("abort", cancel, { once: true });
+        setFeedback({ kind: "confirm",
+          message: tr("将采用 {0} 的《{1}》，更新已保存的平台专辑资料和曲目表。", {
+            0: albumScraperName(edition.pluginId), 1: edition.details.title,
+          }),
+          accept: () => { signal.removeEventListener("abort", cancel); resolve(true); },
+        });
+      });
     }
     async function save(choice: Selection) {
       const { edition, revision, key } = choice;
@@ -68,11 +81,7 @@ export function AutoAlbumScrape({ albumId, name, provider, close }: {
       show("progress", tr("正在查询资料…"));
       // 先读取修订，再检查已存资料。两次读取后的并发编辑由保存时的修订检查保护。
       const album = await services.musicCatalog.album(albumId, signal);
-      if ((await api.savedAlbum(albumId, signal)).length) {
-        reload.current = true;
-        show("result", tr("这张专辑已有刮削资料。"));
-        return;
-      }
+      const hasSavedFields = (await api.savedAlbum(albumId, signal)).length > 0;
       const requestedAt = Date.now();
       const candidates = await api.autoAlbumCandidates(albumId, provider, signal);
       const previews = new AlbumPreviews(api);
@@ -89,6 +98,8 @@ export function AutoAlbumScrape({ albumId, name, provider, close }: {
           lastFailure = albumLookupMessage(cause);
           continue;
         }
+        signal.throwIfAborted();
+        if (hasSavedFields && !await confirmReplacement(edition)) return;
         signal.throwIfAborted();
         const rejected = await save({ edition, revision: album.revision, key: crypto.randomUUID() });
         if (!rejected) return;
@@ -110,5 +121,9 @@ export function AutoAlbumScrape({ albumId, name, provider, close }: {
     <p><strong>{name}</strong></p>
     {feedback.kind === "error" ? <ErrorNotice error={feedback.message} retry={() => setAttempt(value => value + 1)} />
       : <p role="status">{feedback.message}</p>}
+    {feedback.kind === "confirm" && <div className="album-search-actions">
+      <button type="button" onClick={dismiss}>{tr("取消")}</button>
+      <button type="button" className="primary" onClick={feedback.accept}>{tr("确认更新")}</button>
+    </div>}
   </Modal>;
 }

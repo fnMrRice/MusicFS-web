@@ -38,8 +38,7 @@ export function AlbumScraping({ album, provider, artist, detailsId, detailsOpen,
   return <>
     {detailsOpen && <section id={detailsId} className="album-metadata" aria-label={tr("专辑详情")}>
       <div className="album-metadata-actions">
-        <button type="button" disabled={saved.loading || !!saved.data?.length} onClick={() => setAutoOpen(true)}
-          title={saved.data?.length ? tr("这张专辑已有刮削资料。") : undefined}>{tr("自动刮削")}</button>
+        <button type="button" onClick={() => setAutoOpen(true)}>{tr("自动刮削")}</button>
         <button type="button" onClick={() => setSearchOpen(true)}>{tr("搜索")}</button>
         <button type="button" disabled={saved.loading || !linked} onClick={() => setRefreshing(true)}
           title={linked ? undefined : tr("请先在编辑资料中关联平台专辑页面。")}>{tr("刷新资料")}</button>
