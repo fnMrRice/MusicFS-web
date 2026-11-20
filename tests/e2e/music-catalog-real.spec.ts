@@ -25,8 +25,16 @@ test("a track without sources persists in artist, favorites and playlist views",
   const { trackId } = await created.json();
   await expect(form).toHaveCount(0);
   const row = page.locator(".tracks tbody tr").filter({ hasText: title });
+  await expect(row).toHaveCount(0);
+  await page.reload();
+  await expect(row).toHaveCount(0);
+  await page.getByRole("button", { name: "歌手", exact: true }).click();
+  await page.getByRole("button", { name: new RegExp(artist) }).click();
+  await expect(row).toHaveClass(/source-missing/);
   await expect(row.getByRole("button", { name: `播放 ${title}`, exact: true })).toBeDisabled();
   await expect(row).toContainText("暂无来源");
+  expect(await row.locator(".track-play").evaluate((element) => getComputedStyle(element).color))
+    .toBe(await row.evaluate((element) => getComputedStyle(element).color));
   await expect(page.getByRole("button", { name: "播放全部", exact: true })).toBeDisabled();
   await row.getByRole("button", { name: `收藏 ${title}`, exact: true }).click();
   await expect(row.getByRole("button", { name: `取消收藏 ${title}`, exact: true })).toHaveAttribute("aria-pressed", "true");

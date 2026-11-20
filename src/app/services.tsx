@@ -157,7 +157,7 @@ export class Services {
       this.libraries.set(
         provider,
         new LibraryState((p, cursor, signal) =>
-          this.musicCatalog.tracks({ providerInstanceId: p }, cursor, signal),
+          this.musicCatalog.tracks({ providerInstanceId: p, sourceOnly: true }, cursor, signal),
           (items) => this.recordingCovers.reconcile(items.map(displaySource).filter((item) => item !== null), this.coverTracks()),
         ),
       );

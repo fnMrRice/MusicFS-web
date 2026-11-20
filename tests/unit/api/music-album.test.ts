@@ -18,3 +18,19 @@ describe("Music album details", () => {
       await expect(api.album(album.albumId)).rejects.toMatchObject({ code: "INVALID_RESPONSE" });
     });
 });
+
+describe("Music catalog source filter", () => {
+  it.each([true, false, undefined])("preserves the explicit source filter without filtering category requests (%s)", async (sourceOnly) => {
+    const fetch = vi.fn().mockImplementation(async () => reply({ items: [], libraryRevision: "1", matchingRevision: 0, nextAfter: null }));
+    const api = new MusicCatalogApi(new ApiClient(fetch));
+    await api.tracks({ providerInstanceId: "all", sourceOnly }, null);
+    const query = new URL(fetch.mock.calls[0][0], "https://example.org").searchParams;
+    expect(query.get("sourceOnly")).toBe(sourceOnly === undefined ? null : String(sourceOnly));
+    expect(query.has("providerInstanceId")).toBe(false);
+    await api.tracks({ artistId: "artist-1", albumId: "album-1" }, null);
+    const category = new URL(fetch.mock.calls[1][0], "https://example.org").searchParams;
+    expect(category.get("artistId")).toBe("artist-1");
+    expect(category.get("albumId")).toBe("album-1");
+    expect(category.has("sourceOnly")).toBe(false);
+  });
+});
