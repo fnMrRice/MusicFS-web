@@ -85,3 +85,31 @@ test("album details support an empty ranked search without changing the album", 
   await expect(page.getByRole("dialog").getByRole("status")).toHaveText("没有匹配的资料。");
   expect(state.writes).toHaveLength(0);
 });
+
+test("auto-scrape uses the third release after an expired and an invalid candidate", async ({ page }) => {
+  await mock(page);
+  const pluginId = "musicfs.scraper.musicbrainz";
+  const ids = ["expired", "invalid", "complete"];
+  const submitted: string[] = [];
+  await page.route("**/api/v1/library/albums/one/auto-scrape", route => route.fulfill({
+    json: { items: ids.map(id => ({ id, title: id, pluginId, candidateToken: id })) },
+  }));
+  await page.route("**/api/v1/scrapers/musicfs.scraper.musicbrainz/search", route => {
+    const id = route.request().postDataJSON().query.externalId;
+    return route.fulfill({ json: { items: [{ ...completeCandidate, id, candidateToken: id + "-tracks" }] } });
+  });
+  await page.route("**/api/v1/library/albums/one/scraped-fields", route => {
+    if (route.request().method() === "GET") return route.fulfill({ json: { items: [] } });
+    const id = route.request().postDataJSON().candidates.albumDetails;
+    submitted.push(id);
+    if (id === "expired") return route.fulfill({ status: 404,
+      json: { error: { code: "NOT_FOUND", message: "Scraper candidate expired or unavailable" } } });
+    if (id === "invalid") return route.fulfill({ status: 400, json: { error: { code: "INVALID_ARGUMENT" } } });
+    return route.fulfill({ json: { revision: 2 } });
+  });
+  await openAlbum(page, origin, false);
+  await detailsToggle(page).click();
+  await details(page).getByRole("button", { name: "自动刮削", exact: true }).click();
+  await expect(page.getByRole("dialog").getByRole("status")).toHaveText("已采用 MusicBrainz 的《complete》。");
+  expect(submitted).toEqual(ids);
+});

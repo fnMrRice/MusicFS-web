@@ -50,6 +50,8 @@ export function AutoAlbumScrape({ albumId, name, provider, close }: {
         reload.current = uncertain || cause instanceof ApiError && cause.status === 409;
         const message = uncertain ? withRequestId("保存结果待确认，请重试或关闭后刷新。", cause) : albumSaveMessage(cause, "selection");
         // 只在服务端明确拒绝候选资料时换用下一项。
+        if (cause instanceof ApiError && cause.code === "NOT_FOUND" && cause.message === "Scraper candidate expired or unavailable")
+          return withRequestId("预览资料已失效，请刷新预览。", cause);
         if (cause instanceof ApiError && cause.status === 400 && cause.code === "INVALID_ARGUMENT") return message;
         show("error", message);
       } finally {
