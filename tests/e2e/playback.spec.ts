@@ -166,7 +166,7 @@ test('keyboard reaches scrollable library and final minimal player controls', as
   await expect(page.getByRole('button', { name: '停止', exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: '暂停', exact: true }).scrollIntoViewIfNeeded();
   await expect(page.getByRole('button', { name: '暂停', exact: true })).toBeInViewport();
-  await expect(page.getByRole('button', { name: '播放模式：顺序播放，点击切换', exact: true })).toBeInViewport();
+  await expect(page.getByRole('button', { name: '播放模式：顺序播放', exact: true })).toBeInViewport();
   await page.screenshot({ path: info.outputPath('minimal-web.png'), fullPage: true });
   await page.getByRole('region', { name: '播放器', exact: true }).screenshot({ path: info.outputPath('player-detail.png') });
   await page.getByRole('button', { name: '暂停', exact: true }).click();

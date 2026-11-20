@@ -163,7 +163,8 @@ test('both pinned panels stay visible and fit together on desktop and mobile', a
   expect(await audio.getAttribute('src')).toBe(source); expect(creates).toEqual(['Alpha']); expect(errors).toEqual([]);
   await page.reload();
   await expectQueue(page); await expect(lyrics(page)).toBeDisabled();
-  await play(page); await expect(lyricsDialog).toBeVisible(); await expectQueue(page);
+  await queueDialog.getByRole('button', { name: 'Alpha.wav', exact: true }).click();
+  await waitPlaying(page); await expect(lyricsDialog).toBeVisible(); await expectQueue(page);
   await page.getByRole('button', { name: '取消固定播放队列' }).click();
   await expect(queueDialog).toBeVisible(); await expect(lyricsDialog).toBeVisible();
   await page.getByRole('button', { name: '取消固定歌词' }).click();
@@ -206,13 +207,15 @@ for (const viewport of [{ width: 1200, height: 900 }, { width: 390, height: 844 
     await page.getByRole('button', { name: '加入队列', exact: true }).click();
     await queue(page).click(); await expectQueue(page);
     const title = await panel(page).getByRole('heading', { name: '播放队列', exact: true }).boundingBox();
+    const count = await panel(page).getByText('30 首', { exact: true }).boundingBox();
     const shuffle = await page.getByRole('button', { name: '打乱队列', exact: true }).boundingBox();
     const pin = await page.getByRole('button', { name: '固定播放队列', exact: true }).boundingBox();
     const end = await close(page).boundingBox();
-    expect(shuffle!.x).toBeGreaterThanOrEqual(title!.x + title!.width);
+    expect(count!.x).toBeGreaterThanOrEqual(title!.x + title!.width);
+    expect(shuffle!.x).toBeGreaterThanOrEqual(count!.x + count!.width);
     expect(pin!.x).toBeGreaterThanOrEqual(shuffle!.x + shuffle!.width);
     expect(end!.x).toBeGreaterThanOrEqual(pin!.x + pin!.width);
-    const centers = [title!, shuffle!, pin!, end!].map((box) => box.y + box.height / 2);
+    const centers = [title!, count!, shuffle!, pin!, end!].map((box) => box.y + box.height / 2);
     expect(Math.max(...centers) - Math.min(...centers)).toBeLessThanOrEqual(2);
     expect(await panel(page).evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
@@ -222,7 +225,7 @@ for (const viewport of [{ width: 1200, height: 900 }, { width: 390, height: 844 
     await expect(queue(page)).toHaveAttribute('aria-pressed', 'true');
     for (const input of ['mouse', 'keyboard'] as const) evidence.push(await tooltipGeometry(page, info, '取消固定播放队列', input, `${viewport.width}-queue-unpin`));
     for (const input of ['mouse', 'keyboard'] as const) evidence.push(await tooltipGeometry(page, info, '关闭面板', input, `${viewport.width}-queue-close`));
-    await info.attach('queue-header-and-tooltip-geometry', { body: JSON.stringify({ viewport, title, shuffle, pin, close: end, evidence }, null, 2), contentType: 'application/json' });
+    await info.attach('queue-header-and-tooltip-geometry', { body: JSON.stringify({ viewport, title, count, shuffle, pin, close: end, evidence }, null, 2), contentType: 'application/json' });
     expect(creates).toEqual([]); expect(errors).toEqual([]);
   });
 }
@@ -254,7 +257,7 @@ test('refresh restores shuffled pinned queue, selected entry and mode without re
   await pinQueue(page);
   const buttons = page.locator('.queue-list button');
   await buttons.nth(4).click(); await waitPlaying(page);
-  await page.getByRole('button', { name: '播放模式：顺序播放，点击切换', exact: true }).click();
+  await page.getByRole('button', { name: '播放模式：顺序播放', exact: true }).click();
   await page.getByRole('button', { name: '打乱队列', exact: true }).click();
   await expect.poll(() => buttons.allTextContents()).not.toEqual(original);
   const shuffled = await buttons.allTextContents();
@@ -268,7 +271,7 @@ test('refresh restores shuffled pinned queue, selected entry and mode without re
   await expect(buttons).toHaveText(shuffled);
   await expect(buttons.nth(selectedIndex)).toHaveAttribute('aria-current', 'true');
   await expect(page.locator('.queue-list button[aria-current="true"]')).toHaveCount(1);
-  await expect(page.getByRole('button', { name: '播放模式：列表循环，点击切换', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '播放模式：列表循环', exact: true })).toBeVisible();
   await expect(page.locator('audio')).toHaveCount(0);
   expect(creates).toEqual(['Beta']);
   await buttons.nth(selectedIndex).click(); await waitPlaying(page);

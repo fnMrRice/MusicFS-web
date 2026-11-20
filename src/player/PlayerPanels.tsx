@@ -98,9 +98,12 @@ export function PlayerPanels({ track }: { track: SourceTrack | null }) {
                   <div className="player-panel-heading">
                     <h2>{tr(names[panel])}</h2>
                     {isQueue && (
-                      <button className="shuffle-queue" disabled={queue.items.length < 2} onClick={() => s.shuffleQueue()}>
-                        <Icon name="shuffle" size={16} />{tr("打乱队列")}
-                      </button>
+                      <>
+                        <span className="muted">{tr("{0} 首", { 0: queue.items.length })}</span>
+                        <button className="shuffle-queue" disabled={queue.items.length < 2} onClick={() => s.shuffleQueue()}>
+                          <Icon name="shuffle" size={16} />{tr("打乱队列")}
+                        </button>
+                      </>
                     )}
                   </div>
                   <IconButton icon="pin" className={`pin-panel ${isQueue ? "pin-queue" : "pin-lyrics"}`}
@@ -108,24 +111,19 @@ export function PlayerPanels({ track }: { track: SourceTrack | null }) {
                   <IconButton icon="close" label={tr("关闭面板")}
                     onClick={() => setOpen(previous => ({ ...previous, [panel]: false }))} />
                 </div>
-                {isQueue ? (
-                  <>
-                    <p className="muted">{tr("临时播放列表 · {0} 首", { 0: queue.items.length })}</p>
-                    {queue.items.length ? (
-                      <ol className="queue-list">
-                        {queue.items.map((t, i) => (
-                          <li key={`${t.sourceTrackId}:${i}`}>
-                            <button className={queue.index === i ? "selected" : ""}
-                              aria-current={queue.index === i ? "true" : undefined}
-                              onClick={() => s.playQueueIndex(i)}>
-                              {t.title || t.displayName}
-                            </button>
-                          </li>
-                        ))}
-                      </ol>
-                    ) : <p className="muted">{tr("还没有加入曲目")}</p>}
-                  </>
-                ) : <MediaPanel track={track} />}
+                {!isQueue ? <MediaPanel track={track} /> : queue.items.length ? (
+                  <ol className="queue-list">
+                    {queue.items.map((t, i) => (
+                      <li key={`${t.sourceTrackId}:${i}`}>
+                        <button className={queue.index === i ? "selected" : ""}
+                          aria-current={queue.index === i ? "true" : undefined}
+                          onClick={() => s.playQueueIndex(i)}>
+                          {t.title || t.displayName}
+                        </button>
+                      </li>
+                    ))}
+                  </ol>
+                ) : <p className="muted">{tr("还没有加入曲目")}</p>}
               </div>
             );
           })}

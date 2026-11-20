@@ -93,7 +93,6 @@ export default {
   "外观": ["Appearance", "外觀", "外観"],
   "外观与语言": ["Appearance & language", "外觀與語言", "外観と言語"],
   "关于": ["About", "關於", "このサービスについて"],
-  "这些偏好仅保存在当前浏览器，按实例和账号区分。": ["These preferences are saved in this browser for each server instance and account.", "這些偏好僅儲存在目前瀏覽器，依執行個體和帳號區分。", "これらの設定は、サーバーとアカウントごとにこのブラウザーに保存されます。"],
   "请求服务端处理，降低 6 dB（下一首生效）": ["Request server processing at −6 dB (from the next track)", "要求伺服器處理，降低 6 dB（下一首生效）", "サーバー処理で 6 dB 下げる（次の曲から適用）"],
   "服务端处理（降低 6 dB，下一首生效）": ["Server processing (−6 dB, from the next track)", "伺服器處理（降低 6 dB，下一首生效）", "サーバー処理（−6 dB、次の曲から適用）"],
   "服务端根据实际插件能力协商输出；播放器会显示最终生效的处理。音量调节在浏览器中完成。": ["The server selects output based on available plugins. The player shows the processing applied. Volume is adjusted in your browser.", "伺服器依實際外掛能力選擇輸出；播放器會顯示生效的處理。音量在瀏覽器中調整。", "サーバーがプラグインの機能に応じて出力を選びます。適用された処理はプレーヤーに表示されます。音量はブラウザーで調整します。"],

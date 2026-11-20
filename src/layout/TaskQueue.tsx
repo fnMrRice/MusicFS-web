@@ -62,7 +62,7 @@ export function TaskQueue() {
         </ul>
         {value.nextCursor && <button className={styles.more} type="button" disabled={value.loading} onClick={() => void services.tasks.more()}>{tr("加载更多")}</button>}
       </div>
-      <p className={styles.note}>{tr("离开当前页面后，任务仍会继续。中断不会撤销已完成的结果。")}</p>
+      <p className={styles.note}>{tr("离开当前页面后，任务仍会继续。")}</p>
     </section>}
   </div>;
 }

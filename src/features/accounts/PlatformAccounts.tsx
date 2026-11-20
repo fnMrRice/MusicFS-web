@@ -24,7 +24,7 @@ export function PlatformAccount({ instance }: { instance: OnlineInstance }) {
   const modalLogin = instance.platform === "netease";
   const status = !account ? "正在读取账号状态…"
     : account.state === "signedOut" || account.state === "canceled"
-      ? `尚未登录${name}，登录后可使用此音乐来源。`
+      ? null
       : states[account.state] ?? account.state;
 
   const loginActions = <div className="platform-account-actions">
@@ -40,7 +40,7 @@ export function PlatformAccount({ instance }: { instance: OnlineInstance }) {
         onClick={() => { void startLogin(); }}>登录</button>}
     </div>
     {signedIn && account ? <AccountProfile key={`${account.accountId}:${account.avatarUrl}`} account={account} />
-      : <p className="muted" aria-live="polite">{status}</p>}
+      : status && <p className="muted" aria-live="polite">{status}</p>}
     {error && !dialogOpen && <p role="alert">{error}</p>}
     {instance.availability === "offline" && <p className="muted">此音乐来源暂时离线，请稍后重试。</p>}
     {options && !options.configured && <p className="muted">请先在服务端配置 Apple Music 开发者授权。</p>}

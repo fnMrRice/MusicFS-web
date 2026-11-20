@@ -24,7 +24,7 @@ export default {
   "部分内容未能更新，请检查来源状态。": ["Some content could not be updated. Check the source status.", "部分內容未能更新，請檢查來源狀態。", "一部の内容を更新できませんでした。ソースの状態を確認してください。"],
   "取消目录 {0} 的刷新": ["Cancel refresh for {0}", "取消目錄 {0} 的重新整理", "{0} の更新をキャンセル"],
   "中断目录 {0} 的刷新": ["Stop refresh for {0}", "中斷目錄 {0} 的重新整理", "{0} の更新を中断"],
-  "离开当前页面后，任务仍会继续。中断不会撤销已完成的结果。": ["Tasks continue when you leave this page. Stopping keeps completed results.", "離開目前頁面後，任務仍會繼續。中斷不會撤銷已完成的結果。", "ページを離れてもタスクは続行されます。中断しても完了した結果は保持されます。"],
+  "离开当前页面后，任务仍会继续。": ["Tasks continue when you leave this page.", "離開目前頁面後，任務仍會繼續。", "ページを離れてもタスクは続行されます。"],
   "已加入 {0} 个目录，{1} 个目录已在队列中。": ["Added {0} folders; {1} already queued.", "已加入 {0} 個目錄，{1} 個目錄已在佇列中。", "{0} 個のフォルダーを追加、{1} 個は登録済みです。"],
   "正在加入队列…": ["Adding to queue…", "正在加入佇列…", "キューに追加中…"],
   "继续确认": ["Check submission", "繼續確認", "送信結果を確認"],

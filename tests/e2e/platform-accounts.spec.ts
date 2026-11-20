@@ -12,7 +12,6 @@ test.afterAll(async () => { await server?.stop(); });
 type Account = { state: string; [key: string]: unknown };
 type AccountAction = { action: string; loginId?: string };
 const avatarUrl = "https://p1.music.126.net/fixture-avatar.png";
-const signedOutMessage = "尚未登录网易云音乐，登录后可使用此音乐来源。";
 const listener: Account = { state: "signedIn", accountId: "fixture", displayName: "测试听众", avatarUrl };
 const waiting = (loginId = "challenge"): Account => ({
   state: "waiting", method: "qr", loginId,
@@ -81,7 +80,8 @@ test("platform login opens a loading dialog, renders QR pixels and account ident
   const heading = page.getByRole("heading", { name: "网易云音乐", exact: true });
   const login = page.getByRole("button", { name: "登录网易云音乐", exact: true });
   await expect(page.getByText("测试来源", { exact: false })).toHaveCount(0);
-  await expect(page.getByText(signedOutMessage, { exact: true })).toBeVisible();
+  await expect(login).toBeEnabled();
+  await expect(page.getByText("尚未登录网易云音乐，登录后可使用此音乐来源。", { exact: true })).toHaveCount(0);
   await expect(login).toHaveText("登录");
   for (const width of [1200, 390]) {
     await page.setViewportSize({ width, height: 900 });
@@ -122,7 +122,6 @@ test("platform login opens a loading dialog, renders QR pixels and account ident
   await page.goto(`${server.origin}/#/settings`);
   await page.getByRole("button", { name: "退出网易云音乐账号", exact: true }).click();
   await expect(login).toBeEnabled();
-  await expect(page.getByText(signedOutMessage, { exact: true })).toBeVisible();
   await expect(avatar).toHaveCount(0);
   await expect(page.getByText("测试听众", { exact: true })).toHaveCount(0);
   await expect(page).toHaveURL(/\/settings$/);
@@ -146,7 +145,7 @@ test("closing during begin keeps its late challenge out of a reopened login dial
   await expect.poll(() => begins).toBe(1);
   await dialog.getByRole("button", { name: "关闭", exact: true }).click();
   await expect(dialog).not.toBeVisible();
-  await expect(page.getByText(signedOutMessage, { exact: true })).toBeVisible();
+  await expect(login).toBeEnabled();
   await login.click();
   await expect(dialog.getByRole("status")).toHaveText("正在加载二维码");
   firstBegin.resolve(waiting("obsolete-challenge"));
@@ -178,7 +177,6 @@ test("Escape cancels an in-flight poll and ignores its late successful result", 
   // Let the browser process the delayed response before checking account state.
   await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
   await expect(login).toBeEnabled();
-  await expect(page.getByText(signedOutMessage, { exact: true })).toBeVisible();
   await expect(page.getByText("测试听众", { exact: true })).toHaveCount(0);
   await expect(page.getByAltText("测试听众的头像", { exact: true })).toHaveCount(0);
 });

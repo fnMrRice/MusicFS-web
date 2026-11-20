@@ -70,9 +70,6 @@ function AppearanceSettings() {
   const prefs = useStore(s.preferences);
   return (
       <div className="settings-card appearance-language">
-        <p className="muted">
-          {tr("这些偏好仅保存在当前浏览器，按实例和账号区分。")}
-        </p>
         <div className="theme-choices">
           <button
             aria-pressed={prefs.theme === "dark"}

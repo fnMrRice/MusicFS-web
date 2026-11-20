@@ -367,6 +367,12 @@
   .player-panels {
     --panel-bottom: 148px;
   }
+  .player-panel[data-panel="queue"] {
+    padding-inline: 12px;
+  }
+  .shuffle-queue {
+    padding-inline: 10px;
+  }
   .playback-message {
     bottom: 145px;
     left: 12px;

@@ -36,8 +36,6 @@ export function Favorites() {
     {tracks.length > 0 && <TrackTable tracks={tracks} providers={providers.data ?? []}
       queryKey={`favorites:${provider}`} complete={favorites.loaded && !favorites.loading && !favorites.error} />}
     {favorites.loading && <p className="loading" role="status">{tr("正在加载…")}</p>}
-    {favorites.loaded && !favorites.loading && !favorites.error && !tracks.length && <Empty title={tr("暂无收藏音乐")} icon="heart">
-      {tr("在曲目上点击右键，选择收藏，即可在这里找到。")}
-    </Empty>}
+    {favorites.loaded && !favorites.loading && !favorites.error && !tracks.length && <Empty title={tr("暂无收藏音乐")} icon="heart" />}
   </section>;
 }

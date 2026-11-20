@@ -63,7 +63,7 @@ async function setup(page: Page, count = 3, failPlayback = false) {
   return { creates, errors };
 }
 
-const mode = (page: Page, name: string) => page.getByRole('button', { name: `播放模式：${name}，点击切换`, exact: true });
+const mode = (page: Page, name: string) => page.getByRole('button', { name: `播放模式：${name}`, exact: true });
 async function setMode(page: Page, name: string): Promise<void> {
   const button = page.getByRole('button', { name: /^播放模式：/ });
   for (let attempt = 0; attempt < 4; attempt++) {
