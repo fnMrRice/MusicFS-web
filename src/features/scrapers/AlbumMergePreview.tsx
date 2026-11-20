@@ -4,6 +4,7 @@ import type { AlbumMergeField, SavedScrapedField, ScrapeCandidate } from "../../
 import { tr, useLocale } from "../../i18n";
 import { AlbumCover } from "../library/AlbumCover";
 import { albumDate, genreName } from "./AlbumMetadata";
+import { TrackCredits } from "./ScrapedPreview";
 
 export interface AlbumMergeSnapshot {
   album: MusicAlbum;
@@ -62,6 +63,7 @@ export function AlbumMergePreview({ snapshot, saving, locked, merge }: {
             <strong>{tr("{0} 首", { 0: tracks.tracks!.length })}</strong>
             <ol className="album-compare-tracks album-compare-platform" aria-label={tr("平台曲目表")}>{tracks.tracks!.map((track, index) => <li key={index}>
               <span>{track.disc ? `${track.disc}.${track.number || index + 1}` : track.number || index + 1} {track.title}</span>
+              <TrackCredits track={track} />
             </li>)}</ol>
           </> : display(item.field, item.incoming)}
         {!item.incoming && item.current && item.field !== "name" && <small className="muted">{tr("平台没有此项，勾选后会清空当前值。")}</small>}

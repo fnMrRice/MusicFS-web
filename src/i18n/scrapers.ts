@@ -69,6 +69,7 @@ export default {
   "补充信息": ["Additional information", "補充資訊", "追加情報"],
   "曲目表": ["Track list", "曲目表", "曲目一覧"],
   "曲序": ["Track", "曲序", "曲順"],
+  "作曲": ["Composer", "作曲", "作曲"],
   "封面": ["Artwork", "封面", "カバー"],
   "在平台查看": ["View on platform", "在平台查看", "配信元で見る"],
   "{0} 的专辑封面": ["Album artwork for {0}", "{0} 的專輯封面", "{0} のアルバムカバー"],

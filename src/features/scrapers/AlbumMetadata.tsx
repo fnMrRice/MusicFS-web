@@ -55,6 +55,7 @@ export function AlbumMetadata({ album, fields, collapsibleTrackList = false }: {
     </article>
     {fields.filter((entry) => entry.field !== "albumDetails").map(({ field, item }) => {
     const heading = field === "albumTracks" ? "曲目表" : "封面";
+    const hasComposer = item.tracks?.some(track => track.composer);
     return <article className="album-metadata-section" key={field}>
       <header><h3>{field === "albumTracks" && collapsibleTrackList && item.tracks?.length
         ? <button type="button" className="album-tracklist-toggle" aria-expanded={expanded} aria-controls={trackListId}
@@ -66,10 +67,12 @@ export function AlbumMetadata({ album, fields, collapsibleTrackList = false }: {
       {field === "albumTracks" && !!item.tracks?.length && <div id={trackListId} className="album-tracklist-wrap" hidden={!showTracks}>
         {showTracks && <table className="album-tracklist">
           <caption className="sr-only">{tr("专辑曲目")}</caption>
-          <thead><tr><th>{tr("曲序")}</th><th>{tr("曲名")}</th><th>{tr("艺人")}</th><th>{tr("时长")}</th></tr></thead>
+          <thead><tr><th>{tr("曲序")}</th><th>{tr("曲名")}</th><th>{tr("艺人")}</th>
+            {hasComposer && <th>{tr("作曲")}</th>}<th>{tr("时长")}</th></tr></thead>
           <tbody>{item.tracks.map((track, index) => <tr key={index}>
             <td>{track.disc ? `${track.disc}.${track.number || index + 1}` : track.number || index + 1}</td>
             <td>{track.title}</td><td>{track.artist || "—"}</td>
+            {hasComposer && <td>{track.composer || "—"}</td>}
             <td>{track.duration ? duration(track.duration * 1000) : "—"}</td>
           </tr>)}</tbody>
         </table>}

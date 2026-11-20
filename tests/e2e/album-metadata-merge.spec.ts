@@ -145,6 +145,25 @@ test("refresh compares current and platform values without writing and cancel pr
   expect({ album: state.album, saved: state.saved }).toEqual(before);
 });
 
+test("the album track list and refresh preview show artist and composer separately from the title", async ({ page }) => {
+  const state = await linkedAlbum(page);
+  const track = { title: "鳥", artist: "幸祜 & 春猿火", composer: "Guiano", disc: 1, number: 6 };
+  state.platformTracks = [track];
+  state.saved.push({ field: "albumTracks", pluginId: "album-source", item: { ...candidate, tracks: [track] } });
+  await openDetails(page);
+  await details(page).getByRole("button", { name: "曲目表", exact: true }).click();
+  const table = details(page).getByRole("table", { name: "专辑曲目" });
+  await expect(table.getByRole("columnheader", { name: "作曲" })).toBeVisible();
+  const row = table.getByRole("row").filter({ has: page.getByRole("cell", { name: "鳥", exact: true }) });
+  await expect(row.getByRole("cell", { name: track.artist, exact: true })).toBeVisible();
+  await expect(row.getByRole("cell", { name: track.composer, exact: true })).toBeVisible();
+  const panel = await refresh(page);
+  const incoming = panel.getByRole("list", { name: "平台曲目表" }).getByRole("listitem");
+  await expect(incoming.getByText("1.6 鳥", { exact: true })).toBeVisible();
+  await expect(incoming.getByText("艺人 · " + track.artist, { exact: true })).toBeVisible();
+  await expect(incoming.getByText("作曲 · " + track.composer, { exact: true })).toBeVisible();
+});
+
 test("the merge dialog reports invalid library metadata without discarding selected fields", async ({ page }) => {
   const state = await linkedAlbum(page);
   await page.route("**/api/v1/library/albums/one/metadata-merge", route => route.fulfill({ status: 400,

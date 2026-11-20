@@ -49,6 +49,7 @@ export interface ScrapedTrack {
   localizedTitles?: LocalizedTitle[];
   localizedArtistNames?: LocalizedTitle[];
   artist?: string;
+  composer?: string;
   disc?: number;
   number?: number;
   duration?: number;
@@ -95,6 +96,7 @@ function isTrack(value: unknown): value is ScrapedTrack {
     (value.localizedTitles === undefined || Array.isArray(value.localizedTitles) && value.localizedTitles.every(isLocalizedTitle)) &&
     (value.localizedArtistNames === undefined || Array.isArray(value.localizedArtistNames) && value.localizedArtistNames.every(isLocalizedTitle)) &&
     (value.artist === undefined || typeof value.artist === "string") &&
+    (value.composer === undefined || typeof value.composer === "string") &&
     ["disc", "number", "duration"].every((key) => value[key] === undefined || numeric(value[key]));
 }
 function isItem(value: unknown): value is ScrapedItem {
