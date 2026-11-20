@@ -100,6 +100,20 @@ test("refresh compares current and platform values without writing and cancel pr
   expect({ album: state.album, saved: state.saved }).toEqual(before);
 });
 
+test("the merge dialog reports invalid library metadata without discarding selected fields", async ({ page }) => {
+  const state = await linkedAlbum(page);
+  await page.route("**/api/v1/library/albums/one/metadata-merge", route => route.fulfill({ status: 400,
+    json: { error: { code: "INVALID_ARGUMENT", message: "Invalid music library metadata", requestId: "merge-bad-metadata" } } }));
+  await openDetails(page);
+  const panel = await refresh(page);
+  await selectOnly(panel, "曲目表");
+  await panel.getByRole("button", { name: "合并选中资料" }).click();
+  await expect(panel.getByRole("alert")).toContainText("平台返回的曲名或其他音乐资料格式不符合曲库要求");
+  await expect(panel.getByRole("alert")).toContainText("请求编号：merge-bad-metadata");
+  await expect(panel.getByRole("checkbox", { name: "曲目表", exact: true })).toBeChecked();
+  expect(state.album.revision).toBe(1);
+});
+
 test("selecting only the display name preserves every other field and the existing track list", async ({ page }) => {
   const state = await linkedAlbum(page);
   const before = structuredClone({ album: state.album, saved: state.saved });

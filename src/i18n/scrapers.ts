@@ -1,4 +1,8 @@
 export default {
+  "平台返回的曲名或其他音乐资料格式不符合曲库要求。请核对平台资料，或尝试其他发行版。": ["A track title or another metadata field from the platform has a format the library cannot store. Check the platform metadata or try another release.", "平台返回的曲名或其他音樂資料格式不符合曲庫要求。請核對平台資料，或嘗試其他發行版本。", "配信元の曲名または他の音楽情報がライブラリに保存できない形式です。配信元の情報を確認するか、別のリリースを試してください。"],
+  "这份专辑资料未通过保存校验。请返回搜索结果，核对发行版和完整曲目表，或改选其他版本。": ["The album metadata failed validation. Return to the results and check the release and its full track list, or select another edition.", "這份專輯資料未通過儲存驗證。請返回搜尋結果，核對發行版本和完整曲目表，或改選其他版本。", "アルバム情報を保存できませんでした。検索結果に戻り、リリースと全曲目を確認するか、別の版を選んでください。"],
+  "选中的专辑资料未通过合并校验。请核对勾选的字段和平台曲目表。": ["The selected album metadata failed validation. Check the selected fields and the platform track list.", "選取的專輯資料未通過合併驗證。請核對勾選的欄位和平台曲目表。", "選択したアルバム情報を反映できませんでした。選択項目と配信元の曲目一覧を確認してください。"],
+  "专辑页面关联未通过校验。每个平台可关联一个 HTTPS 专辑页面，最多可关联 32 个平台。": ["The album links failed validation. Link one HTTPS album page per platform, up to 32 platforms.", "專輯頁面關聯未通過驗證。每個平台可關聯一個 HTTPS 專輯頁面，最多可關聯 32 個平台。", "アルバムのリンクを保存できませんでした。配信元ごとに HTTPS のアルバムページを1件、最大32件まで登録できます。"],
   "多语言歌手名": ["Artist names by language", "多語言歌手名", "歌手名の言語別表記"],
   "所选歌曲在另一张专辑中占用不同曲序，请先核对那张专辑。": ["These songs occupy different positions on another album. Check that album before merging.", "所選歌曲在另一張專輯中佔用不同曲序，請先核對那張專輯。", "選択した曲は別のアルバムの異なる曲順にあります。そのアルバムを確認してください。"],
   "选择要保留的曲目。其他曲名将成为别名，歌单和专辑引用将转到这首曲目。": ["Choose the track to keep. Other titles become aliases. Playlists and albums will reference this track.", "選擇要保留的曲目。其他曲名將成為別名，歌單和專輯將引用這首曲目。", "残す曲を選んでください。他の曲名は別名になり、プレイリストとアルバムはこの曲を参照します。"],

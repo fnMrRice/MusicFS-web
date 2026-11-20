@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ApiError, errorMessage } from "../../api/client";
+import { ApiError, withRequestId } from "../../api/client";
 import { MusicCatalogApi, type MusicAlbum, type MusicTrack } from "../../api/music-catalog";
 import { ScrapersApi, type AlbumMergeField, type ScrapeCandidate } from "../../api/scrapers";
 import { useServices } from "../../app/services";
@@ -8,7 +8,7 @@ import { ErrorNotice } from "../../components/ui";
 import { tr, useLocale } from "../../i18n";
 import { AlbumMergePreview, type AlbumMergeSnapshot } from "./AlbumMergePreview";
 import { externalLink } from "./fields";
-import { AlbumLookupError, albumLookupMessage } from "./album-search-errors";
+import { AlbumLookupError, albumLookupMessage, albumSaveMessage } from "./album-search-errors";
 
 export interface AlbumEdition { pluginId: string; details: ScrapeCandidate; tracks: ScrapeCandidate }
 
@@ -89,8 +89,8 @@ export function AlbumRefresh({ album, edition, applied, savingChanged }: {
       const expired = cause instanceof ApiError && (cause.status === 404 || cause.status === 410);
       setPending(uncertain ? { key, fields: selected } : undefined);
       setConflict(expired || cause instanceof ApiError && cause.status === 409);
-      setError(expired ? tr("预览资料已失效，请重新读取后再合并。")
-        : uncertain ? tr("保存结果待确认，请重试或关闭后刷新。") : errorMessage(cause));
+      setError(expired ? withRequestId("预览资料已失效，请重新读取后再合并。", cause)
+        : uncertain ? withRequestId("保存结果待确认，请重试或关闭后刷新。", cause) : albumSaveMessage(cause, "merge"));
     } finally {
       lock.current = false;
       if (mounted.current) { setSaving(false); savingChanged(false); }

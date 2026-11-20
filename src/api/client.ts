@@ -86,7 +86,7 @@ export class ApiClient {
             ? detail.message
             : "Request failed",
           response.status,
-          typeof detail?.requestId === "string" ? detail.requestId : undefined,
+          typeof detail?.requestId === "string" && detail.requestId ? detail.requestId : response.headers.get("X-Request-ID") ?? undefined,
           typeof detail?.retryAfter === "number"
             ? detail.retryAfter
             : undefined,
@@ -114,6 +114,10 @@ export class ApiClient {
       options.signal?.removeEventListener("abort", cancel);
     }
   }
+}
+
+export function withRequestId(message: string, error: unknown): string {
+  return error instanceof ApiError && error.requestId ? `${message} 请求编号：${error.requestId}` : message;
 }
 
 export function errorMessage(error: unknown): string {
@@ -148,5 +152,5 @@ export function errorMessage(error: unknown): string {
       : error.status === 403
         ? "无权执行此操作。"
         : (messages[error.code] ?? "操作失败，请重试或检查 Server 状态。");
-  return error.requestId ? `${message} 请求编号：${error.requestId}` : message;
+  return withRequestId(message, error);
 }
