@@ -56,12 +56,12 @@ export function ScraperSearch({ initial, preferredField, externalIds = [], allow
     return () => { mounted.current = false; controller.current?.abort(); };
   }, []);
   const reset = () => { setResults(null); setError(null); };
-  async function search() {
+  async function search(refreshResults = false) {
     if (!source || !source.available || controller.current || saveLock.current || pending || conflict) return;
     const request = new AbortController();
-    controller.current = request; reset(); setSearching(true);
+    controller.current = request; setError(null); if (!refreshResults) setResults(null); setSearching(true);
     try {
-      const items = await api.search(source.pluginId, field, effectiveQuery, request.signal);
+      const items = await api.search(source.pluginId, field, effectiveQuery, request.signal, refreshResults);
       if (!request.signal.aborted) setResults(items);
     } catch (cause) {
       if (!request.signal.aborted) setError(scraperSearchMessage(cause, sources));
@@ -100,13 +100,15 @@ export function ScraperSearch({ initial, preferredField, externalIds = [], allow
       {fieldControls?.(field)}
     </SearchForm>}
     <ErrorNotice error={error} />
+    {results !== null && (field === "albumDetails" || field === "albumTracks") &&
+      <button type="button" disabled={searching || saving || conflict || !!pending} onClick={() => void search(true)}>{tr("刷新预览")}</button>}
     {conflict && <button onClick={refresh}>{tr("刷新资料")}</button>}
     {results?.length === 0 && <p role="status">{tr("没有匹配的资料。")}</p>}
     {!!results?.length && <div className="scraper-results">
       {results.map((item, index) => <details className="scraper-result" key={item.candidateToken} open={index === 0 || undefined}>
         <summary><strong>{item.title}</strong> · {item.id}</summary>
         <ScrapedPreview item={item} />
-        {apply && canApply(field, item) && <button type="button" disabled={saving || conflict || !!pending && pending.item !== item}
+        {apply && canApply(field, item) && <button type="button" disabled={searching || saving || conflict || !!pending && pending.item !== item}
           onClick={() => void save(item)}>{pending?.item === item ? tr("重试确认保存") : applyLabel?.(field) ?? tr("选用这项资料")}</button>}
       </details>)}
     </div>}

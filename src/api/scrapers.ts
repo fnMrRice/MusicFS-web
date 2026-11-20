@@ -130,9 +130,9 @@ export class ScrapersApi {
   async list(signal?: AbortSignal): Promise<Scraper[]> {
     return items(await this.client.request<unknown>("/scrapers", { signal }), isScraper);
   }
-  async search(pluginId: string, field: string, query: ScraperQuery, signal?: AbortSignal): Promise<ScrapeCandidate[]> {
+  async search(pluginId: string, field: string, query: ScraperQuery, signal?: AbortSignal, refresh = false): Promise<ScrapeCandidate[]> {
     const result = await this.client.request<unknown>(`/scrapers/${encodeURIComponent(pluginId)}/search`,
-      { method: "POST", body: { field, query }, signal, timeoutMs: 45_000 });
+      { method: "POST", body: { field, query, ...(refresh ? { refresh: true } : {}) }, signal, timeoutMs: 45_000 });
     return items(result, (item): item is ScrapeCandidate =>
       isItem(item) && "candidateToken" in item && nonempty(item.candidateToken));
   }

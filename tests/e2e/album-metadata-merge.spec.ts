@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { preview, type PreviewServer } from "vite";
-import { album, candidate, artwork, mock, details, detailsToggle, openAlbum as openAlbumFixture } from "./album-scraping-mock";
+import { album, candidate, artwork, mock, details, detailsToggle, dialog, albumSearchButton, openAlbum as openAlbumFixture } from "./album-scraping-mock";
 
 let server: PreviewServer;
 let origin: string;
@@ -44,6 +44,51 @@ async function selectOnly(panel: Locator, label: string) {
   await panel.getByRole("checkbox", { name: label, exact: true }).check();
 }
 
+test("reopening an album preview reuses both fields and refresh replaces the selected edition", async ({ page }) => {
+  const state = await mock(page);
+  state.rotateTokens = true;
+  await openAlbumFixture(page, origin);
+  const modal = dialog(page);
+  const search = () => modal.getByRole("button", { name: "搜索", exact: true }).click();
+  const preview = () => modal.getByRole("button", { name: "预览完整专辑", exact: true }).click();
+  const back = () => modal.getByRole("button", { name: "返回搜索结果", exact: true }).click();
+  await search();
+  await preview();
+  await expect(modal.getByText(candidate.description, { exact: true })).toBeVisible();
+  state.online.description = "更新后的介绍";
+  state.platformTracks = [{ title: "新的曲目", disc: 1, number: 1 }];
+  await back();
+  await preview();
+  await expect(modal.getByText(candidate.description, { exact: true })).toBeVisible();
+  expect(state.searches).toHaveLength(2);
+  await page.keyboard.press("Escape");
+  await albumSearchButton(page).click();
+  await search();
+  await preview();
+  await expect(modal.getByText(candidate.description, { exact: true })).toBeVisible();
+  expect(state.searches).toHaveLength(3);
+  state.trackSearchFailure = true;
+  await modal.getByRole("button", { name: "刷新预览" }).click();
+  await expect(modal.getByRole("alert")).toBeVisible();
+  await expect(modal.getByText(candidate.description, { exact: true })).toBeVisible();
+  state.trackSearchFailure = false;
+  await modal.getByRole("button", { name: "刷新预览" }).click();
+  await expect(modal.getByText("更新后的介绍", { exact: true })).toBeVisible();
+  await expect(modal.getByRole("cell", { name: "新的曲目", exact: true })).toBeVisible();
+  const query = { externalId: candidate.id, sourceUrl: candidate.sourceUrl };
+  expect(state.searches.slice(-2)).toEqual([{ field: "albumDetails", query, refresh: true }, { field: "albumTracks", query, refresh: true }]);
+  await back();
+  await preview();
+  await expect(modal.getByText("更新后的介绍", { exact: true })).toBeVisible();
+  expect(state.searches).toHaveLength(7);
+  expect(state.writes).toEqual([]);
+  const put = page.waitForRequest(request => request.method() === "PUT" && request.url().endsWith("/library/albums/one/scraped-fields"));
+  await page.route("**/library/albums/one/scraped-fields", route => route.request().method() === "PUT"
+    ? route.fulfill({ json: { revision: 2 } }) : route.fallback());
+  await modal.getByRole("button", { name: "选用这张专辑" }).click();
+  expect((await put).postDataJSON().candidates).toEqual({ albumDetails: "details-token-4", albumTracks: "tracks-token-4" });
+});
+
 test("saving an associated platform page only updates the album and leaves scraping for an explicit refresh", async ({ page }) => {
   const state = await mock(page);
   await openDetails(page);
@@ -85,8 +130,8 @@ test("refresh compares current and platform values without writing and cancel pr
   await expect(panel.getByRole("list", { name: "当前曲目表" }).getByText("第一曲", { exact: true })).toBeVisible();
   await expect(panel.getByRole("list", { name: "平台曲目表" }).getByText(/未收录曲目/)).toBeVisible();
   await expect(panel.getByRole("checkbox", { name: "发行商", exact: true })).toBeChecked();
-  expect(state.searches).toEqual([{ field: "albumDetails", query: { sourceUrl: candidate.sourceUrl } },
-    { field: "albumTracks", query: { externalId: candidate.id, sourceUrl: candidate.sourceUrl } }]);
+  expect(state.searches).toEqual([{ field: "albumDetails", query: { sourceUrl: candidate.sourceUrl }, refresh: true },
+    { field: "albumTracks", query: { externalId: candidate.id, sourceUrl: candidate.sourceUrl }, refresh: true }]);
   expect(state.writes).toEqual([]);
   expect({ album: state.album, saved: state.saved }).toEqual(before);
   await page.screenshot({ path: info.outputPath("album-merge-desktop-dark.png") });

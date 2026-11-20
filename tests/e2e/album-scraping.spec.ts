@@ -191,8 +191,8 @@ test("multiple platforms can be searched and linked together, then refreshed one
   await panel.getByRole("button", { name: "读取平台资料" }).click();
   await expect(panel.getByRole("checkbox", { name: "曲目表" })).toBeVisible();
   expect(state.searches).toHaveLength(before);
-  expect(secondQueries.slice(-2)).toEqual([{ field: "albumDetails", query: { sourceUrl: second.sourceUrl } },
-    { field: "albumTracks", query: { externalId: second.id, sourceUrl: second.sourceUrl } }]);
+  expect(secondQueries.slice(-2)).toEqual([{ field: "albumDetails", query: { sourceUrl: second.sourceUrl }, refresh: true },
+    { field: "albumTracks", query: { externalId: second.id, sourceUrl: second.sourceUrl }, refresh: true }]);
 });
 
 test("editing the display name preserves the immutable original album name and saved metadata", async ({ page }) => {

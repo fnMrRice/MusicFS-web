@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import type { MusicAlbum } from "../../api/music-catalog";
 import { ScrapersApi } from "../../api/scrapers";
-import { useServices } from "../../app/services";
+import { useServices, useStore } from "../../app/services";
 import { Modal } from "../../components/Modal";
 import { useResource } from "../../components/query";
 import { ErrorNotice } from "../../components/ui";
@@ -10,6 +10,7 @@ import { AlbumMetadata } from "./AlbumMetadata";
 import { AlbumScraperSearch } from "./AlbumScraperSearch";
 import { AlbumEditor } from "./AlbumEditor";
 import { AlbumRefresh } from "./AlbumRefresh";
+import { AlbumPreviews } from "./album-previews";
 import { externalLink } from "./fields";
 import "./scrapers.css";
 
@@ -18,8 +19,11 @@ export function AlbumScraping({ album, artist, detailsId, detailsOpen, applied, 
   applied: () => void; refresh: () => void;
 }) {
   useLocale();
-  const client = useServices().client;
+  const services = useServices();
+  const client = services.client;
+  const auth = useStore(services.auth);
   const api = useMemo(() => new ScrapersApi(client), [client]);
+  const previews = useMemo(() => new AlbumPreviews(api), [api, auth.session, auth.ready?.instanceId, album.albumId]);
   const saved = useResource(`album-scraped:${album.albumId}:${album.revision}`, (signal) => api.savedAlbum(album.albumId, signal));
   const [saving, setSaving] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -42,7 +46,7 @@ export function AlbumScraping({ album, artist, detailsId, detailsOpen, applied, 
     {searchOpen && <Modal title={tr("搜索在线资料")} close={() => { if (!saving) setSearchOpen(false); }}>
       <ErrorNotice error={saved.error} retry={saved.reload} />
       {saved.loading && <p role="status">{tr("正在加载…")}</p>}
-      {saved.data && <AlbumScraperSearch album={album} artist={artist} hasSavedFields={saved.data.length > 0}
+      {saved.data && <AlbumScraperSearch album={album} previews={previews} artist={artist} hasSavedFields={saved.data.length > 0}
         applied={() => { setSearchOpen(false); applied(); }}
         refresh={() => { setSearchOpen(false); refresh(); }} savingChanged={setSaving} />}
     </Modal>}
@@ -52,7 +56,7 @@ export function AlbumScraping({ album, artist, detailsId, detailsOpen, applied, 
         refresh={() => { setEditing(false); refresh(); }} savingChanged={setSaving} />
     </Modal>}
     {refreshing && <Modal title={tr("对比专辑资料")} close={() => { if (!saving) setRefreshing(false); }}>
-      <AlbumRefresh album={album} applied={() => { setRefreshing(false); applied(); }} savingChanged={setSaving} />
+      <AlbumRefresh album={album} previews={previews} applied={() => { setRefreshing(false); applied(); }} savingChanged={setSaving} />
     </Modal>}
   </>;
 }

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ApiError, withRequestId } from "../../api/client";
 import { MusicCatalogApi, type MusicAlbum, type MusicTrack } from "../../api/music-catalog";
-import { ScrapersApi, type AlbumMergeField, type ScrapeCandidate } from "../../api/scrapers";
+import { ScrapersApi, type AlbumMergeField } from "../../api/scrapers";
 import { useServices } from "../../app/services";
 import { useResource } from "../../components/query";
 import { ErrorNotice } from "../../components/ui";
@@ -9,11 +9,10 @@ import { tr, useLocale } from "../../i18n";
 import { AlbumMergePreview, type AlbumMergeSnapshot } from "./AlbumMergePreview";
 import { externalLink } from "./fields";
 import { AlbumLookupError, albumLookupMessage, albumSaveMessage } from "./album-search-errors";
+import type { AlbumEdition, AlbumPreviews } from "./album-previews";
 
-export interface AlbumEdition { pluginId: string; details: ScrapeCandidate; tracks: ScrapeCandidate }
-
-export function AlbumRefresh({ album, edition, applied, savingChanged }: {
-  album: MusicAlbum; edition?: AlbumEdition; applied: () => void; savingChanged: (busy: boolean) => void;
+export function AlbumRefresh({ album, edition, previews, onRefresh, applied, savingChanged }: {
+  album: MusicAlbum; edition?: AlbumEdition; previews: AlbumPreviews; onRefresh?: (edition: AlbumEdition) => void; applied: () => void; savingChanged: (busy: boolean) => void;
 }) {
   useLocale();
   const client = useServices().client;
@@ -32,29 +31,23 @@ export function AlbumRefresh({ album, edition, applied, savingChanged }: {
   const [pending, setPending] = useState<{ key: string; fields: AlbumMergeField[] }>();
   const mounted = useRef(true);
   const lock = useRef(false);
+  const keepSnapshot = useRef(false);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   useEffect(() => {
     if (!reading) return;
     const controller = new AbortController();
     const signal = controller.signal;
-    setLoading(true); setSnapshot(undefined); setError(null); setConflict(false); setPending(undefined);
+    setLoading(true); if (!keepSnapshot.current) setSnapshot(undefined);
+    keepSnapshot.current = false;
+    setError(null); setConflict(false); setPending(undefined);
     async function read() {
       const current = await music.album(album.albumId, signal);
       const link = current.sourceLinks.find(item => item.pluginId === reading);
       if (!edition && (!link || !externalLink(link.url))) throw new AlbumLookupError(tr("请先关联平台专辑页面。"));
       const saved = await api.savedAlbum(current.albumId, signal);
       const prior = retry === 0 ? edition : undefined;
-      const lookup = edition ? { externalId: edition.details.id, sourceUrl: edition.details.sourceUrl } : { sourceUrl: link!.url };
-      const details = prior ? [prior.details] : await api.search(reading, "albumDetails", lookup, signal);
-      if (details.length !== 1 || edition && details[0]?.id !== edition.details.id) {
-        throw new AlbumLookupError(tr("未找到关联页面对应的唯一专辑，请检查平台页面。"));
-      }
-      const item = details[0]!;
-      const candidates = prior ? [prior.tracks] : await api.search(reading, "albumTracks", {
-        externalId: item.id, sourceUrl: item.sourceUrl || lookup.sourceUrl,
-      }, signal);
-      const tracks = candidates.find((candidate) => candidate.id === item.id && candidate.tracks?.length);
-      if (!tracks) throw new AlbumLookupError(tr("未能读取这张专辑的完整曲目，请重试或更换资料来源。"));
+      const lookup = edition ? { externalId: edition.details.id, sourceUrl: edition.details.sourceUrl, country: edition.country } : { sourceUrl: link!.url };
+      const platform = prior ?? await previews.read(reading, lookup, signal, { refresh: true });
       const currentTracks: MusicTrack[] = [];
       const cursors = new Set<string>();
       let after: string | null = null, revision: string | undefined;
@@ -67,13 +60,19 @@ export function AlbumRefresh({ album, edition, applied, savingChanged }: {
         if (after && cursors.has(after)) throw new ApiError("INVALID_RESPONSE", "Album pagination did not advance");
         if (after) cursors.add(after);
       } while (after);
-      if (!signal.aborted) setSnapshot({ album: current, saved, currentTracks, details: item, tracks });
+      if (!signal.aborted) {
+        setSnapshot({ album: current, saved, currentTracks, details: platform.details, tracks: platform.tracks });
+        if (!prior) onRefresh?.(platform);
+      }
     }
     void read().catch((cause) => {
-      if (!signal.aborted) setError({ lookup: cause });
+      if (!signal.aborted) {
+        if (cause instanceof AlbumLookupError) setSnapshot(undefined);
+        setError({ lookup: cause });
+      }
     }).finally(() => { if (!signal.aborted) setLoading(false); });
     return () => controller.abort();
-  }, [album.albumId, api, music, retry, reading, edition]);
+  }, [album.albumId, api, music, retry, reading, edition, previews, onRefresh]);
   async function merge(fields: AlbumMergeField[]) {
     if (!snapshot || lock.current || conflict) return;
     const selected = pending?.fields ?? fields;
@@ -109,7 +108,9 @@ export function AlbumRefresh({ album, edition, applied, savingChanged }: {
     {loading && <p className="muted" role="status">{tr("正在读取平台资料和完整曲目…")}</p>}
     <ErrorNotice error={error && typeof error === "object" ? albumLookupMessage(error.lookup, true, plugins.data ?? undefined) : error} />
     {reading && !loading && (conflict || !snapshot) && <button type="button" disabled={saving} onClick={() => setRetry((value) => value + 1)}>{tr("重新读取")}</button>}
-    {snapshot && <AlbumMergePreview key={snapshot.details.candidateToken} snapshot={snapshot} saving={saving || conflict}
+    {snapshot && !loading && !conflict && <button type="button" disabled={saving || !!pending}
+      onClick={() => { keepSnapshot.current = true; setRetry(value => value + 1); }}>{tr("刷新预览")}</button>}
+    {snapshot && <AlbumMergePreview key={snapshot.details.candidateToken} snapshot={snapshot} saving={loading || saving || conflict}
       locked={!!pending} merge={(fields) => void merge(fields)} />}
   </div>;
 }

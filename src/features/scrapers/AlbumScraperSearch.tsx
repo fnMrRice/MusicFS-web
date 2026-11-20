@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ApiError, withRequestId } from "../../api/client";
 import type { MusicAlbum } from "../../api/music-catalog";
 import { ScrapersApi, type ScrapeCandidate, type Scraper, type ScraperQuery } from "../../api/scrapers";
@@ -7,15 +7,16 @@ import { useResource } from "../../components/query";
 import { ErrorNotice } from "../../components/ui";
 import { tr, useLocale } from "../../i18n";
 import { AlbumMetadata } from "./AlbumMetadata";
-import { AlbumRefresh, type AlbumEdition } from "./AlbumRefresh";
-import { albumLookupMessage, albumSaveMessage } from "./album-search-errors";
+import { AlbumRefresh } from "./AlbumRefresh";
+import type { AlbumEdition, AlbumPreviews } from "./album-previews";
+import { AlbumLookupError, albumLookupMessage, albumSaveMessage } from "./album-search-errors";
 import { externalLink } from "./fields";
 
 type CompleteAlbum = AlbumEdition & { source: Scraper };
 type PlatformResults = { source: Scraper; items: ScrapeCandidate[]; error?: string };
 
-export function AlbumScraperSearch({ album, artist, hasSavedFields, applied, refresh, savingChanged }: {
-  album: MusicAlbum; artist?: string; hasSavedFields: boolean; applied: () => void; refresh: () => void; savingChanged: (busy: boolean) => void;
+export function AlbumScraperSearch({ album, previews, artist, hasSavedFields, applied, refresh, savingChanged }: {
+  album: MusicAlbum; previews: AlbumPreviews; artist?: string; hasSavedFields: boolean; applied: () => void; refresh: () => void; savingChanged: (busy: boolean) => void;
 }) {
   useLocale();
   const client = useServices().client;
@@ -39,8 +40,10 @@ export function AlbumScraperSearch({ album, artist, hasSavedFields, applied, ref
   const [error, setError] = useState<string | null>(null);
   const [pendingKey, setPendingKey] = useState<string>();
   const [conflict, setConflict] = useState(false);
+  const [expired, setExpired] = useState(false);
   const controller = useRef<AbortController | null>(null);
   const lastQuery = useRef<ScraperQuery>({});
+  const requestedAt = useRef(0);
   const mounted = useRef(true);
   const saveLock = useRef(false);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; controller.current?.abort(); }; }, []);
@@ -50,7 +53,12 @@ export function AlbumScraperSearch({ album, artist, hasSavedFields, applied, ref
     if (controller.current || saveLock.current) return;
     const request = new AbortController(); controller.current = request; setBusy(true); setError(null);
     try { await action(request.signal); }
-    catch (cause) { if (!request.signal.aborted) setError(albumLookupMessage(cause, pageLookup, sources)); }
+    catch (cause) {
+      if (!request.signal.aborted) {
+        if (cause instanceof AlbumLookupError) setPreview(undefined);
+        setError(albumLookupMessage(cause, pageLookup, sources));
+      }
+    }
     finally { controller.current = null; if (!request.signal.aborted) setBusy(false); }
   }
   async function search() {
@@ -59,6 +67,7 @@ export function AlbumScraperSearch({ album, artist, hasSavedFields, applied, ref
     const query: ScraperQuery = sourceUrl.trim() ? { sourceUrl: sourceUrl.trim() } : { title: title.trim(), ...(artistName.trim() ? { artist: artistName.trim() } : {}) };
     if (country.trim()) query.country = country.trim().toUpperCase();
     lastQuery.current = query;
+    requestedAt.current = Date.now();
     await load(async (signal) => {
       const groups = await Promise.all(selected.map(async (source): Promise<PlatformResults> => {
         try { return { source, items: await api.search(source.pluginId, "albumDetails", query, signal) }; }
@@ -67,17 +76,22 @@ export function AlbumScraperSearch({ album, artist, hasSavedFields, applied, ref
       if (!signal.aborted) setResults(groups);
     }, !!query.sourceUrl);
   }
-  async function complete(source: Scraper, details: ScrapeCandidate) {
+  const updateResult = useCallback((edition: AlbumEdition) => {
+    setResults(groups => groups?.map(group => group.source.pluginId !== edition.pluginId ? group : { ...group,
+      items: group.items.map(item => item.id === edition.details.id ? edition.details : item) }) ?? null);
+  }, []);
+  async function complete(source: Scraper, details: ScrapeCandidate, force = false) {
     if (!source?.available || disabled) return;
     const url = details.sourceUrl || lastQuery.current.sourceUrl;
     const query: ScraperQuery = { externalId: details.id, ...(url ? { sourceUrl: url } : {}),
       ...(lastQuery.current.country ? { country: lastQuery.current.country } : {}) };
     await load(async (signal) => {
-      const items = await api.search(source.pluginId, "albumTracks", query, signal);
+      const edition = await previews.read(source.pluginId, query, signal,
+        { refresh: force || expired, summary: { item: details, requestedAt: requestedAt.current } });
       if (signal.aborted) return;
-      const tracks = items.find((item) => item.id === details.id && item.tracks?.length);
-      if (!tracks) { setError(tr("未能读取这张专辑的完整曲目，请重试或更换资料来源。")); return; }
-      setPreview({ pluginId: source.pluginId, source, details, tracks });
+      updateResult(edition);
+      setPreview({ ...edition, source });
+      setExpired(false);
     }, !!query.sourceUrl);
   }
   async function save(operation: (key: string) => Promise<unknown>) {
@@ -91,8 +105,11 @@ export function AlbumScraperSearch({ album, artist, hasSavedFields, applied, ref
       if (!mounted.current) return;
       const uncertain = cause instanceof ApiError && (cause.status === 0 || cause.status >= 500 || cause.code === "INVALID_RESPONSE");
       setPendingKey(uncertain ? key : undefined);
-      setConflict(cause instanceof ApiError && (cause.status === 409 || cause.status === 410));
-      setError(uncertain ? withRequestId("保存结果待确认，请重试或关闭后刷新。", cause)
+      const tokenExpired = !!preview && cause instanceof ApiError && (cause.status === 404 || cause.status === 410);
+      setExpired(tokenExpired);
+      setConflict(cause instanceof ApiError && (cause.status === 409 || cause.status === 410 && !tokenExpired));
+      setError(tokenExpired ? withRequestId("预览资料已失效，请刷新预览。", cause)
+        : uncertain ? withRequestId("保存结果待确认，请重试或关闭后刷新。", cause)
         : albumSaveMessage(cause, preview ? "selection" : "links"));
     } finally {
       saveLock.current = false;
@@ -151,7 +168,7 @@ export function AlbumScraperSearch({ album, artist, hasSavedFields, applied, ref
       onClick={saveLinks}>{tr(pendingKey ? "重试确认保存" : "保存选中平台链接")}</button>}
     {preview && hasSavedFields && <>
       <button type="button" disabled={saving} onClick={() => setPreview(undefined)}>{tr("返回搜索结果")}</button>
-      <AlbumRefresh album={album} edition={preview} applied={applied}
+      <AlbumRefresh album={album} edition={preview} previews={previews} onRefresh={updateResult} applied={applied}
         savingChanged={value => { setSaving(value); savingChanged(value); }} />
     </>}
     {preview && !hasSavedFields && <>
@@ -163,7 +180,8 @@ export function AlbumScraperSearch({ album, artist, hasSavedFields, applied, ref
       <p className="muted">{tr("平台曲目表共 {0} 首。", { 0: preview.tracks.tracks!.length })}</p>
       <div className="album-search-actions">
         <button type="button" disabled={disabled} onClick={() => setPreview(undefined)}>{tr("返回搜索结果")}</button>
-        <button type="button" className="primary" disabled={saving || conflict}
+        <button type="button" disabled={disabled} onClick={() => void complete(preview.source, preview.details, true)}>{tr("刷新预览")}</button>
+        <button type="button" className="primary" disabled={busy || saving || conflict || expired}
           onClick={() => void save(key => api.applyAlbumBundle(album.albumId, album.revision, preview.source.pluginId,
             { albumDetails: preview.details.candidateToken, albumTracks: preview.tracks.candidateToken }, key))}>{tr(pendingKey ? "重试确认保存" : "选用这张专辑")}</button>
       </div>

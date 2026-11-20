@@ -98,6 +98,8 @@ export default {
   "平台专辑页面（可选）": ["Album page URL (optional)", "平台專輯頁面（可選）", "アルバムページのURL（任意）"],
   "暂无支持完整专辑资料的刮削插件。": ["No source supports complete album metadata.", "暫無支援完整專輯資料的刮削外掛程式。", "アルバム全体の情報に対応する情報源がありません。"],
   "预览完整专辑": ["Preview complete album", "預覽完整專輯", "アルバム全体をプレビュー"],
+  "刷新预览": ["Refresh preview", "重新整理預覽", "プレビューを更新"],
+  "预览资料已失效，请刷新预览。": ["This preview has expired. Refresh the preview to continue.", "預覽資料已失效，請重新整理預覽。", "プレビューの有効期限が切れました。更新してください。"],
   "完整专辑预览": ["Complete album preview", "完整專輯預覽", "アルバム全体のプレビュー"],
   "选用这张专辑": ["Use this album", "選用這張專輯", "このアルバムを採用"],
   "返回搜索结果": ["Back to results", "返回搜尋結果", "検索結果に戻る"],
