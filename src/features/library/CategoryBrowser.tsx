@@ -10,6 +10,7 @@ import { tr, useLocale } from "../../i18n";
 import { TrackTable } from "../TrackTable";
 import { useCatalogPages } from "./use-catalog-pages";
 import { MusicCategoryBrowser } from "./MusicCategoryBrowser";
+import { AlbumViewSwitch } from "./AlbumCollection";
 import "./categories.css";
 
 export const categoryKinds: Record<string, CategoryKind> = { "歌手": "artist", "专辑": "album", "流派": "genre", "文件夹": "folder" };
@@ -62,6 +63,7 @@ export function CategoryBrowser({ kind, provider, providers, providerError, relo
         <option value="all">{tr("全部来源")}</option>
         {providers.map((item) => <option key={item.id} value={item.id}>{sourceName(item)}</option>)}
       </select>
+      {kind === "album" && !inCategory && <AlbumViewSwitch />}
       <div className="filter-end">
         <input value={draft} maxLength={256} onChange={(event) => setDraft(event.target.value)}
           aria-label={tr(inCategory ? "搜索当前列表" : "搜索分类")} placeholder={tr(inCategory ? "搜索当前列表" : "搜索分类")} />
@@ -139,7 +141,7 @@ function CategoryDetail({ api, kind, provider, id, query, refresh, providers, na
     {kind === "folder" && selected && <section aria-label={tr("子目录")}>
       <CategoryCollection key={`${id}:${refresh}`} api={api} kind={kind} provider={provider} parentId={id} providers={providers} navigate={navigate} />
     </section>}
-    {pages.items.length > 0 && <TrackTable tracks={pages.items} providers={providers} queryKey={scope}
+    {pages.items.length > 0 && <TrackTable tracks={pages.items} providers={providers} queryKey={scope} libraryProvider={provider}
       complete={!pages.cursor && !pages.loading && !pages.error}
       pagination={{ loading: pages.loading, hasMore: !!pages.cursor, error: pages.error, more: pages.more }} />}
     <ErrorNotice error={pages.error} retry={pages.retry} />

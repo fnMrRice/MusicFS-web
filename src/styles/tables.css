@@ -82,9 +82,6 @@
 .list-actions strong {
   font-size: 14px;
 }
-.action-hint {
-  margin-left: auto;
-}
 .list-actions-end {
   display: flex;
   align-items: center;
@@ -189,6 +186,13 @@
 .track-play:hover {
   color: var(--accent);
   background: none;
+}
+.track-credits {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.track-credits a:hover {
+  color: var(--accent);
 }
 .cover {
   display: inline-flex;

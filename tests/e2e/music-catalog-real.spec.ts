@@ -32,7 +32,7 @@ test("a track without sources persists in artist, favorites and playlist views",
   await page.getByRole("button", { name: new RegExp(artist) }).click();
   await expect(row).toHaveClass(/source-missing/);
   await expect(row.getByRole("button", { name: `播放 ${title}`, exact: true })).toBeDisabled();
-  await expect(row).toContainText("暂无来源");
+  await expect(page.getByRole("columnheader", { name: "来源", exact: true })).toHaveCount(0);
   expect(await row.locator(".track-play").evaluate((element) => getComputedStyle(element).color))
     .toBe(await row.evaluate((element) => getComputedStyle(element).color));
   await expect(page.getByRole("button", { name: "播放全部", exact: true })).toBeDisabled();
@@ -56,6 +56,7 @@ test("a track without sources persists in artist, favorites and playlist views",
   await expect(row.getByRole("button", { name: `播放 ${title}` })).toBeDisabled();
   await page.goto(`${server.origin}/#/favorites`);
   await page.reload();
+  await expect(page.getByRole("columnheader", { name: "来源", exact: true })).toBeVisible();
   await expect(row).toContainText("暂无来源");
   await page.goto(`${server.origin}/#/library`);
   await page.getByRole("button", { name: "歌手", exact: true }).click();

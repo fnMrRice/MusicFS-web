@@ -1,0 +1,78 @@
+.album-view-switch {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--input);
+}
+.album-view-switch .icon-button[aria-pressed="true"] {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.album-cards { grid-template-columns: repeat(auto-fill, minmax(min(100%, 245px), 1fr)); }
+.album-card {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  padding-inline-end: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+}
+.album-card .category-card {
+  flex: 1;
+  align-self: stretch;
+  justify-content: flex-start;
+  padding-inline-end: 6px;
+  border: 0;
+  background: transparent;
+}
+.album-card:hover, .album-list tbody tr:hover { background: var(--hover); }
+.album-list-wrap {
+  margin: 16px 0;
+  container-type: inline-size;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.album-list {
+  width: 100%;
+  border-spacing: 0;
+  font-size: 13px;
+  text-align: start;
+}
+.album-list th, .album-list td {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+  text-align: start;
+}
+.album-list th {
+  height: 42px;
+  color: var(--muted);
+  font-weight: 400;
+  background: var(--panel);
+  white-space: nowrap;
+}
+.album-list th:first-child { border-start-start-radius: 9px; }
+.album-list th:last-child { border-start-end-radius: 9px; }
+.album-list tbody tr:last-child td { border-bottom: 0; }
+.album-list-name {
+  justify-content: flex-start;
+  padding: 2px 0;
+  border: 0;
+  background: transparent;
+  text-align: start;
+  overflow-wrap: anywhere;
+}
+.album-list-name:hover { color: var(--accent); background: transparent; }
+.album-list-name .album-cover { width: 42px; height: 42px; }
+.album-list-name strong { font-weight: 600; }
+.album-release, .album-release-summary { color: var(--muted); overflow-wrap: anywhere; }
+.album-release-summary { display: none; }
+.album-list .album-count { text-align: end; width: 1%; font-variant-numeric: tabular-nums; }
+.album-list-actions { width: 1%; }
+@container (max-width: 600px) {
+  .album-list .album-release { display: none; }
+  .album-release-summary { display: block; margin-top: 3px; }
+  .album-list th, .album-list td { padding-inline: 8px; }
+}

@@ -6,6 +6,25 @@ const album = { albumId: "album/1", originalName: "Original album", name: "Album
   isExternal: false, coverPath: null, publisher: null, releaseDate: null, sourceLinks: [] };
 const reply = (body: unknown) => new Response(JSON.stringify(body));
 
+describe("Music album list", () => {
+  it("includes release information and accepts albums with missing metadata", async () => {
+    const items = [
+      { ...album, publisher: "Label", releaseDate: "2025-06", trackCount: 2 },
+      { albumId: "", name: "", trackCount: 1 },
+    ];
+    const api = new MusicCatalogApi(new ApiClient(vi.fn().mockResolvedValue(reply({ items, nextAfter: null }))));
+    expect((await api.categories("album", "all", "", null)).items).toEqual([
+      { id: album.albumId, name: album.name, publisher: "Label", releaseDate: "2025-06", coverPath: null, trackCount: 2 },
+      { id: "", name: "", trackCount: 1 },
+    ]);
+  });
+  it.each([{ publisher: {} }, { releaseDate: 2025 }])("rejects malformed release metadata", async (invalid) => {
+    const items = [{ ...album, trackCount: 0, ...invalid }];
+    const api = new MusicCatalogApi(new ApiClient(vi.fn().mockResolvedValue(reply({ items, nextAfter: null }))));
+    await expect(api.categories("album", "all", "", null)).rejects.toMatchObject({ code: "INVALID_RESPONSE" });
+  });
+});
+
 describe("Music album details", () => {
   it("loads the requested album and retains its revision", async () => {
     const fetch = vi.fn().mockResolvedValue(reply(album));

@@ -359,9 +359,6 @@ form label select {
   .list-actions {
     gap: 8px;
   }
-  .action-hint {
-    display: none;
-  }
 }
 @media (prefers-reduced-motion: reduce) {
   *,

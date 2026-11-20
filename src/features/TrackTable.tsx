@@ -13,6 +13,7 @@ import { AddToPlaylist } from "./playlists/AddToPlaylist";
 import { useSourceName } from "../components/use-source-name";
 import { MergeSongs } from "./matching/MergeSongs";
 import { TrackRow } from "./library/TrackRow";
+import { TrackCredits } from "./library/TrackCredits";
 import { MusicTrackMetadata } from "./scrapers/MusicTrackMetadata";
 import { MergeMusicTracks } from "./library/MergeMusicTracks";
 import { RecordingCover } from "./matching/RecordingCover";
@@ -26,6 +27,7 @@ import "./matching/matching.css";
 export function TrackTable({
   tracks: sourceRows,
   providers = [],
+  libraryProvider,
   queryKey,
   selectionKey = queryKey,
   complete = false,
@@ -38,6 +40,7 @@ export function TrackTable({
 }: {
   tracks: readonly TrackItem[];
   providers?: Provider[];
+  libraryProvider?: string;
   queryKey: string;
   selectionKey?: string;
   complete?: boolean;
@@ -56,7 +59,9 @@ export function TrackTable({
   const rows = useMemo(() => sourceRows.map((item) => "trackId" in item
     ? { ...item, selectedSource: item.selectedSource && withProviderAvailability(item.selectedSource, providerMap) }
     : withProviderAvailability(item, providerMap)), [sourceRows, providerMap]);
-  const entries = rows.map((item) => ({ item, source: displaySource(item) }));
+  const entries = rows.map((item) => ({
+    item, source: displaySource(item), credits: <TrackCredits track={item} libraryProvider={libraryProvider} />,
+  }));
   const tracks = entries.map(({ source }) => source).filter((item) => item !== null);
   const matchingPending = useStore(s.matchingDecisions.pending);
   const favorites = useStore(s.favorites);
@@ -177,9 +182,6 @@ export function TrackTable({
             >
               {tr("加入队列")}
             </button>
-            <span className="muted action-hint">
-              {!complete && tr("可选择曲目加入队列")}
-            </span>
           </>
         )}
         <div className="list-actions-end">
@@ -220,7 +222,7 @@ export function TrackTable({
               <th>{tr("曲名")}</th>
               <th>{tr("歌手")}</th>
               <th>{tr("专辑")}</th>
-              <th>{tr("来源")}</th>
+              {libraryProvider === undefined && <th>{tr("来源")}</th>}
               <th>{tr("格式")}</th>
               <th>{tr("时长")}</th>
               <th>
@@ -229,16 +231,17 @@ export function TrackTable({
             </tr>
           </thead>
           <tbody>
-            {entries.map(({ item, source: t }, i) => t ? (
+            {entries.map(({ item, source: t, credits }, i) => t ? (
               <TrackRow
                 key={tableRowKey(item)}
                 track={t}
+                credits={credits}
                 localizedTitles={"trackId" in item ? item.localizedTitles : undefined}
                 number={i + 1}
-                provider={sourceName(
+                provider={libraryProvider === undefined ? sourceName(
                   providers.find((p) => p.id === t.providerInstanceId) ??
                     t.providerInstanceId,
-                )}
+                ) : undefined}
                 checked={selection.isSelected(tableRowKey(item))}
                 toggle={() => selection.toggle(tableRowKey(item))}
                 add={() => setAdd({items: [item]})}
@@ -255,6 +258,7 @@ export function TrackTable({
                 onMatchingChange={onMatchingChange}
               />
             ) : "trackId" in item && <UnavailableMusicRow key={tableRowKey(item)} track={item} number={i + 1} checked={selection.isSelected(tableRowKey(item))} toggle={() => selection.toggle(tableRowKey(item))}
+              credits={credits} showSource={libraryProvider === undefined}
               isFavorite={s.favorites.has(item.trackId)} favoriteDisabled={favoriteDisabled}
               favorite={() => void favorite([item], !s.favorites.has(item.trackId))} add={() => setAdd({items:[item]})}
               openMenu={(x, y, origin) => setMenu({ items: selection.isSelected(tableRowKey(item)) ? chosen : [item], selection: selection.isSelected(tableRowKey(item)), x, y, origin })} />)}

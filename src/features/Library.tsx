@@ -139,6 +139,7 @@ export function Library() {
           {snapshot.items.length > 0 && (
             <TrackTable
               tracks={snapshot.items}
+              libraryProvider={provider}
               providers={providers.data ?? []}
               queryKey={`${provider}:${revision}`}
               selectionKey={`${provider}:${revision}:${snapshot.revision}:${snapshot.matchingRevision ?? ""}`}

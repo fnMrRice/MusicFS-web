@@ -15,6 +15,10 @@ test.beforeAll(async () => {
 });
 test.afterAll(async () => { await new Promise<void>((resolve) => server?.httpServer.close(() => resolve())); });
 
+const albumA = { albumId: "album-known", name: "Album A" };
+const liveAlbum = { albumId: "live-edition", name: "Live Edition" };
+const artistA = { artistId: "artist-known", name: "Artist A" };
+const guestArtist = { artistId: "artist-guest", name: "Guest Artist" };
 const tracks: SourceTrack[] = ["Alpha", "Beta"].map((name) => ({ sourceTrackId: name, providerInstanceId: "local",
   displayName: `${name}.flac`, title: name, artists: ["Artist A"], album: "Album A", genre: "Jazz", coverObjectId: name === "Alpha" ? "cover" : "broken",
   durationMs: 120000, codec: "flac", container: "flac", bitrateBps: null, availability: "available", assetId: name }));
@@ -25,8 +29,10 @@ const root = makeCategory("folder", "folder-root", "Root");
 const child: Category = { ...makeCategory("folder", "folder-child", "钢琴 & Live"), parentId: root.categoryId,
   breadcrumbs: [...root.breadcrumbs, { categoryId: "folder-child", name: "钢琴 & Live" }] };
 const categories: Record<CategoryKind, Category[]> = {
-  artist: [makeCategory("artist", "artist-known", "Artist A"), makeCategory("artist", "artist-unknown", "Unknown artist", true)],
-  album: [makeCategory("album", "album-known", "Album A"), makeCategory("album", "album-unknown", "Unknown album", true)],
+  artist: [makeCategory("artist", artistA.artistId, artistA.name), makeCategory("artist", guestArtist.artistId, guestArtist.name),
+    makeCategory("artist", "artist-unknown", "Unknown artist", true)],
+  album: [makeCategory("album", albumA.albumId, albumA.name), makeCategory("album", liveAlbum.albumId, liveAlbum.name),
+    makeCategory("album", "album-unknown", "Unknown album", true)],
   genre: [makeCategory("genre", "genre-known", "Jazz"), makeCategory("genre", "genre-unknown", "Unknown genre", true)],
   folder: [root, child],
 };
@@ -56,10 +62,13 @@ async function mockApi(page: Page, special?: (route: Route, url: URL) => Promise
     if (path.endsWith("/health/ready")) json = { product: "MusicFS", apiVersion: "1", ready: true, instanceId: "categories-mock" };
     if (path.endsWith("/auth/session")) json = { csrfToken: "fixture", user: { id: "user", role: "admin" } };
     if (path.endsWith("/provider-instances")) json = { items: [
-      { id: "local", name: "本地来源", capabilities: [], availability: "available", roots: [{ id: "root", name: "音乐收藏" }] },
-      { id: "other", name: "另一来源", capabilities: [], availability: "available", roots: [] },
+      { id: "local", name: "本地来源", capabilities: [], availability: "available", roots: [{ id: "root", name: "音乐收藏" }],
+        plugin: { id: "local-plugin", name: "本地来源", localizedNames: {}, features: ["music-source"] } },
+      { id: "other", name: "另一来源", capabilities: [], availability: "available", roots: [],
+        plugin: { id: "other-plugin", name: "另一来源", localizedNames: {}, features: ["music-source"] } },
     ] };
-    if (path.endsWith("/library/tracks")) json = musicPage(tracks.map((track) => ({ ...track, versions: [track] })));
+    if (path.endsWith("/library/tracks")) json = { ...musicPage([]),
+      items: tracks.map((track) => ({ ...musicTrack(track), artists: [artistA], albums: [albumA] })) };
     for (const kind of ["artist", "album", "genre"] as const) {
       const collection = `/library/${kind}s`;
       const idKey = `${kind}Id`;
@@ -84,12 +93,85 @@ async function mockApi(page: Page, special?: (route: Route, url: URL) => Promise
         .filter((item) => !url.searchParams.get("q") || item.name.includes(url.searchParams.get("q")!));
       json = catalogPage(url, url.searchParams.get("providerInstanceId") === "other" ? [] : items);
     }
-    if (path.endsWith("/library/search")) json = catalogPage(url, tracks.filter((track) => !url.searchParams.get("q") || track.title?.includes(url.searchParams.get("q")!)));
+    if (path.endsWith("/library/search")) json = catalogPage(url, tracks
+      .filter((track) => !url.searchParams.get("q") || track.title?.includes(url.searchParams.get("q")!))
+      .map((track) => ({ ...track, catalogArtists: [artistA], albums: [albumA] })));
     await route.fulfill({ json });
   });
   return { requests, released };
 }
 const tab = (page: Page, name: string) => page.getByLabel("曲目分类", { exact: true }).getByRole("button", { name, exact: true });
+
+test("album views retain the chosen layout and show release information and per-album actions", async ({ page }) => {
+  const { requests } = await mockApi(page, async (route, url) => {
+    if (!url.pathname.endsWith("/library/albums")) return false;
+    await route.fulfill({ json: { items: [
+      { ...albumA, trackCount: 2, publisher: "Fixture Records", releaseDate: "2024-06-17" },
+      { ...liveAlbum, trackCount: 0, publisher: null, releaseDate: null },
+      { albumId: "", name: "", trackCount: 1, publisher: null, releaseDate: null },
+    ], nextAfter: null } });
+    return true;
+  });
+  await page.goto(`${origin}/#/library?category=${encodeURIComponent("专辑")}`);
+  const cards = page.getByRole("button", { name: "卡片视图", exact: true });
+  const list = page.getByRole("button", { name: "列表视图", exact: true });
+  const more = (name: string) => page.getByRole("button", { name: `${name} 的更多操作`, exact: true });
+  const menu = page.getByRole("menu");
+  await expect(cards).toHaveAttribute("aria-pressed", "true");
+  await more(albumA.name).click();
+  await expect(menu.getByRole("menuitem", { name: "查看曲目" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(more(albumA.name)).toBeFocused();
+  await list.click();
+  const row = page.getByRole("row").filter({ has: more(albumA.name) });
+  await expect(row).toContainText(albumA.name);
+  await expect(row.getByRole("cell", { name: /^2(?:\s*首)?$/ })).toBeVisible();
+  await expect(row).toContainText("Fixture Records");
+  await expect(row).toContainText(/2024\D+0?6\D+17/);
+  expect(requests.some(url => url.pathname.includes("/library/albums/"))).toBe(false);
+  await page.reload();
+  await expect(row).toBeVisible();
+  await more(liveAlbum.name).click();
+  await expect(menu.getByRole("menuitem", { name: "查看曲目" })).toBeEnabled();
+  await expect(menu.getByRole("menuitem", { name: "播放全部" })).toBeDisabled();
+  await page.keyboard.press("Escape");
+  await more("未知专辑").click();
+  await menu.getByRole("menuitem", { name: "查看曲目" }).click();
+  await expect(page.getByRole("heading", { name: "未知专辑", exact: true })).toBeVisible();
+  await expect.poll(() => requests.some(url => url.searchParams.get("unknown") === "album")).toBe(true);
+  await page.goBack();
+  await expect(list).toHaveAttribute("aria-pressed", "true");
+  await expect(row).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(row.getByText(/Fixture Records · 2024/)).toBeVisible();
+  await expect(more(albumA.name)).toBeInViewport();
+  await more(albumA.name).click();
+  await expect(menu.getByRole("menuitem", { name: "添加到歌单" })).toBeInViewport();
+  await page.keyboard.press("Escape");
+  await cards.click();
+  await expect(page.locator(".category-card").filter({ hasText: albumA.name })).toBeVisible();
+});
+
+test("album queue actions load every page in provider scope and skip unavailable recordings", async ({ page }) => {
+  const after: (string | null)[] = [];
+  const offline = { ...tracks[0], sourceTrackId: "offline", title: "Offline", availability: "offline" };
+  await mockApi(page, async (route, url) => {
+    if (!url.pathname.endsWith("/library/tracks") || url.searchParams.get("albumId") !== albumA.albumId) return false;
+    expect(url.searchParams.get("providerInstanceId")).toBe("local");
+    after.push(url.searchParams.get("after"));
+    const result = url.searchParams.has("after") ? musicPage([offline, tracks[1]]) : musicPage([tracks[0]], "1", 0, "next");
+    await route.fulfill({ json: result });
+    return true;
+  });
+  await page.goto(`${origin}/#/library?category=${encodeURIComponent("专辑")}&source=local`);
+  await page.getByRole("button", { name: "列表视图", exact: true }).click();
+  await page.getByRole("button", { name: `${albumA.name} 的更多操作`, exact: true }).click();
+  expect(after).toEqual([]);
+  await page.getByRole("menuitem", { name: "加入队列", exact: true }).click();
+  await page.getByRole("button", { name: "播放队列", exact: true }).click();
+  await expect(page.locator(".queue-list button")).toHaveText(["Alpha", "Beta"]);
+  expect(after).toEqual([null, "next"]);
+});
 
 test("artists, albums and genres open scoped track lists, including unknown categories", async ({ page }) => {
   const { requests } = await mockApi(page);
@@ -100,7 +182,10 @@ test("artists, albums and genres open scoped track lists, including unknown cate
     await page.locator(".category-card").filter({ hasText: name }).click();
     await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
     await expect(page.getByRole("checkbox", { name: "选择 Alpha", exact: true })).toBeVisible();
-    await expect(page.locator(".tracks tbody tr").first()).toContainText("Album A");
+    await expect(page.getByRole("columnheader", { name: "来源", exact: true })).toHaveCount(0);
+    const row = page.locator(".tracks tbody tr").first();
+    await expect(row.getByRole("link", { name: albumA.name, exact: true })).toBeVisible();
+    await expect(row.getByRole("link", { name: artistA.name, exact: true })).toBeVisible();
     await page.getByLabel("分类路径").getByRole("button", { name: label, exact: true }).click();
     await page.locator(".category-card").filter({ hasText: unknown }).click();
     await expect(page.getByRole("heading", { name: unknown, exact: true })).toBeVisible();
@@ -135,8 +220,39 @@ test("a folder track menu edits the linked catalog track", async ({ page }) => {
   expect(saved).toBe(true);
 });
 
+test("all tracks links each artist and album by catalog ID and shows providers in the expanded versions", async ({ page }) => {
+  const alternate = { ...tracks[0], sourceTrackId: "alternate", providerInstanceId: "other", displayName: "Alpha live.flac" };
+  const song = { ...musicTrack({ ...tracks[0], versions: [tracks[0], alternate] }), artists: [artistA, guestArtist], albums: [albumA, liveAlbum] };
+  const noCredits = musicTrack({ ...tracks[1], artists: [], album: null });
+  const { requests } = await mockApi(page, async (route, url) => {
+    if (!url.pathname.endsWith("/library/tracks")) return false;
+    await route.fulfill({ json: { ...musicPage([]), items: [song, noCredits] } });
+    return true;
+  });
+  await page.goto(`${origin}/#/library?source=local`);
+  const row = page.getByRole("row").filter({ has: page.getByRole("checkbox", { name: "选择 Alpha", exact: true }) });
+  await expect(row.getByRole("link", { name: albumA.name, exact: true })).toBeVisible();
+  await expect(page.getByRole("row").filter({ has: page.getByRole("checkbox", { name: "选择 Beta", exact: true }) })
+    .getByRole("link")).toHaveCount(0);
+  await expect(page.getByRole("columnheader", { name: "来源", exact: true })).toHaveCount(0);
+  await expect(row.getByText("本地来源", { exact: true })).toHaveCount(0);
+  await row.getByRole("button", { name: "展开 Alpha 的来源版本" }).click();
+  const versions = page.getByLabel("来源版本", { exact: true });
+  await expect(versions.getByText("本地来源", { exact: true })).toBeVisible();
+  await expect(versions.getByText("另一来源", { exact: true })).toBeVisible();
+  for (const credit of [artistA, guestArtist, albumA, liveAlbum]) {
+    await row.getByRole("link", { name: credit.name, exact: true }).click();
+    await expect(page.getByRole("heading", { name: credit.name, exact: true })).toBeVisible();
+    const [field, id] = "artistId" in credit ? ["artistId", credit.artistId] : ["albumId", credit.albumId];
+    await expect.poll(() => requests.some(url => url.pathname.endsWith("/library/tracks") &&
+      url.searchParams.get(field) === id && url.searchParams.get("providerInstanceId") === "local")).toBe(true);
+    await page.goBack();
+    await expect(tab(page, "全部曲目")).toHaveAttribute("aria-pressed", "true");
+  }
+});
+
 test("all tracks requests source records while artist and album views keep gray metadata-only rows", async ({ page }) => {
-  const available = musicTrack(tracks[0]);
+  const available = { ...musicTrack(tracks[0]), artists: [artistA], albums: [albumA] };
   const offline = musicTrack({ ...tracks[1], availability: "offline" });
   const missing = { ...available, trackId: "metadata-only", title: "尚无音源的曲目", selectedSource: null };
   const queries: URLSearchParams[] = [];
@@ -157,7 +273,9 @@ test("all tracks requests source records while artist and album views keep gray 
     await tab(page, label).click();
     await page.locator(".category-card").filter({ hasText: name }).click();
     await expect(missingRow).toHaveClass(/source-missing/);
-    await expect(missingRow).toContainText("暂无来源");
+    await expect(missingRow.getByRole("link", { name: albumA.name, exact: true })).toBeVisible();
+    await expect(missingRow.getByRole("link", { name: artistA.name, exact: true })).toBeVisible();
+    await expect(missingRow.getByRole("cell", { name: "暂无来源", exact: true })).toHaveCount(0);
     const play = missingRow.getByRole("button", { name: `播放 ${missing.title}`, exact: true });
     await expect(play).toBeDisabled();
     const gray = await missingRow.evaluate((element) => getComputedStyle(element).color);
@@ -182,6 +300,13 @@ test("folder navigation restores breadcrumbs after reload and scopes search to t
   await page.reload();
   await expect(page.getByLabel("分类路径")).toContainText("音乐收藏");
   await expect(page.getByRole("heading", { name: "钢琴 & Live", exact: true })).toBeVisible();
+  await expect(page.getByRole("columnheader", { name: "来源", exact: true })).toHaveCount(0);
+  for (const name of [albumA.name, artistA.name]) {
+    await page.locator(".tracks tbody tr").first().getByRole("link", { name, exact: true }).click();
+    await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
+    await page.goBack();
+    await expect(page.getByRole("heading", { name: "钢琴 & Live", exact: true })).toBeVisible();
+  }
   await page.getByRole("checkbox", { name: "选择 Alpha", exact: true }).check();
   await page.getByRole("textbox", { name: "搜索当前列表", exact: true }).fill("Beta");
   await page.getByRole("textbox", { name: "搜索当前列表", exact: true }).press("Enter");

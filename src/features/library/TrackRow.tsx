@@ -1,4 +1,4 @@
-import { Fragment, useState } from "react";
+import { Fragment, useState, type ReactNode } from "react";
 import { tr, useLocale } from "../../i18n";
 import type { SourceTrack } from "../../api/types";
 import { useServices, useStore } from "../../app/services";
@@ -12,6 +12,7 @@ import { OtherTrackTitles } from "./OtherTrackTitles";
 
 export function TrackRow({
   track: t,
+  credits,
   localizedTitles,
   number,
   provider,
@@ -28,9 +29,10 @@ export function TrackRow({
   onMatchingChange,
 }: {
   track: SourceTrack;
+  credits: ReactNode;
   localizedTitles?: LocalizedTitle[];
   number: number;
-  provider: string;
+  provider?: string;
   checked: boolean;
   toggle: () => void;
   add: () => void;
@@ -105,9 +107,8 @@ export function TrackRow({
           </div>
         </div>
       </td>
-      <td>{t.artists?.join(" / ") || "—"}</td>
-      <td>{t.album || "—"}</td>
-      <td>{provider}</td>
+      {credits}
+      {provider !== undefined && <td>{provider}</td>}
       <td>
         <span className="format">
           {(t.container || t.codec)?.toUpperCase() ?? "—"}
@@ -130,7 +131,7 @@ export function TrackRow({
         </div>
       </td>
     </tr>
-    {expanded && versions.length > 1 && <tr className="track-versions"><td colSpan={9}>
+    {expanded && versions.length > 1 && <tr className="track-versions"><td colSpan={provider === undefined ? 8 : 9}>
       <TrackVersions tracks={versions} revision={matchingRevision} refresh={onMatchingChange}
         openActions={openVersionMenu}
         recordingId={t.recordingId} defaultSourceTrackId={t.sourceTrackId} manualSourceTrackId={t.manualSourceTrackId} />

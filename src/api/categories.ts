@@ -28,6 +28,10 @@ function track(value: unknown): value is SourceTrack {
   return object(value) && text(value.sourceTrackId) && text(value.providerInstanceId) && text(value.displayName) &&
     text(value.availability) && (value.durationMs === null || typeof value.durationMs === "number") &&
     nullableText(value.title) && (value.artists === null || Array.isArray(value.artists) && value.artists.every(text)) &&
+    (value.albums === undefined || Array.isArray(value.albums) && value.albums.every(album =>
+      object(album) && text(album.albumId) && !!album.albumId && text(album.name) && !!album.name)) &&
+    (value.catalogArtists === undefined || Array.isArray(value.catalogArtists) && value.catalogArtists.every(artist =>
+      object(artist) && text(artist.artistId) && !!artist.artistId && text(artist.name) && !!artist.name)) &&
     (value.coverObjectId === undefined || nullableText(value.coverObjectId));
 }
 export class CategoriesApi {

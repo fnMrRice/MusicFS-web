@@ -49,6 +49,7 @@ interface AuthState {
 }
 interface PreferencesState {
   theme: "dark" | "light" | "system";
+  albumView: "cards" | "list";
   volume: number;
   lastVolume: number;
   lyricsPinned: boolean;
@@ -63,6 +64,7 @@ interface PreferencesState {
 }
 const defaults: PreferencesState = {
   theme: "system",
+  albumView: "cards",
   volume: 0.8,
   lastVolume: 0.8,
   lyricsPinned: false,
@@ -262,6 +264,7 @@ export class Services {
         saved?.theme === "system"
           ? saved.theme
           : defaults.theme,
+      albumView: saved?.albumView === "list" ? "list" : defaults.albumView,
       ...loadVolumePreferences(),
       lyricsPinned: saved?.lyricsPinned === true,
       queuePinned: saved?.queuePinned === true,

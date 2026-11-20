@@ -38,7 +38,10 @@ export interface MusicTrackPage {
 }
 export type MusicCategoryKind = "artist" | "album" | "genre";
 export type MusicTrackQuery = { providerInstanceId?: string; artistId?: string; albumId?: string; genre?: string; unknown?: MusicCategoryKind; q?: string; sourceOnly?: boolean };
-export interface MusicCategory { id: string; name: string; trackCount: number; coverPath?: string | null }
+export interface MusicCategory {
+  id: string; name: string; trackCount: number;
+  coverPath?: string | null; publisher?: string | null; releaseDate?: string | null;
+}
 const record = (value: unknown): value is Record<string, unknown> => !!value && typeof value === "object";
 const text = (value: unknown): value is string => typeof value === "string";
 const id = (value: unknown): value is string => text(value) && value.length > 0;
@@ -145,10 +148,16 @@ export class MusicCatalogApi {
       const key = kind === "genre" ? "name" : `${kind}Id`;
       if (!record(item) || !text(item[key]) || !text(item.name) || !Number.isSafeInteger(item.trackCount) || Number(item.trackCount) < 0)
         throw new ApiError("INVALID_RESPONSE", "Invalid music category");
-      if (kind === "album" && item.coverPath !== undefined && !nullableText(item.coverPath))
-        throw new ApiError("INVALID_RESPONSE", "Invalid music album cover");
-      return { id: item[key], name: item.name, trackCount: Number(item.trackCount),
-        ...(kind === "album" && item.coverPath !== undefined ? { coverPath: item.coverPath as string | null } : {}) };
+      const category: MusicCategory = { id: item[key], name: item.name, trackCount: Number(item.trackCount) };
+      if (kind === "album") {
+        for (const field of ["coverPath", "publisher", "releaseDate"] as const) {
+          const value = item[field];
+          if (value === undefined) continue;
+          if (!nullableText(value)) throw new ApiError("INVALID_RESPONSE", "Invalid music album metadata");
+          category[field] = value;
+        }
+      }
+      return category;
     });
     return { items, cursor: page.nextAfter };
   }

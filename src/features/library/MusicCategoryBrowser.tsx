@@ -8,6 +8,7 @@ import { tr } from "../../i18n";
 import { TrackTable } from "../TrackTable";
 import { AlbumScraping } from "../scrapers/AlbumScraping";
 import { AlbumCover } from "./AlbumCover";
+import { AlbumCollection } from "./AlbumCollection";
 import { ArtistNames, readNamedArtist, type NamedArtist } from "./ArtistNames";
 
 const labels = { artist: "歌手", album: "专辑", genre: "流派" };
@@ -23,15 +24,14 @@ function MusicCategoryList({ kind, provider, query, navigate }: Props) {
   const api = useServices().musicCatalog;
   const pages = usePages(`${kind}:${provider}:${query}`, (after, signal) => api.categories(kind, provider, query, after, signal), (item) => item.id);
   return <>
-    <div className="category-cards">
+    {kind === "album" ? <AlbumCollection items={pages.items} provider={provider} openAlbum={navigate} /> : <div className="category-cards">
       {pages.items.map((item) => <button type="button" key={item.id} className="category-card" onClick={() => navigate(item.id)}>
-        {kind === "album" ? <AlbumCover coverPath={item.coverPath} name={item.name} decorative />
-          : <span className="category-icon"><Icon name={kind === "artist" ? "user" : "music"} size={25} /></span>}
+        <span className="category-icon"><Icon name={kind === "artist" ? "user" : "music"} size={25} /></span>
         <span className="category-card-text"><strong>{item.name || tr(unknownLabels[kind])}</strong>
           <small>{tr("{0} 首", { 0: item.trackCount })}</small></span>
         <Icon name="chevron" size={16} />
       </button>)}
-    </div>
+    </div>}
     <ErrorNotice error={pages.error} retry={pages.retry} />
     {pages.loading && <p className="loading" role="status">{tr("正在加载…")}</p>}
     {!pages.loading && !pages.error && !pages.items.length && <Empty title={tr("暂无可浏览的分类")} />}
@@ -91,7 +91,7 @@ function MusicCategoryTracks({ kind, provider, providers, id, unknown, query, na
     </div>}
     {album && <AlbumScraping album={album} detailsId={detailsId} detailsOpen={detailsOpen}
       applied={finish} refresh={() => { title.reload(); pages.reload(); }} />}
-    {(pages.items.length > 0 || album) && <TrackTable tracks={pages.items} providers={providers} queryKey={scope}
+    {(pages.items.length > 0 || album) && <TrackTable tracks={pages.items} providers={providers} queryKey={scope} libraryProvider={provider}
       hideEmptyTable
       pagination={{ loading: pages.loading, hasMore: !!pages.cursor, error: pages.error, more: pages.more }}
       albumScope={album && { albumId: album.albumId, revision: album.revision, reload: () => { title.reload(); pages.reload(); services.invalidateLibraries(); } }}

@@ -1,3 +1,5 @@
+import type { CatalogAlbum, CatalogArtist } from "./music-catalog";
+
 export interface PluginIdentity {
   id: string; name: string; localizedNames: Record<string, string>; features: string[];
 }
@@ -14,6 +16,7 @@ export interface SourceTrack {
   sourceTrackId: string; providerInstanceId: string; displayName: string;
   title: string | null; artists: string[] | null; durationMs: number | null;
   album?: string | null; genre?: string | null; coverObjectId?: string | null;
+  albums?: CatalogAlbum[]; catalogArtists?: CatalogArtist[];
   codec: string | null; container: string | null; bitrateBps: number | null;
   sampleRateHz?: number | null;
   availability: string; assetId: string | null; recordingId?: string | null;
