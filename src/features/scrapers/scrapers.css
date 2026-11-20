@@ -8,8 +8,40 @@
 .scraper-controls details[open] > summary { margin-bottom: 10px; }
 .scraper-results, .scraped-saved { display: grid; gap: 10px; }
 .scraped-saved { margin-top: 14px; }
-.album-scraping { margin: 16px 0 24px; }
-.album-scraping h3 { margin: 0; }
+.album-metadata { padding: 16px 20px; margin: 0 0 18px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; min-width: 0; }
+.album-metadata-section + .album-metadata-section { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
+.album-metadata-section > header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 14px; }
+.album-metadata-section h3 { margin: 0; font-size: 14px; }
+.album-metadata-section > header a { color: var(--accent); font-size: 12px; text-decoration: none; }
+.album-metadata-section > header a:hover { text-decoration: underline; }
+.album-metadata-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr)); gap: 16px 24px; margin: 0; }
+.album-metadata-fields dt { color: var(--muted); font-size: 12px; margin-bottom: 5px; }
+.album-metadata-fields dd { margin: 0; font-size: 14px; overflow-wrap: anywhere; white-space: pre-wrap; line-height: 1.6; }
+.album-metadata-wide { grid-column: 1 / -1; }
+.album-metadata-empty { margin: 14px 0 0; }
+.album-metadata-actions { display: flex; justify-content: flex-end; margin-bottom: 14px; }
+.album-metadata-actions button { padding: 6px 10px; font-size: 12px; color: var(--muted); }
+.album-search, .album-search form, .album-search fieldset, .album-editor, .album-editor fieldset { display: grid; gap: 14px; }
+.album-search fieldset, .album-editor fieldset { min-width: 0; border: 0; margin: 0; padding: 0; }
+.album-search label, .album-editor label { display: grid; gap: 6px; font-size: 13px; }
+.album-search input, .album-search select, .album-editor input { min-width: 0; width: 100%; }
+.album-search form > button, .album-editor > button { justify-self: start; }
+.album-editor input[readonly] { color: var(--muted); background: transparent; }
+.album-editor p { margin: -6px 0 0; }
+.album-editor-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr)); gap: 14px; }
+.album-search-results { display: grid; gap: 10px; }
+.album-search-results article { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 14px; border: 1px solid var(--line); border-radius: 8px; }
+.album-search-results article > div { display: grid; gap: 5px; min-width: 0; overflow-wrap: anywhere; }
+.album-search-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
+.album-search > .album-metadata { margin: 0; }
+.album-tracklist-wrap { max-height: 18rem; overflow: auto; }
+.album-tracklist { width: 100%; border-collapse: collapse; font-size: 13px; text-align: start; }
+.album-tracklist th { color: var(--muted); font-size: 12px; font-weight: 400; }
+.album-tracklist th, .album-tracklist td { padding: 8px; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+.album-tracklist th:first-child, .album-tracklist td:first-child { padding-left: 0; width: 44px; }
+.album-tracklist th:last-child, .album-tracklist td:last-child { text-align: end; white-space: nowrap; }
+.album-tracklist tr:last-child td { border-bottom: 0; }
+@media (max-width: 520px) { .album-metadata { padding: 14px; } }
 .scraper-result { border: 1px solid var(--line); border-radius: 8px; padding: 12px; min-width: 0; }
 .scraper-result summary { cursor: pointer; overflow-wrap: anywhere; }
 .scraper-result button { margin-top: 10px; }

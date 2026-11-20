@@ -6,37 +6,36 @@ import { Modal } from "../../components/Modal";
 import { useResource } from "../../components/query";
 import { ErrorNotice } from "../../components/ui";
 import { tr, useLocale } from "../../i18n";
-import { scrapedFieldName } from "./fields";
-import { ScrapedPreview } from "./ScrapedPreview";
-import { ScraperSearch } from "./ScraperSearch";
+import { AlbumMetadata } from "./AlbumMetadata";
+import { AlbumScraperSearch } from "./AlbumScraperSearch";
+import { AlbumEditor } from "./AlbumEditor";
+import "./scrapers.css";
 
-const albumFields = ["albumDetails", "albumTracks", "artwork"];
-
-export function AlbumScraping({ album, artist, refresh }: { album: MusicAlbum; artist?: string; refresh: () => void }) {
+export function AlbumScraping({ album, artist, detailsId, detailsOpen, searchOpen, closeSearch, applied, refresh }: {
+  album: MusicAlbum; artist?: string; detailsId: string; detailsOpen: boolean; searchOpen: boolean;
+  closeSearch: () => void; applied: () => void; refresh: () => void;
+}) {
   useLocale();
   const client = useServices().client;
   const api = useMemo(() => new ScrapersApi(client), [client]);
   const saved = useResource(`album-scraped:${album.albumId}:${album.revision}`, (signal) => api.savedAlbum(album.albumId, signal));
-  const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-  const finish = () => { setOpen(false); refresh(); };
-  return <section className="album-scraping" aria-label={tr("刮削资料")}>
-    <div className="category-heading"><h3>{tr("刮削资料")}</h3>
-      <button onClick={() => setOpen(true)}>{tr("搜索在线资料")}</button>
-    </div>
-    <ErrorNotice error={saved.error} retry={saved.reload} />
-    {!!saved.data?.length && <div className="scraped-saved">
-      {saved.data.map((entry) => <details className="scraper-result" key={entry.field}>
-        <summary><strong>{scrapedFieldName(entry.field)}</strong> · {entry.item.title}</summary>
-        <small>{entry.pluginId}</small>
-        <ScrapedPreview item={entry.item} />
-      </details>)}
-    </div>}
-    {open && <Modal title={tr("搜索在线资料")} close={() => { if (!saving) setOpen(false); }}>
-      <ScraperSearch preferredField="albumDetails" allowedFields={albumFields}
-        initial={{ title: album.name, artist }}
-        apply={(field, pluginId, candidate, key) => api.applyAlbum(album.albumId, field, album.revision, pluginId, candidate.candidateToken, key)}
-        canApply={(field) => albumFields.includes(field)} finished={finish} refresh={finish} savingChanged={setSaving} />
+  const [editing, setEditing] = useState(false);
+  const online = saved.data?.find((entry) => entry.field === "albumDetails")?.item;
+  return <>
+    {detailsOpen && <section id={detailsId} className="album-metadata" aria-label={tr("专辑详情")}>
+      <div className="album-metadata-actions"><button type="button" disabled={saved.loading} onClick={() => setEditing(true)}>{tr("编辑资料")}</button></div>
+      <ErrorNotice error={saved.error} retry={saved.reload} />
+      {saved.loading && <p className="muted" role="status">{tr("正在加载…")}</p>}
+      {saved.data && <AlbumMetadata album={album} fields={saved.data} />}
+    </section>}
+    {searchOpen && <Modal title={tr("搜索在线资料")} close={() => { if (!saving) closeSearch(); }}>
+      <AlbumScraperSearch album={album} artist={artist} applied={applied} refresh={refresh} savingChanged={setSaving} />
     </Modal>}
-  </section>;
+    {editing && <Modal title={tr("编辑专辑资料")} close={() => { if (!saving) setEditing(false); }}>
+      <AlbumEditor album={album} initialPublisher={album.publisher ?? online?.publisher}
+        initialReleaseDate={album.releaseDate ?? online?.date} applied={() => { setEditing(false); applied(); }}
+        refresh={() => { setEditing(false); refresh(); }} savingChanged={setSaving} />
+    </Modal>}
+  </>;
 }

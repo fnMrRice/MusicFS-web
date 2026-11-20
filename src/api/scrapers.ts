@@ -18,6 +18,7 @@ export interface ScraperQuery {
   country?: string;
   fingerprint?: string;
   duration?: number;
+  sourceUrl?: string;
 }
 
 export interface ScrapedTrack {
@@ -35,6 +36,8 @@ export interface ScrapedItem {
   album?: string;
   date?: string;
   description?: string;
+  genre?: string;
+  publisher?: string;
   sourceUrl?: string;
   imageUrl?: string;
   lyrics?: string;
@@ -65,7 +68,7 @@ function isTrack(value: unknown): value is ScrapedTrack {
 }
 function isItem(value: unknown): value is ScrapedItem {
   return record(value) && nonempty(value.id) && typeof value.title === "string" &&
-    ["artist", "album", "date", "description", "sourceUrl", "imageUrl", "lyrics", "format"]
+    ["artist", "album", "date", "description", "genre", "publisher", "sourceUrl", "imageUrl", "lyrics", "format"]
       .every((key) => value[key] === undefined || typeof value[key] === "string") &&
     (value.duration === undefined || numeric(value.duration)) &&
     (value.tracks === undefined || Array.isArray(value.tracks) && value.tracks.every(isTrack));
@@ -116,6 +119,13 @@ export class ScrapersApi {
       { method: "PUT", body: { expectedRevision, pluginId, candidateToken }, idempotencyKey: key });
     if (!record(result) || !Number.isSafeInteger(result.revision) || Number(result.revision) <= expectedRevision)
       throw new ApiError("INVALID_RESPONSE", "Invalid album scraped field revision");
+  }
+  async applyAlbumBundle(albumId: string, expectedRevision: number, pluginId: string,
+    candidates: { albumDetails: string; albumTracks: string }, key: string) {
+    const result = await this.client.request<unknown>(`/library/albums/${encodeURIComponent(albumId)}/scraped-fields`,
+      { method: "PUT", body: { expectedRevision, pluginId, candidates }, idempotencyKey: key });
+    if (!record(result) || !Number.isSafeInteger(result.revision) || Number(result.revision) <= expectedRevision)
+      throw new ApiError("INVALID_RESPONSE", "Invalid complete album revision");
   }
   async apply(workId: string, field: string, expectedRevision: number, pluginId: string, candidateToken: string, key: string) {
     const result = await this.client.request<unknown>(`/works/${encodeURIComponent(workId)}/scraped-fields/${encodeURIComponent(field)}`,

@@ -55,4 +55,16 @@ describe("Scraper content declarations and selection", () => {
     await expect(api.savedAlbum("album")).rejects.toMatchObject({ code: "INVALID_RESPONSE" });
     await expect(api.applyAlbum("album", "artwork", 3, "plugin", "token", "key")).rejects.toMatchObject({ code: "INVALID_RESPONSE" });
   });
+  it("submits a complete release as one revision-protected idempotent selection", async () => {
+    const fetch = vi.fn().mockResolvedValue(reply({ revision: 4 }));
+    const client = new ApiClient(fetch);
+    client.csrfToken = "csrf";
+    const candidates = { albumDetails: "details-token", albumTracks: "tracks-token" };
+    await new ScrapersApi(client).applyAlbumBundle("album/1", 3, "plugin", candidates, "complete-album");
+    expect(fetch).toHaveBeenCalledTimes(1);
+    const [path, options] = fetch.mock.calls[0];
+    expect(path).toBe("/api/v1/library/albums/album%2F1/scraped-fields");
+    expect(options.headers.get("Idempotency-Key")).toBe("complete-album");
+    expect(JSON.parse(options.body)).toEqual({ expectedRevision: 3, pluginId: "plugin", candidates });
+  });
 });
