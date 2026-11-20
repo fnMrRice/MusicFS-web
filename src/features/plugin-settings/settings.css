@@ -1,5 +1,7 @@
 .plugin-settings { margin: 14px 0; padding: 18px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
 .plugin-settings h4 { margin: 0 0 12px; }
+.plugin-configuration .plugin-settings { margin: 0; padding: 0; border: 0; background: transparent; }
+.plugin-settings-footer { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
 .plugin-settings-fields { display: grid; gap: 16px; max-width: 650px; margin-bottom: 18px; }
 .plugin-setting-field > label { display: block; margin-bottom: 6px; }
 .plugin-setting-field > label.check-label { display: flex; flex-direction: row; align-items: center; gap: 9px; white-space: normal; }

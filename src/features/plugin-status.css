@@ -84,9 +84,13 @@
 .plugin-purposes .badge {
   color: var(--text);
 }
-.plugin-entry + .plugin-entry {
+.plugin-entry-row { position: relative; min-width: 0; }
+.plugin-entry-row + .plugin-entry-row {
   border-top: 1px solid var(--line);
 }
+.plugin-entry-row.has-settings > .plugin-entry > summary { padding-right: 124px; }
+.plugin-configuration-action { position: absolute; top: 20px; right: 0; }
+.plugin-configuration-action button { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
 .plugin-entry > summary {
   display: flex;
   align-items: center;

@@ -11,7 +11,9 @@ import "./settings.css";
 
 type Pending = { key: string } & ({ kind: "save"; request: SettingsRequest } | { kind: "action"; action: string });
 
-export function PluginSettings({ pluginId }: { pluginId: string }) {
+export function PluginSettings({ pluginId, busyChanged, cancel }: {
+  pluginId: string; busyChanged?: (busy: boolean) => void; cancel?: () => void;
+}) {
   const { locale } = useLocale();
   const services = useServices();
   const api = useMemo(() => new PluginSettingsApi(services.client, pluginId), [services, pluginId]);
@@ -68,7 +70,7 @@ export function PluginSettings({ pluginId }: { pluginId: string }) {
     if (!operation) return;
     const controller = new AbortController();
     control.current = controller;
-    setBusy(true); setError(null); setMessage("");
+    setBusy(true); busyChanged?.(true); setError(null); setMessage("");
     try {
       if (operation.kind === "save") {
         const result = await api.save(operation.request, operation.key, controller.signal);
@@ -83,11 +85,15 @@ export function PluginSettings({ pluginId }: { pluginId: string }) {
     } catch (cause) {
       if (controller.signal.aborted) return;
       const stale = cause instanceof ApiError && (cause.status === 409 || cause.status === 412 || cause.code === "REVISION_CONFLICT");
-      setConflict(stale); setUncertain(!stale);
-      setError(stale ? "插件设置已发生变化，请重新加载后再编辑。" : errorMessage(cause));
+      const unknown = cause instanceof ApiError && (cause.status === 0 || cause.status >= 500 || cause.code === "INVALID_RESPONSE");
+      setConflict(stale); setUncertain(unknown);
+      if (!unknown) pending.current = null;
+      setError(stale ? "插件设置已发生变化，请重新加载后再编辑。"
+        : cause instanceof ApiError && cause.code === "INVALID_ARGUMENT"
+          ? "配置内容无效，请检查填写格式后重试。" : errorMessage(cause));
     } finally {
       control.current = null;
-      if (!controller.signal.aborted) setBusy(false);
+      if (!controller.signal.aborted) { setBusy(false); busyChanged?.(false); }
     }
   }
   const title = data ? localizedPluginText(data.schema.title, data.schema.localizedTitles, locale) : tr("插件设置");
@@ -108,11 +114,14 @@ export function PluginSettings({ pluginId }: { pluginId: string }) {
       }}>
         <div className="plugin-settings-fields">{data.schema.fields.map((field) => <SettingField key={field.key} field={field} value={values[field.key]}
           disabled={loading || busy || conflict || uncertain} change={(value) => setValues((previous) => ({ ...previous, [field.key]: value }))} />)}</div>
-        {data.schema.fields.length > 0 && <button className="primary" disabled={loading || busy || !dirty || conflict || uncertain || !settingsValid(data.schema, values)}>
-          {busy ? tr("正在保存…") : tr("保存设置")}
-        </button>}
+        <div className="plugin-settings-footer">
+          {data.schema.fields.length > 0 && <button className="primary" disabled={loading || busy || !dirty || conflict || uncertain || !settingsValid(data.schema, values)}>
+            {busy ? tr("正在保存…") : tr("保存设置")}
+          </button>}
+          {cancel && <button type="button" disabled={busy} onClick={cancel}>{tr("取消")}</button>}
+        </div>
       </form>
-      {dirty && <p className="muted">{tr("请先保存修改，再执行插件操作。")}</p>}
+      {dirty && data.schema.actions.length > 0 && <p className="muted">{tr("请先保存修改，再执行插件操作。")}</p>}
       <div className="plugin-settings-actions">{data.schema.actions.map((action) => <div key={action.id}>
         <button disabled={loading || busy || dirty || conflict || uncertain || active} onClick={() => {
           void submit({ kind: "action", action: action.id, key: crypto.randomUUID() });
@@ -120,8 +129,9 @@ export function PluginSettings({ pluginId }: { pluginId: string }) {
         {action.description && <p className="muted">{localizedPluginText(action.description, action.localizedDescriptions, locale)}</p>}
       </div>)}</div>
       {message && <p className="feedback" role="status">{tr(message)}</p>}
-      <PluginJobStatus job={job} />
+      {(data.schema.actions.length > 0 || job && job.status !== "idle") && <PluginJobStatus job={job} />}
       <ErrorNotice error={pollError} retry={() => setPollEpoch((value) => value + 1)} />
     </>}
+    {!data && cancel && <div className="plugin-settings-footer"><button type="button" disabled={busy} onClick={cancel}>{tr("取消")}</button></div>}
   </section>;
 }
