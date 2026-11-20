@@ -139,10 +139,13 @@ export async function mock(page: Page, { empty = false, coverPath = "/api/v1/med
 export const dialog = (page: Page) => page.getByRole("dialog", { name: "搜索在线资料", exact: true });
 export const details = (page: Page) => page.getByRole("region", { name: "专辑详情", exact: true });
 export const detailsToggle = (page: Page) => page.getByRole("button", { name: "专辑详情", exact: true });
-export const scraping = (page: Page) => page.getByRole("button", { name: "搜索在线资料", exact: true });
+export const albumSearchButton = (page: Page) => details(page).getByRole("button", { name: "搜索", exact: true });
 export async function openAlbum(page: Page, origin: string, search = true) {
   await page.goto(`${origin}/#/library?category=${encodeURIComponent("专辑")}`);
   await page.getByRole("button", { name: /^夜间专辑 \d+ 首$/ }).click();
   await expect(detailsToggle(page)).toHaveAttribute("aria-expanded", "false");
-  if (search) await scraping(page).click();
+  if (search) {
+    await detailsToggle(page).click();
+    await albumSearchButton(page).click();
+  }
 }

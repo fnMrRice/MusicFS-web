@@ -45,7 +45,7 @@ export function AlbumMetadata({ album, fields }: { album: MusicAlbum; fields: Sa
       <header><h3>{tr("专辑资料")}</h3><div className="album-platform-links">{album.sourceLinks.map(link =>
         <PlatformLink key={link.pluginId} value={link.url} showHost />)}</div></header>
       <MetadataFields album={album} item={details?.item} />
-      {!fields.length && <p className="muted album-metadata-empty">{tr("尚无在线专辑资料，可通过「刮削」补充。")}</p>}
+      {!fields.length && <p className="muted album-metadata-empty">{tr("尚无在线专辑资料，可通过「搜索」补充。")}</p>}
     </article>
     {fields.filter((entry) => entry.field !== "albumDetails").map(({ field, item }) => {
     const heading = field === "albumTracks" ? "曲目表" : "封面";

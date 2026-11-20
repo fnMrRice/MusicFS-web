@@ -38,7 +38,7 @@ export default {
   "封面": ["Artwork", "封面", "カバー"],
   "在平台查看": ["View on platform", "在平台查看", "配信元で見る"],
   "{0} 的专辑封面": ["Album artwork for {0}", "{0} 的專輯封面", "{0} のアルバムカバー"],
-  "尚无在线专辑资料，可通过「刮削」补充。": ["No online album metadata yet. Use Look up metadata to add it.", "尚無線上專輯資料，可透過「刮削」補充。", "オンライン情報はまだありません。情報を取得して追加できます。"],
+  "尚无在线专辑资料，可通过「搜索」补充。": ["No online album metadata yet. Use Search to add it.", "尚無線上專輯資料，可透過「搜尋」補充。", "オンライン情報はまだありません。「検索」から追加できます。"],
   "原名": ["Original name", "原名", "元の名前"],
   "显示名": ["Display name", "顯示名稱", "表示名"],
   "编辑资料": ["Edit metadata", "編輯資料", "情報を編集"],

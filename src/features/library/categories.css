@@ -22,7 +22,6 @@
 .album-cover-heading { width: 76px; height: 76px; }
 .album-cover-preview { width: 160px; height: 160px; }
 .album-cover-preview img { object-fit: contain; }
-.album-scrape-action { display: inline-flex; align-items: center; gap: 6px; }
 @media (max-width: 520px) {
   .album-heading { gap: 12px; margin-top: 16px; }
   .album-cover-heading { width: 64px; height: 64px; }
