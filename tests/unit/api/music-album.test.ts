@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ApiClient } from "../../../src/api/client";
 import { MusicCatalogApi } from "../../../src/api/music-catalog";
 
-const album = { albumId: "album/1", name: "Album", revision: 2, externalId: null,
+const album = { albumId: "album/1", originalName: "Original album", name: "Album", revision: 2, externalId: null,
   isExternal: false, coverPath: null, publisher: null, releaseDate: null };
 const reply = (body: unknown) => new Response(JSON.stringify(body));
 
@@ -12,10 +12,29 @@ describe("Music album details", () => {
     expect(await new MusicCatalogApi(new ApiClient(fetch)).album(album.albumId)).toEqual(album);
     expect(fetch.mock.calls[0][0]).toBe("/api/v1/library/albums/album%2F1");
   });
-  it.each([{ ...album, albumId: "other" }, { ...album, revision: 0 }, { ...album, publisher: 4 }])
+  it.each([{ ...album, albumId: "other" }, { ...album, revision: 0 }, { ...album, publisher: 4 }, { ...album, originalName: null }])
     ("rejects mismatched or malformed album details", async (value) => {
       const api = new MusicCatalogApi(new ApiClient(vi.fn().mockResolvedValue(reply(value))));
       await expect(api.album(album.albumId)).rejects.toMatchObject({ code: "INVALID_RESPONSE" });
+    });
+  it("updates editable fields at the observed revision and preserves the original name", async () => {
+    const updated = { ...album, name: "Renamed", publisher: "Publisher", releaseDate: "2020-02-01", revision: 3 };
+    const fetch = vi.fn().mockResolvedValue(reply(updated));
+    const client = new ApiClient(fetch);
+    client.csrfToken = "csrf";
+    expect(await new MusicCatalogApi(client).updateAlbum(album,
+      { name: "Renamed", publisher: "Publisher", releaseDate: "2020-02-01" }, "edit-album")).toEqual(updated);
+    const [path, options] = fetch.mock.calls[0];
+    expect(path).toBe("/api/v1/library/albums/album%2F1");
+    expect(options.headers.get("Idempotency-Key")).toBe("edit-album");
+    expect(JSON.parse(options.body)).toEqual({ expectedRevision: 2, name: "Renamed", externalId: null,
+      isExternal: false, coverPath: null, publisher: "Publisher", releaseDate: "2020-02-01" });
+  });
+  it.each([{ ...album, originalName: "Overwritten", revision: 3 }, { ...album, revision: 2 }])
+    ("rejects an update that overwrites the immutable name or does not advance the revision", async (value) => {
+      const api = new MusicCatalogApi(new ApiClient(vi.fn().mockResolvedValue(reply(value))));
+      await expect(api.updateAlbum(album, { name: "Renamed", publisher: "", releaseDate: "" }, "edit-album"))
+        .rejects.toMatchObject({ code: "INVALID_RESPONSE" });
     });
 });
 

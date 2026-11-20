@@ -4,6 +4,7 @@ import type { SourceTrack } from "./types";
 export interface CatalogArtist { artistId: string; name: string }
 export interface CatalogAlbum { albumId: string; name: string }
 export interface MusicAlbum extends CatalogAlbum {
+  originalName: string;
   revision: number;
   externalId: string | null;
   isExternal: boolean;
@@ -32,11 +33,16 @@ export interface MusicTrackPage {
 }
 export type MusicCategoryKind = "artist" | "album" | "genre";
 export type MusicTrackQuery = { providerInstanceId?: string; artistId?: string; albumId?: string; genre?: string; unknown?: MusicCategoryKind; q?: string; sourceOnly?: boolean };
-export interface MusicCategory { id: string; name: string; trackCount: number }
+export interface MusicCategory { id: string; name: string; trackCount: number; coverPath?: string | null }
 const record = (value: unknown): value is Record<string, unknown> => !!value && typeof value === "object";
 const text = (value: unknown): value is string => typeof value === "string";
 const id = (value: unknown): value is string => text(value) && value.length > 0;
 const nullableText = (value: unknown) => value === null || text(value);
+function musicAlbum(value: unknown, albumId: string): value is MusicAlbum {
+  return record(value) && value.albumId === albumId && text(value.name) && text(value.originalName) &&
+    Number.isSafeInteger(value.revision) && Number(value.revision) > 0 && typeof value.isExternal === "boolean" &&
+    ["externalId", "coverPath", "publisher", "releaseDate"].every((key) => nullableText(value[key]));
+}
 const source = (value: unknown): value is SourceTrack => record(value) && id(value.sourceTrackId) &&
   id(value.providerInstanceId) && text(value.displayName) && text(value.availability) &&
   (value.durationMs === null || typeof value.durationMs === "number");
@@ -59,11 +65,20 @@ export class MusicCatalogApi {
 
   async album(albumId: string, signal?: AbortSignal): Promise<MusicAlbum> {
     const value = await this.client.request<unknown>(`/library/albums/${encodeURIComponent(albumId)}`, { signal });
-    if (!record(value) || value.albumId !== albumId || !text(value.name) ||
-      !Number.isSafeInteger(value.revision) || Number(value.revision) < 1 || typeof value.isExternal !== "boolean" ||
-      !["externalId", "coverPath", "publisher", "releaseDate"].every((key) => nullableText(value[key])))
+    if (!musicAlbum(value, albumId))
       throw new ApiError("INVALID_RESPONSE", "Invalid music album");
-    return value as unknown as MusicAlbum;
+    return value;
+  }
+
+  async updateAlbum(album: MusicAlbum, changes: { name: string; publisher: string; releaseDate: string }, key: string) {
+    const value = await this.client.request<unknown>(`/library/albums/${encodeURIComponent(album.albumId)}`, {
+      method: "PUT", idempotencyKey: key, body: { expectedRevision: album.revision, name: changes.name,
+        externalId: album.externalId, isExternal: album.isExternal, coverPath: album.coverPath,
+        publisher: changes.publisher || null, releaseDate: changes.releaseDate || null },
+    });
+    if (!musicAlbum(value, album.albumId) || value.revision <= album.revision || value.originalName !== album.originalName)
+      throw new ApiError("INVALID_RESPONSE", "Invalid updated music album");
+    return value;
   }
 
   async track(id: string, signal?: AbortSignal, bySource = false): Promise<MusicTrack> {
@@ -106,7 +121,10 @@ export class MusicCatalogApi {
       const key = kind === "genre" ? "name" : `${kind}Id`;
       if (!record(item) || !text(item[key]) || !text(item.name) || !Number.isSafeInteger(item.trackCount) || Number(item.trackCount) < 0)
         throw new ApiError("INVALID_RESPONSE", "Invalid music category");
-      return { id: item[key], name: item.name, trackCount: Number(item.trackCount) };
+      if (kind === "album" && item.coverPath !== undefined && !nullableText(item.coverPath))
+        throw new ApiError("INVALID_RESPONSE", "Invalid music album cover");
+      return { id: item[key], name: item.name, trackCount: Number(item.trackCount),
+        ...(kind === "album" && item.coverPath !== undefined ? { coverPath: item.coverPath as string | null } : {}) };
     });
     return { items, cursor: page.nextAfter };
   }

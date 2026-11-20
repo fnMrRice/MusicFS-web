@@ -1,5 +1,5 @@
 import { tr, useLocale, statusText } from "../i18n";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { SourceTrack, Provider } from "../api/types";
 import { displaySource, tableRowKey, trackKey, trackTitle, type TrackItem } from "../api/music-catalog";
 import { UnavailableMusicRow } from "./library/UnavailableMusicRow";
@@ -31,6 +31,8 @@ export function TrackTable({
   selectionScope,
   matchingRevision,
   onMatchingChange,
+  toolbarActions,
+  hideEmptyTable = false,
 }: {
   tracks: readonly TrackItem[];
   providers?: Provider[];
@@ -41,6 +43,8 @@ export function TrackTable({
   selectionScope?: Omit<TrackSelection, "batch" | "sourceTrackIds" | "exclude">;
   matchingRevision?: number;
   onMatchingChange?: () => void;
+  toolbarActions?: ReactNode;
+  hideEmptyTable?: boolean;
 }) {
   useLocale();
   const sourceName = useSourceName();
@@ -164,15 +168,18 @@ export function TrackTable({
             <span className="muted action-hint">
               {!complete && tr("可选择曲目加入队列")}
             </span>
-            <select
+          </>
+        )}
+        <div className="list-actions-end">
+          {toolbarActions}
+          <select
               aria-label={tr("曲目排序")}
               disabled
               title={tr("等待服务端提供完整查询排序能力")}
             >
               <option>{tr("默认顺序")}</option>
-            </select>
-          </>
-        )}
+          </select>
+        </div>
       </div>
       {selection.busy && <p className="loading" role="status">{tr("正在读取全部选中曲目…")}</p>}
       {batch.busy && <p className="loading" role="status">{tr("正在处理选中曲目…")}</p>}
@@ -183,7 +190,7 @@ export function TrackTable({
       )}
       <ErrorNotice error={error && error !== favorites.error ? error : null} />
       <ErrorNotice error={favorites.error} retry={() => void s.favorites.load(true)} />
-      <div className="table-wrap">
+      {(!hideEmptyTable || rows.length > 0) && <div className="table-wrap">
         <table className="tracks">
           <thead>
             <tr>
@@ -241,7 +248,7 @@ export function TrackTable({
               openMenu={(x, y, origin) => setMenu({ items: selection.isSelected(tableRowKey(item)) ? chosen : [item], selection: selection.isSelected(tableRowKey(item)), x, y, origin })} />)}
           </tbody>
         </table>
-      </div>
+      </div>}
       {menu && <ContextMenu {...menu} label={menu.selection ? selection.label : menu.items.length > 1
         ? tr("已选择 {0} 首", { 0: menu.items.length }) : trackTitle(menu.version ?? menu.items[0])}
         close={() => setMenu(null)} actions={[
