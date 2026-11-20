@@ -71,9 +71,9 @@ async function mockApi(page: Page, special?: (route: Route, url: URL) => Promise
       }
       if (path.includes(collection + "/")) {
         const item = categories[kind].find((c) => c.categoryId === path.split("/").at(-1));
-        json = item && { [idKey]: item.categoryId, name: item.name,
+        json = item && { [idKey]: item.categoryId, name: item.name, ...(kind === "artist" ? { namesRevision: 1 } : {}),
           ...(kind === "album" ? { originalName: item.name, revision: 1, externalId: null, isExternal: false,
-            sourceUrl: null, sourcePluginId: null,
+            sourceLinks: [],
             coverPath: null, publisher: null, releaseDate: null } : {}) };
       }
     }
@@ -109,6 +109,30 @@ test("artists, albums and genres open scoped track lists, including unknown cate
   for (const field of ["artistId", "albumId", "genre"]) expect(filters.some((query) => query.has(field))).toBe(true);
   for (const kind of ["artist", "album", "genre"]) expect(filters.some((query) => query.get("unknown") === kind)).toBe(true);
   expect(requests.some((url) => url.pathname.endsWith("/source-albums"))).toBe(false);
+});
+
+test("a folder track menu edits the linked catalog track", async ({ page }) => {
+  let saved = false;
+  const canonical = { ...musicTrack(tracks[0]), trackId: "catalog-1", title: "Library title", revision: 2 };
+  await mockApi(page, async (route, url) => {
+    if (url.pathname.endsWith("/library/sources/Alpha/track")) await route.fulfill({ json: canonical });
+    else if (url.pathname.endsWith("/library/tracks/catalog-1")) {
+      expect(route.request().method()).toBe("PUT");
+      expect(route.request().postDataJSON()).toMatchObject({ expectedRevision: 2, title: "Library title", localizedTitles: [{ language: "und", title: "Alias" }] });
+      saved = true; await route.fulfill({ json: { ...canonical, revision: 3 } });
+    } else return false;
+    return true;
+  });
+  await page.goto(`${origin}/#/library?category=${encodeURIComponent("文件夹")}&categoryId=folder-child`);
+  await page.getByRole("button", { name: "Alpha 的更多操作", exact: true }).click();
+  await page.getByRole("menuitem", { name: "编辑多语言曲名" }).click();
+  const modal = page.getByRole("dialog");
+  await expect(modal.getByText("Library title")).toBeVisible();
+  await modal.getByRole("button", { name: "添加名称" }).click();
+  await modal.getByLabel("曲名", { exact: true }).fill("Alias");
+  await modal.getByRole("button", { name: "保存", exact: true }).click();
+  await expect(modal).toHaveCount(0);
+  expect(saved).toBe(true);
 });
 
 test("all tracks requests source records while artist and album views keep gray metadata-only rows", async ({ page }) => {

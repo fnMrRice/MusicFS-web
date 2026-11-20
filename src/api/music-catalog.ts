@@ -1,8 +1,10 @@
 import { ApiClient, ApiError } from "./client";
 import type { SourceTrack } from "./types";
+import { isLocalizedTitle, type LocalizedTitle } from "./localized-titles";
 
 export interface CatalogArtist { artistId: string; name: string }
 export interface CatalogAlbum { albumId: string; name: string }
+export interface AlbumSourceLink { pluginId: string; url: string }
 export interface MusicAlbum extends CatalogAlbum {
   originalName: string;
   revision: number;
@@ -11,12 +13,13 @@ export interface MusicAlbum extends CatalogAlbum {
   coverPath: string | null;
   publisher: string | null;
   releaseDate: string | null;
-  sourceUrl: string | null;
-  sourcePluginId: string | null;
+  sourceLinks: AlbumSourceLink[];
 }
 export interface MusicTrack {
   trackId: string;
   title: string;
+  revision?: number;
+  localizedTitles?: LocalizedTitle[];
   artists: CatalogArtist[];
   albums: CatalogAlbum[];
   genre: string | null;
@@ -43,8 +46,9 @@ const nullableText = (value: unknown) => value === null || text(value);
 function musicAlbum(value: unknown, albumId: string): value is MusicAlbum {
   return record(value) && value.albumId === albumId && text(value.name) && text(value.originalName) &&
     Number.isSafeInteger(value.revision) && Number(value.revision) > 0 && typeof value.isExternal === "boolean" &&
-    ["externalId", "coverPath", "publisher", "releaseDate", "sourceUrl", "sourcePluginId"].every((key) => nullableText(value[key])) &&
-    (value.sourceUrl === null) === (value.sourcePluginId === null);
+    ["externalId", "coverPath", "publisher", "releaseDate"].every((key) => nullableText(value[key])) &&
+    Array.isArray(value.sourceLinks) && value.sourceLinks.every(link => record(link) && id(link.pluginId) && id(link.url)) &&
+    new Set(value.sourceLinks.map(link => link.pluginId)).size === value.sourceLinks.length;
 }
 const source = (value: unknown): value is SourceTrack => record(value) && id(value.sourceTrackId) &&
   id(value.providerInstanceId) && text(value.displayName) && text(value.availability) &&
@@ -52,6 +56,7 @@ const source = (value: unknown): value is SourceTrack => record(value) && id(val
 
 export function musicTrack(value: unknown): value is MusicTrack {
   if (!record(value) || !id(value.trackId) || !id(value.title) || !nullableText(value.coverPath) ||
+    (value.localizedTitles !== undefined && !(Array.isArray(value.localizedTitles) && value.localizedTitles.every(isLocalizedTitle))) ||
     !nullableText(value.genre) || !(value.year === null || Number.isSafeInteger(value.year)) ||
     !(value.rating === null || Number.isSafeInteger(value.rating)) ||
     !Array.isArray(value.artists) || !value.artists.every((a) => record(a) && id(a.artistId) && id(a.name)) ||
@@ -74,13 +79,12 @@ export class MusicCatalogApi {
   }
 
   async updateAlbum(album: MusicAlbum, changes: { name: string; publisher: string; releaseDate: string;
-    sourceUrl?: string; sourcePluginId?: string }, key: string) {
+    sourceLinks?: AlbumSourceLink[] }, key: string) {
     const value = await this.client.request<unknown>(`/library/albums/${encodeURIComponent(album.albumId)}`, {
       method: "PUT", idempotencyKey: key, body: { expectedRevision: album.revision, name: changes.name,
         externalId: album.externalId, isExternal: album.isExternal, coverPath: album.coverPath,
         publisher: changes.publisher || null, releaseDate: changes.releaseDate || null,
-        sourceUrl: changes.sourceUrl === undefined ? album.sourceUrl : changes.sourceUrl || null,
-        sourcePluginId: changes.sourceUrl === undefined ? album.sourcePluginId : changes.sourceUrl ? changes.sourcePluginId || null : null },
+        sourceLinks: changes.sourceLinks ?? album.sourceLinks },
     });
     if (!musicAlbum(value, album.albumId) || value.revision <= album.revision || value.originalName !== album.originalName)
       throw new ApiError("INVALID_RESPONSE", "Invalid updated music album");
@@ -105,6 +109,20 @@ export class MusicCatalogApi {
       !id(page.libraryRevision) || !Number.isSafeInteger(page.matchingRevision) ||
       !(page.nextAfter === null || id(page.nextAfter))) throw new ApiError("INVALID_RESPONSE", "Invalid music catalog page");
     return page as unknown as MusicTrackPage;
+  }
+
+  async updateTrackTitles(track: MusicTrack, localizedTitles: LocalizedTitle[], key: string): Promise<void> {
+    if (!Number.isSafeInteger(track.revision) || !track.revision)
+      throw new ApiError("INVALID_RESPONSE", "Missing music track revision");
+    const value = await this.client.request<unknown>(`/library/tracks/${encodeURIComponent(track.trackId)}`, {
+      method: "PUT", idempotencyKey: key, body: {
+        expectedRevision: track.revision, title: track.title, localizedTitles,
+        artistNames: track.artists.map(artist => artist.name), albumIds: track.albums.map(album => album.albumId),
+        coverPath: track.coverPath, genre: track.genre, year: track.year, rating: track.rating,
+      },
+    });
+    if (!musicTrack(value) || value.trackId !== track.trackId || !value.revision || value.revision <= track.revision)
+      throw new ApiError("INVALID_RESPONSE", "Invalid updated music track");
   }
 
   async createTrack(title: string, artistNames: string[], idempotencyKey: string): Promise<MusicTrack> {

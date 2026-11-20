@@ -27,11 +27,22 @@
 .album-search input, .album-search select, .album-editor input, .album-editor select { min-width: 0; width: 100%; }
 .album-search form > button, .album-editor > button { justify-self: start; }
 .album-editor input[readonly] { color: var(--muted); background: transparent; }
+.album-editor-link { display: grid; grid-template-columns: minmax(85px, 1fr) minmax(120px, 2fr) auto; gap: 8px; align-items: end; }
+.album-add-link { justify-self: start; }
+.album-platform-links, .album-search .album-platforms { display: flex; flex-wrap: wrap; gap: 8px 16px; }
+.album-platforms legend { margin-bottom: 6px; font-size: 13px; }
+.album-search .album-platforms label { display: inline-flex; align-items: center; gap: 5px; }
+.album-search .album-platforms input { width: auto; }
+.album-refresh > label { display: grid; gap: 6px; }
+.album-refresh > button { justify-self: start; }
+@media (max-width: 520px) { .album-editor-link { grid-template-columns: 1fr auto; } .album-editor-link > label:first-child { grid-column: 1 / -1; } }
 .album-editor p { margin: -6px 0 0; }
 .album-editor-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr)); gap: 14px; }
 .album-search-results { display: grid; gap: 10px; }
 .album-search-results article { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 14px; border: 1px solid var(--line); border-radius: 8px; }
 .album-search-results article > div { display: grid; gap: 5px; min-width: 0; overflow-wrap: anywhere; }
+.album-search-results article > .album-result-actions, .album-result-actions label { display: inline-flex; align-items: center; gap: 8px; }
+.album-result-actions input { width: auto; }
 .album-search-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
 .album-search > .album-metadata { margin: 0; }
 .album-refresh, .album-merge-preview { display: grid; gap: 14px; }
@@ -66,6 +77,10 @@
 .scraper-result summary { cursor: pointer; overflow-wrap: anywhere; }
 .scraper-result button { margin-top: 10px; }
 .scraped-preview { overflow-wrap: anywhere; }
+.scraped-names { margin: 8px 0; font-size: 13px; }
+.scraped-names > div { display: flex; flex-wrap: wrap; gap: 0 8px; }
+.scraped-names dt { color: var(--muted); }
+.scraped-names dd { margin: 0; }
 .scraped-image { display: block; max-width: 100%; max-height: 220px; object-fit: contain; margin-top: 8px; }
 .scraped-preview p, .scraped-lyrics { white-space: pre-wrap; }
 .scraped-byline, .scraped-track-list small { color: var(--muted); }

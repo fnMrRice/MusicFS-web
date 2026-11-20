@@ -7,9 +7,12 @@ import { TrackVersions } from "../matching/TrackVersions";
 import { useTrackCover } from "../../components/use-track-cover";
 import { trackAvailabilityMessage } from "../../library/track-availability";
 import { TrackPlaybackIndicator } from "../TrackPlaybackIndicator";
+import type { LocalizedTitle } from "../../api/localized-titles";
+import { OtherTrackTitles } from "./OtherTrackTitles";
 
 export function TrackRow({
   track: t,
+  localizedTitles,
   number,
   provider,
   checked,
@@ -25,6 +28,7 @@ export function TrackRow({
   onMatchingChange,
 }: {
   track: SourceTrack;
+  localizedTitles?: LocalizedTitle[];
   number: number;
   provider: string;
   checked: boolean;
@@ -87,6 +91,7 @@ export function TrackRow({
               <Icon name="play" size={14} />
               <span>{t.title || t.displayName}</span>
             </button>
+            <OtherTrackTitles title={title} names={localizedTitles} />
             {versions.length > 1 && <button className="text-button track-expand" aria-expanded={expanded}
               aria-label={tr("展开 {0} 的来源版本", { 0: t.title || t.displayName })}
               onClick={() => setExpanded(!expanded)}>

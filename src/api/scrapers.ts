@@ -1,4 +1,5 @@
 import { ApiClient, ApiError } from "./client";
+import { isLocalizedTitle, type LocalizedTitle } from "./localized-titles";
 
 export interface Scraper {
   pluginId: string;
@@ -22,7 +23,10 @@ export interface ScraperQuery {
 }
 
 export interface ScrapedTrack {
+  externalId?: string;
   title: string;
+  localizedTitles?: LocalizedTitle[];
+  localizedArtistNames?: LocalizedTitle[];
   artist?: string;
   disc?: number;
   number?: number;
@@ -32,6 +36,8 @@ export interface ScrapedTrack {
 export interface ScrapedItem {
   id: string;
   title: string;
+  localizedTitles?: LocalizedTitle[];
+  localizedArtistNames?: LocalizedTitle[];
   artist?: string;
   album?: string;
   date?: string;
@@ -64,11 +70,16 @@ function numeric(value: unknown): boolean {
 }
 function isTrack(value: unknown): value is ScrapedTrack {
   return record(value) && typeof value.title === "string" &&
+    (value.externalId === undefined || nonempty(value.externalId)) &&
+    (value.localizedTitles === undefined || Array.isArray(value.localizedTitles) && value.localizedTitles.every(isLocalizedTitle)) &&
+    (value.localizedArtistNames === undefined || Array.isArray(value.localizedArtistNames) && value.localizedArtistNames.every(isLocalizedTitle)) &&
     (value.artist === undefined || typeof value.artist === "string") &&
     ["disc", "number", "duration"].every((key) => value[key] === undefined || numeric(value[key]));
 }
 function isItem(value: unknown): value is ScrapedItem {
   return record(value) && nonempty(value.id) && typeof value.title === "string" &&
+    (value.localizedArtistNames === undefined || Array.isArray(value.localizedArtistNames) && value.localizedArtistNames.every(isLocalizedTitle)) &&
+    (value.localizedTitles === undefined || Array.isArray(value.localizedTitles) && value.localizedTitles.every(isLocalizedTitle)) &&
     ["artist", "album", "date", "description", "genre", "publisher", "sourceUrl", "imageUrl", "lyrics", "format"]
       .every((key) => value[key] === undefined || typeof value[key] === "string") &&
     (value.duration === undefined || numeric(value.duration)) &&

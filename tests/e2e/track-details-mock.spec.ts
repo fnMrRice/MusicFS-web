@@ -1,4 +1,4 @@
-import { musicPage } from "../fixtures/music-catalog";
+import { musicPage, musicTrack } from "../fixtures/music-catalog";
 import { test, expect, type Page, type Route } from "@playwright/test";
 import { preview, type PreviewServer } from "vite";
 import type { SourceTrack } from "../../src/api/types";
@@ -44,13 +44,15 @@ async function mockApi(page: Page, special: (route: Route, path: string) => Prom
   await page.getByRole("button", { name: "展开 Alpha 的来源版本", exact: true }).click();
 }
 
-test("a source track uses its own media revision when selecting online lyrics", async ({ page }) => {
+test("the track menu opens a logical track and lyrics use the explicitly selected asset", async ({ page }) => {
   const pluginId = "example.lyrics";
   const target = { sourceTrackId: "Alpha", assetId: "Alpha", assetVersion: "v2" };
   let attempts = 0;
   await mockApi(page, async (route, path) => {
     if (path.endsWith("/scrapers")) {
       await route.fulfill({ json: { items: [{ pluginId, name: "Lyrics", type: "scraper", available: true, fields: ["lyrics"] }] } });
+    } else if (path.endsWith("/library/tracks/recording")) {
+      await route.fulfill({ json: musicTrack({ ...tracks[0], versions: tracks }) });
     } else if (path.endsWith("/Alpha/media-selection")) {
       await route.fulfill({ json: { revision: 4, target, bindings: [] } });
     } else if (path.endsWith(`/scrapers/${pluginId}/search`)) {
@@ -63,14 +65,64 @@ test("a source track uses its own media revision when selecting online lyrics", 
     } else return false;
     return true;
   });
-  await page.locator(".track-version").filter({ hasText: "Alpha.flac" }).getByRole("button", { name: "搜索在线资料" }).click();
+  const version = page.locator(".track-version").filter({ hasText: "Alpha.flac" });
+  await expect(version.getByRole("button", { name: "搜索在线资料" })).toHaveCount(0);
+  await version.getByRole("button", { name: "Alpha.flac 的更多操作" }).click();
+  await expect(page.getByRole("menuitem", { name: "搜索在线资料" })).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Alpha 的更多操作", exact: true }).click();
+  await page.getByRole("menuitem", { name: "搜索在线资料" }).click();
   const search = page.getByRole("dialog", { name: "搜索在线资料" });
   await search.getByRole("button", { name: "搜索", exact: true }).click();
   await expect(search.getByText("[00:05]Lyric preview")).toBeVisible();
   expect(attempts).toBe(0);
+  await expect(search.getByRole("button", { name: "选用这项资料" })).toHaveCount(0);
+  await search.getByLabel("保存到来源版本", { exact: true }).selectOption("Alpha");
   await search.getByRole("button", { name: "选用这项资料" }).click();
   await expect(search).toHaveCount(0);
   expect(attempts).toBe(1);
+});
+
+test("a catalog-only track accepts platform titles and manual language edits without an asset", async ({ page }) => {
+  const track = { ...musicTrack(tracks[0]), trackId: "unavailable", title: "打上花火", selectedSource: null,
+    localizedTitles: [{ language: "zh-Hans", title: "烟花" }], revision: 4 };
+  const missing = { ...musicPage([]), items: [track] };
+  await page.route("**/api/v1/**", async route => {
+    const path = new URL(route.request().url()).pathname;
+    let json: unknown = { items: [], nextCursor: null };
+    if (path.endsWith("/health/ready")) json = { product: "MusicFS", apiVersion: "1", ready: true, instanceId: "track-mock" };
+    if (path.endsWith("/auth/session")) json = { csrfToken: "fixture", user: { id: "user", role: "admin" } };
+    if (path.endsWith("/library/artists/artist")) json = { artistId: "artist", name: "Artist", namesRevision: 1 };
+    if (path.endsWith("/library/tracks")) json = missing;
+    if (path.endsWith("/library/tracks/unavailable")) {
+      if (route.request().method() === "PUT") {
+        const body = route.request().postDataJSON();
+        expect(body).toMatchObject({ expectedRevision: track.revision, title: "打上花火", artistNames: ["Library artist"] });
+        track.localizedTitles = body.localizedTitles; track.revision++;
+      }
+      json = track;
+    }
+    if (path.endsWith("/scrapers")) json = { items: [{ pluginId: "platform", name: "Platform", type: "scraper", available: true, fields: ["trackDetails"] }] };
+    if (path.endsWith("/scrapers/platform/search")) json = { items: [{ id: "12", title: "Uchiagehanabi",
+      localizedTitles: [{ language: "ja-Latn", title: "Uchiagehanabi" }], candidateToken: "example" }] };
+    expect(path).not.toMatch(/media-selection|source-tracks/);
+    await route.fulfill({ json });
+  });
+  await page.goto(`${origin}/#/library?category=${encodeURIComponent("歌手")}&categoryId=artist`);
+  const more = page.getByRole("button", { name: "打上花火 的更多操作", exact: true });
+  await more.click(); await page.getByRole("menuitem", { name: "搜索在线资料" }).click();
+  const modal = page.getByRole("dialog");
+  await modal.getByRole("button", { name: "搜索", exact: true }).click();
+  await modal.getByRole("button", { name: "保存为曲目别名" }).click();
+  await expect(modal).toHaveCount(0);
+  expect(track.localizedTitles).toEqual([{ language: "zh-Hans", title: "烟花" }, { language: "ja-Latn", title: "Uchiagehanabi" }]);
+  await more.click(); await page.getByRole("menuitem", { name: "编辑多语言曲名" }).click();
+  await modal.getByRole("button", { name: "添加名称" }).click();
+  await modal.getByLabel("语言标签").last().fill("en");
+  await modal.getByLabel("曲名", { exact: true }).last().fill("Fireworks");
+  await modal.getByRole("button", { name: "保存", exact: true }).click();
+  await expect(modal).toHaveCount(0);
+  expect(track.localizedTitles.at(-1)).toEqual({ language: "en", title: "Fireworks" });
 });
 
 test("source plugin fields render as text on mobile even for an unavailable version", async ({ page }, info) => {

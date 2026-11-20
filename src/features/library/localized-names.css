@@ -1,0 +1,6 @@
+.localized-names-editor { display: grid; gap: 12px; border: 0; padding: 0; margin: 12px 0; min-width: 0; }
+.localized-names-editor > button { justify-self: start; }
+.localized-name-row { display: grid; grid-template-columns: minmax(80px, 1fr) minmax(100px, 2fr) auto; align-items: end; gap: 8px; }
+.localized-name-row label { display: grid; gap: 5px; min-width: 0; font-size: 13px; }
+.localized-name-row input { min-width: 0; width: 100%; }
+.track-other-titles { display: block; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }

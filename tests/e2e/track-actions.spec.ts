@@ -17,7 +17,7 @@ test.beforeAll(async () => {
 test.afterAll(async () => { await new Promise<void>((resolve) => server?.httpServer.close(() => resolve())); });
 
 const titles = ['Alpha.wav', 'Beta.wav', 'Gamma.wav'];
-const actions = ['播放', '下一首播放', '添加到播放列表', '收藏', '添加到歌单'];
+const actions = ['播放', '下一首播放', '添加到播放列表', '收藏', '添加到歌单', '搜索在线资料', '编辑多语言曲名'];
 function tone(): Buffer {
   const rate = 8000, frames = rate * 30, bytes = frames * 2;
   const data = Buffer.alloc(44 + bytes);

@@ -3,7 +3,7 @@ import { ApiClient } from "../../../src/api/client";
 import { MusicCatalogApi } from "../../../src/api/music-catalog";
 
 const album = { albumId: "album/1", originalName: "Original album", name: "Album", revision: 2, externalId: null,
-  isExternal: false, coverPath: null, publisher: null, releaseDate: null, sourceUrl: null, sourcePluginId: null };
+  isExternal: false, coverPath: null, publisher: null, releaseDate: null, sourceLinks: [] };
 const reply = (body: unknown) => new Response(JSON.stringify(body));
 
 describe("Music album details", () => {
@@ -13,7 +13,7 @@ describe("Music album details", () => {
     expect(fetch.mock.calls[0][0]).toBe("/api/v1/library/albums/album%2F1");
   });
   it.each([{ ...album, albumId: "other" }, { ...album, revision: 0 }, { ...album, publisher: 4 }, { ...album, originalName: null },
-    { ...album, sourceUrl: "https://example.org/release" }, { ...album, sourcePluginId: "plugin" }])
+    { ...album, sourceLinks: [{ url: "https://example.org/release" }] }, { ...album, sourceLinks: [{ pluginId: "plugin" }] }])
     ("rejects mismatched or malformed album details", async (value) => {
       const api = new MusicCatalogApi(new ApiClient(vi.fn().mockResolvedValue(reply(value))));
       await expect(api.album(album.albumId)).rejects.toMatchObject({ code: "INVALID_RESPONSE" });
@@ -29,19 +29,19 @@ describe("Music album details", () => {
     expect(path).toBe("/api/v1/library/albums/album%2F1");
     expect(options.headers.get("Idempotency-Key")).toBe("edit-album");
     expect(JSON.parse(options.body)).toEqual({ expectedRevision: 2, name: "Renamed", externalId: null,
-      isExternal: false, coverPath: null, publisher: "Publisher", releaseDate: "2020-02-01", sourceUrl: null, sourcePluginId: null });
+      isExternal: false, coverPath: null, publisher: "Publisher", releaseDate: "2020-02-01", sourceLinks: [] });
   });
   it("saves or clears the platform association without querying external metadata", async () => {
-    const linked = { ...album, sourceUrl: "https://example.org/release", sourcePluginId: "plugin", revision: 3 };
+    const linked = { ...album, sourceLinks: [{ url: "https://example.org/release", pluginId: "plugin" }], revision: 3 };
     const fetch = vi.fn().mockResolvedValueOnce(reply(linked)).mockResolvedValueOnce(reply({ ...album, revision: 4 }));
     const api = new MusicCatalogApi(new ApiClient(fetch));
     await api.updateAlbum(album, { name: album.name, publisher: "", releaseDate: "",
-      sourceUrl: linked.sourceUrl, sourcePluginId: linked.sourcePluginId }, "link-album");
-    await api.updateAlbum(linked, { name: album.name, publisher: "", releaseDate: "", sourceUrl: "" }, "unlink-album");
+      sourceLinks: linked.sourceLinks }, "link-album");
+    await api.updateAlbum(linked, { name: album.name, publisher: "", releaseDate: "", sourceLinks: [] }, "unlink-album");
     expect(fetch).toHaveBeenCalledTimes(2);
     expect(fetch.mock.calls.every(([path]) => path === "/api/v1/library/albums/album%2F1")).toBe(true);
-    expect(JSON.parse(fetch.mock.calls[0][1].body)).toMatchObject({ sourceUrl: linked.sourceUrl, sourcePluginId: linked.sourcePluginId });
-    expect(JSON.parse(fetch.mock.calls[1][1].body)).toMatchObject({ sourceUrl: null, sourcePluginId: null });
+    expect(JSON.parse(fetch.mock.calls[0][1].body)).toMatchObject({ sourceLinks: linked.sourceLinks });
+    expect(JSON.parse(fetch.mock.calls[1][1].body)).toMatchObject({ sourceLinks: [] });
   });
   it.each([{ ...album, originalName: "Overwritten", revision: 3 }, { ...album, revision: 2 }])
     ("rejects an update that overwrites the immutable name or does not advance the revision", async (value) => {

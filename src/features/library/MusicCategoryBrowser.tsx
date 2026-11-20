@@ -8,6 +8,7 @@ import { tr } from "../../i18n";
 import { TrackTable } from "../TrackTable";
 import { AlbumScraping } from "../scrapers/AlbumScraping";
 import { AlbumCover } from "./AlbumCover";
+import { ArtistNames, readNamedArtist, type NamedArtist } from "./ArtistNames";
 
 const labels = { artist: "歌手", album: "专辑", genre: "流派" };
 const unknownLabels = { artist: "未知歌手", album: "未知专辑", genre: "未知流派" };
@@ -45,11 +46,15 @@ function MusicCategoryTracks({ kind, provider, providers, id, unknown, query, na
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const scope = `${kind}:${provider}:${id}:${unknown}:${query}`;
-  const title = useResource<{ name: string; album?: MusicAlbum }>(scope, async (signal) => {
+  const title = useResource<{ name: string; album?: MusicAlbum; artist?: NamedArtist }>(scope, async (signal) => {
     if (unknown) return { name: tr(unknownLabels[kind]) };
     if (kind === "album") {
       const album = await api.album(id, signal);
       return { name: album.name, album };
+    }
+    if (kind === "artist") {
+      const artist = await readNamedArtist(services.client, id, signal);
+      return { name: artist.name, artist };
     }
     return { name: await api.categoryName(kind, id, signal) };
   });
@@ -80,6 +85,7 @@ function MusicCategoryTracks({ kind, provider, providers, id, unknown, query, na
     {title.data && <div className={`category-heading${album ? " album-heading" : ""}`}>
       {album && <AlbumCover coverPath={album.coverPath} name={album.name} size="heading" />}
       <div className="category-heading-title"><h2>{title.data.name}</h2>
+        {title.data.artist && <ArtistNames artist={title.data.artist} refresh={() => { title.reload(); pages.reload(); services.invalidateLibraries(); }} />}
         {album && <button type="button" className="album-details-toggle" aria-label={tr("专辑详情")}
           aria-expanded={detailsOpen} aria-controls={detailsId} onClick={() => setDetailsOpen((value) => !value)}>
           {tr("详情")}<Icon name="chevron" size={14} />
@@ -92,7 +98,10 @@ function MusicCategoryTracks({ kind, provider, providers, id, unknown, query, na
       refresh={() => { setSearchOpen(false); title.reload(); pages.reload(); }} />}
     {(pages.items.length > 0 || album) && <TrackTable tracks={pages.items} providers={providers} queryKey={scope}
       toolbarActions={scrape} hideEmptyTable
-      matchingRevision={revision} onMatchingChange={pages.reload} complete={!pages.cursor && !pages.loading && !pages.error} />}
+      pagination={{ loading: pages.loading, hasMore: !!pages.cursor, error: pages.error, more: pages.more }}
+      albumScope={album && { albumId: album.albumId, revision: album.revision, reload: () => { title.reload(); pages.reload(); services.invalidateLibraries(); } }}
+      matchingRevision={revision} onMatchingChange={kind === "album" && !unknown && !album ? undefined : pages.reload}
+      complete={!pages.cursor && !pages.loading && !pages.error} />}
     <ErrorNotice error={pages.error} retry={pages.retry} />
     {pages.loading && <p className="loading" role="status">{tr("正在加载…")}</p>}
     {!pages.error && !pages.loading && !pages.items.length && <Empty title={tr("没有找到相关曲目")} />}

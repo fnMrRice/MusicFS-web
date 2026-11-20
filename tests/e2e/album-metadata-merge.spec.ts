@@ -20,8 +20,7 @@ async function openDetails(page: Page) {
 }
 async function linkedAlbum(page: Page) {
   const state = await mock(page);
-  state.album.sourceUrl = candidate.sourceUrl;
-  state.album.sourcePluginId = "album-source";
+  state.album.sourceLinks = [{ url: candidate.sourceUrl, pluginId: "album-source" }];
   state.album.releaseDate = "2013-04-02";
   state.saved = [{ field: "albumDetails", pluginId: "album-source", item: {
     ...candidate, publisher: undefined, description: "原来的补充信息" } }];
@@ -34,6 +33,7 @@ async function linkedAlbum(page: Page) {
 async function refresh(page: Page) {
   await details(page).getByRole("button", { name: "刷新资料", exact: true }).click();
   const panel = comparison(page);
+  await panel.getByRole("button", { name: "读取平台资料", exact: true }).click();
   await expect(panel.getByRole("checkbox", { name: "显示名", exact: true })).toBeVisible();
   return panel;
 }
@@ -49,6 +49,7 @@ test("saving an associated platform page only updates the album and leaves scrap
   await openDetails(page);
   await expect(details(page).getByRole("button", { name: "刷新资料", exact: true })).toBeDisabled();
   await details(page).getByRole("button", { name: "编辑资料", exact: true }).click();
+  await editor(page).getByRole("button", { name: "添加平台链接", exact: true }).click();
   await editor(page).getByRole("combobox", { name: "资料平台", exact: true }).selectOption("album-source");
   await editor(page).getByLabel("平台专辑页面", { exact: true }).fill(candidate.sourceUrl);
   await editor(page).getByRole("button", { name: "保存", exact: true }).click();
@@ -57,15 +58,14 @@ test("saving an associated platform page only updates the album and leaves scrap
   expect(state.searches).toEqual([]);
   expect(state.writes).toHaveLength(1);
   expect(state.writes[0]).toMatchObject({ path: "/library/albums/one", body: {
-    expectedRevision: 1, sourceUrl: candidate.sourceUrl, sourcePluginId: "album-source" } });
+    expectedRevision: 1, sourceLinks: [{ url: candidate.sourceUrl, pluginId: "album-source" }] } });
   await details(page).getByRole("button", { name: "编辑资料", exact: true }).click();
   await expect(editor(page).getByLabel("平台专辑页面", { exact: true })).toHaveValue(candidate.sourceUrl);
-  await editor(page).getByLabel("平台专辑页面", { exact: true }).fill("");
+  await editor(page).getByRole("button", { name: "移除链接", exact: true }).click();
   await editor(page).getByRole("button", { name: "保存", exact: true }).click();
   await expect(editor(page)).toHaveCount(0);
   expect(state.searches).toEqual([]);
-  expect(state.album.sourceUrl).toBeNull();
-  expect(state.album.sourcePluginId).toBeNull();
+  expect(state.album.sourceLinks).toEqual([]);
   await expect(details(page).getByRole("button", { name: "刷新资料", exact: true })).toBeDisabled();
 });
 
@@ -137,6 +137,7 @@ test("a failed refresh or an empty selection cannot publish metadata", async ({ 
   state.trackSearchFailure = true;
   await openDetails(page);
   await details(page).getByRole("button", { name: "刷新资料", exact: true }).click();
+  await comparison(page).getByRole("button", { name: "读取平台资料", exact: true }).click();
   await expect(comparison(page).getByRole("alert")).toBeVisible();
   expect(state.writes).toEqual([]);
   expect({ album: state.album, saved: state.saved }).toEqual(before);

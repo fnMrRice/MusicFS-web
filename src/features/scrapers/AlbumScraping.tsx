@@ -25,7 +25,7 @@ export function AlbumScraping({ album, artist, detailsId, detailsOpen, searchOpe
   const [editing, setEditing] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const online = saved.data?.find((entry) => entry.field === "albumDetails")?.item;
-  const linked = !!album.sourcePluginId && !!externalLink(album.sourceUrl ?? undefined);
+  const linked = album.sourceLinks.some(link => !!externalLink(link.url));
   return <>
     {detailsOpen && <section id={detailsId} className="album-metadata" aria-label={tr("专辑详情")}>
       <div className="album-metadata-actions">
@@ -38,7 +38,10 @@ export function AlbumScraping({ album, artist, detailsId, detailsOpen, searchOpe
       {saved.data && <AlbumMetadata album={album} fields={saved.data} />}
     </section>}
     {searchOpen && <Modal title={tr("搜索在线资料")} close={() => { if (!saving) closeSearch(); }}>
-      <AlbumScraperSearch album={album} artist={artist} applied={applied} refresh={refresh} savingChanged={setSaving} />
+      <ErrorNotice error={saved.error} retry={saved.reload} />
+      {saved.loading && <p role="status">{tr("正在加载…")}</p>}
+      {saved.data && <AlbumScraperSearch album={album} artist={artist} hasSavedFields={saved.data.length > 0}
+        applied={applied} refresh={refresh} savingChanged={setSaving} />}
     </Modal>}
     {editing && <Modal title={tr("编辑专辑资料")} close={() => { if (!saving) setEditing(false); }}>
       <AlbumEditor album={album} initialPublisher={album.publisher ?? online?.publisher}

@@ -35,9 +35,6 @@ export function AlbumMergePreview({ snapshot, saving, locked, merge }: {
   ];
   const [selected, setSelected] = useState<AlbumMergeField[]>(() => choices
     .filter((item) => !item.unavailable && !item.current && !!item.incoming).map((item) => item.field));
-  const normalized = (value: string) => value.normalize("NFKC").trim().toLowerCase();
-  const existingTitles = new Set(currentTracks.map((item) => normalized(item.title)));
-  const additions = tracks.tracks!.filter((item) => !existingTitles.has(normalized(item.title))).length;
   const display = (field: AlbumMergeField, value?: string | null) => {
     if (!value) return tr("未填写");
     if (field === "releaseDate") return albumDate(value, locale) ?? value;
@@ -62,10 +59,9 @@ export function AlbumMergePreview({ snapshot, saving, locked, merge }: {
       <div className="album-compare-value" role="group" aria-label={`${tr("平台新资料")}：${tr(item.label)}`}><span className="album-compare-mobile-label">{tr("平台新资料")}</span>
         {item.field === "cover" && item.incoming ? <AlbumCover coverPath={item.incoming} name={album.name} />
           : item.field === "tracks" ? <>
-            <strong>{tr("{0} 首", { 0: tracks.tracks!.length })} · {tr("预计新增 {0} 首", { 0: additions })}</strong>
+            <strong>{tr("{0} 首", { 0: tracks.tracks!.length })}</strong>
             <ol className="album-compare-tracks album-compare-platform" aria-label={tr("平台曲目表")}>{tracks.tracks!.map((track, index) => <li key={index}>
               <span>{track.disc ? `${track.disc}.${track.number || index + 1}` : track.number || index + 1} {track.title}</span>
-              {!existingTitles.has(normalized(track.title)) && <small>{tr("新增")}</small>}
             </li>)}</ol>
           </> : display(item.field, item.incoming)}
         {!item.incoming && item.current && item.field !== "name" && <small className="muted">{tr("平台没有此项，勾选后会清空当前值。")}</small>}

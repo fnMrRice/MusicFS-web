@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import type { LocalizedTitle } from "../../api/localized-titles";
 import { ApiError, errorMessage } from "../../api/client";
 import { ScrapersApi, type ScrapeCandidate, type ScraperQuery } from "../../api/scrapers";
 import { useServices } from "../../app/services";
@@ -11,10 +12,15 @@ import "./scrapers.css";
 
 export type ApplyCandidate = (field: string, pluginId: string, candidate: ScrapeCandidate, key: string) => Promise<void>;
 
-export function ScraperSearch({ initial, preferredField, externalIds = [], allowedFields, apply, canApply, finished, refresh, savingChanged }: {
-  initial: ScraperQuery; preferredField: string; apply?: ApplyCandidate; canApply: (field: string) => boolean;
+export function ScraperSearch({ initial, preferredField, externalIds = [], allowedFields, apply, canApply, finished, refresh, savingChanged,
+  titleOptions, fieldChanged, fieldControls, applyLabel }: {
+  initial: ScraperQuery; preferredField: string; apply?: ApplyCandidate; canApply: (field: string, item: ScrapeCandidate) => boolean;
   externalIds?: { namespace: string; value: string }[];
   allowedFields?: readonly string[];
+  titleOptions?: LocalizedTitle[];
+  fieldChanged?: (field: string) => void;
+  fieldControls?: (field: string) => ReactNode;
+  applyLabel?: (field: string) => string;
   finished: () => void; refresh: () => void; savingChanged: (busy: boolean) => void;
 }) {
   useLocale();
@@ -32,6 +38,7 @@ export function ScraperSearch({ initial, preferredField, externalIds = [], allow
     ?? sources.find((item) => item.available && item.fields.includes(preferredField))
     ?? sources.find((item) => item.available) ?? sources[0];
   const field = source?.fields.includes(chosenField) ? chosenField : source?.fields[0] ?? "";
+  useEffect(() => { fieldChanged?.(field); }, [field, fieldChanged]);
   const [query, setQuery] = useState(initial);
   const matchingIds = externalIds.filter((id) => id.namespace === source?.externalIdNamespace);
   const effectiveQuery = { ...query, externalId: query.externalId ?? (matchingIds.length === 1 ? matchingIds[0].value : undefined) };
@@ -64,7 +71,7 @@ export function ScraperSearch({ initial, preferredField, externalIds = [], allow
     }
   }
   async function save(item: ScrapeCandidate) {
-    if (!source || !apply || !canApply(field) || conflict || saveLock.current || pending && pending.item !== item) return;
+    if (!source || !apply || !canApply(field, item) || conflict || saveLock.current || pending && pending.item !== item) return;
     const key = pending?.key ?? crypto.randomUUID();
     saveLock.current = true; setSaving(true); savingChanged(true); setError(null);
     try {
@@ -85,11 +92,13 @@ export function ScraperSearch({ initial, preferredField, externalIds = [], allow
     <ErrorNotice error={list.error} retry={list.reload} />
     {list.loading && <p role="status">{tr("正在加载…")}</p>}
     {list.data && !source && <p role="status">{tr("暂无在线刮削插件。")}</p>}
-    {source && <SearchForm sources={sources} source={source} field={field} query={effectiveQuery}
+    {source && <SearchForm sources={sources} source={source} field={field} query={effectiveQuery} titleOptions={titleOptions}
       searching={searching} disabled={searching || saving || conflict || !!pending}
       changeQuery={(value) => { reset(); setQuery(value); }}
       changeSource={(id) => { reset(); setSourceId(id); setQuery((q) => ({ ...q, externalId: undefined })); }}
-      changeField={(value) => { reset(); setField(value); setQuery((q) => ({ ...q, externalId: undefined })); }} submit={() => void search()} />}
+      changeField={(value) => { reset(); setField(value); setQuery((q) => ({ ...q, externalId: undefined })); }} submit={() => void search()}>
+      {fieldControls?.(field)}
+    </SearchForm>}
     <ErrorNotice error={error} />
     {conflict && <button onClick={refresh}>{tr("刷新资料")}</button>}
     {results?.length === 0 && <p role="status">{tr("没有匹配的资料。")}</p>}
@@ -97,8 +106,8 @@ export function ScraperSearch({ initial, preferredField, externalIds = [], allow
       {results.map((item, index) => <details className="scraper-result" key={item.candidateToken} open={index === 0 || undefined}>
         <summary><strong>{item.title}</strong> · {item.id}</summary>
         <ScrapedPreview item={item} />
-        {apply && canApply(field) && <button type="button" disabled={saving || conflict || !!pending && pending.item !== item}
-          onClick={() => void save(item)}>{tr(pending?.item === item ? "重试确认保存" : "选用这项资料")}</button>}
+        {apply && canApply(field, item) && <button type="button" disabled={saving || conflict || !!pending && pending.item !== item}
+          onClick={() => void save(item)}>{pending?.item === item ? tr("重试确认保存") : applyLabel?.(field) ?? tr("选用这项资料")}</button>}
       </details>)}
     </div>}
   </div>;
