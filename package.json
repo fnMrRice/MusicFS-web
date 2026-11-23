@@ -1,6 +1,6 @@
 {
   "name": "musicfs-web",
-  "version": "0.103.1",
+  "version": "0.104.1",
   "private": true,
   "type": "module",
   "engines": {
