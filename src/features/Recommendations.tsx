@@ -15,6 +15,7 @@ import { usePlaylistObservation } from "./playlists/usePlaylistObservation";
 import { externalLink } from "./scrapers/fields";
 import { useRecommendations } from "./useRecommendations";
 import { DailySongs } from "./DailySongs";
+import { RecommendationHistory } from "./RecommendationHistory";
 import { RecommendationSection } from "./RecommendationSection";
 
 function hasDailySongs(source: OnlineInstance) {
@@ -47,24 +48,16 @@ function RecommendationFeed({ dailySources }: { dailySources: OnlineInstance[] }
     source, result: results.get(source.instanceId), showDaily: daily.some(account => account.instanceId === source.instanceId),
   }));
   return (
-    <RecommendationSection title={tr("推荐歌单")} actions={
-      <div className="recommendation-actions">
-        <button type="button" aria-label={tr("时光机")} title={tr("时光机")}
-          disabled={feed.loading || feed.offset >= (feed.page?.historyDepth ?? 0)}
-          onClick={feed.previous}>
-          <Icon name="clock" size={16} /><span>{tr("时光机")}</span>
-        </button>
-        <IconButton icon="refresh" label={tr("刷新推荐")} disabled={feed.loading} onClick={feed.refresh} />
-      </div>
-    }>
-      {feed.offset > 0 && (
-        <div className="recommendation-history">
-          <span className="muted" role="status">{tr("历史推荐（{0}/{1}）", { 0: feed.offset, 1: feed.page!.historyDepth })}</span>
-          <button type="button" disabled={feed.loading} onClick={feed.showLatest}>{tr("返回最新推荐")}</button>
+    <section>
+      <div className="section-title recommendation-heading">
+        <h2>{tr("推荐歌单")}</h2>
+        <div className="recommendation-actions">
+          <RecommendationHistory depth={feed.page?.historyDepth ?? 0} offset={feed.offset} loading={feed.loading} select={feed.select} />
+          <IconButton icon="refresh" label={tr("刷新推荐")} disabled={feed.loading} onClick={feed.refresh} />
         </div>
-      )}
+      </div>
       <ErrorNotice error={feed.error} retry={feed.retry} />
-      {feed.loading && <p className="loading" role="status">{tr("正在寻找歌单…")}</p>}
+      {feed.loading && !feed.page && <p className="loading" role="status">{tr("正在寻找歌单…")}</p>}
       {groups.map(({ source, result, showDaily }) => (
         <RecommendationSection key={source.instanceId} sourceId={source.instanceId} title={sourceName(source)}>
           {result?.stale && (
@@ -122,7 +115,7 @@ function RecommendationFeed({ dailySources }: { dailySources: OnlineInstance[] }
           </p>
         </Empty>
       )}
-    </RecommendationSection>
+    </section>
   );
 }
 export function DiscoveryPlaylist({ daily = false }: { daily?: boolean }) {

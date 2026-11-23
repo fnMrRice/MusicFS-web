@@ -59,10 +59,14 @@ test("only the current grid links to daily songs, and track requests start on th
   await expect(card).toBeVisible();
   await expect(dailyCards).toHaveCount(1);
   await expect(content.getByRole("table")).toHaveCount(0);
-  await content.getByRole("button", { name: "时光机" }).click();
+  const history = content.getByRole("button", { name: "时光机" });
+  const popup = page.getByRole("dialog", { name: "时光机" });
+  await history.click();
+  await popup.getByRole("button", { name: "历史推荐（1/1）", exact: true }).click();
   await expect(content.getByRole("link", { name: /Past playlist/ })).toBeVisible();
   await expect(dailyCards).toHaveCount(0);
-  await content.getByRole("button", { name: "返回最新推荐" }).click();
+  await history.click();
+  await popup.getByRole("button", { name: "最新推荐", exact: true }).click();
   await expect(card).toBeVisible();
   expect(state.dailyRequests).toEqual([]);
   await card.click();
@@ -137,6 +141,7 @@ for (const width of [375, 1280]) {
     const heading = content.getByRole("heading", { name: "推荐歌单", exact: true });
     const history = content.getByRole("button", { name: "时光机", exact: true });
     const refresh = content.getByRole("button", { name: "刷新推荐", exact: true });
+    const popup = page.getByRole("dialog", { name: "时光机", exact: true });
     async function expectRow() {
       const boxes = await Promise.all([heading, history, refresh].map(async (control) => {
         await expect(control).toBeVisible();
@@ -151,8 +156,29 @@ for (const width of [375, 1280]) {
     }
     await expect(content.getByRole("link", { name: /Current playlist/ })).toBeVisible();
     await expectRow();
+    const firstCard = content.locator(".music-card").first();
+    const cardTop = await firstCard.evaluate(element => element.getBoundingClientRect().top);
     await history.click();
+    await expect(popup).toBeVisible();
+    await expect(history).toHaveAttribute("aria-expanded", "true");
+    await expect(content.getByRole("link", { name: /Current playlist/ })).toBeVisible();
+    expect(await firstCard.evaluate(element => element.getBoundingClientRect().top)).toBeCloseTo(cardTop, 0);
+    const box = (await popup.boundingBox())!;
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(width + 1);
+
+    await page.keyboard.press("Escape");
+    await expect(popup).toBeHidden();
+    await expect(history).toBeFocused();
+    await history.click();
+    await heading.click();
+    await expect(popup).toBeHidden();
+    await expect(history).toHaveAttribute("aria-expanded", "false");
+    await history.click();
+    await popup.getByRole("button", { name: "历史推荐（1/1）", exact: true }).click();
     await expect(content.getByRole("link", { name: /Past playlist/ })).toBeVisible();
+    await expect(popup).toBeHidden();
+    expect(await firstCard.evaluate(element => element.getBoundingClientRect().top)).toBeCloseTo(cardTop, 0);
     await expectRow();
   });
 }

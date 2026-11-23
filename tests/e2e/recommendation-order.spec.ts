@@ -59,13 +59,18 @@ async function expectCards(page: Page, source: Account) {
   }
 }
 
-test("the page and its source groups expand independently and keep their state across refresh and reload", async ({ page }) => {
+test("the recommendation heading stays visible and source groups keep independent collapse preferences", async ({ page }) => {
   const state = await mock(page);
+  await page.addInitScript(() => {
+    const key = "musicfs:recommendations:listener:collapsedRecommendations";
+    if (!localStorage.getItem(key)) localStorage.setItem(key, JSON.stringify(["all"]));
+  });
   await page.goto(`${origin}/#/recommendations`);
-  const all = toggle(page, "推荐歌单");
+  const heading = content(page).getByRole("heading", { name: "推荐歌单", level: 2, exact: true });
   const a = toggle(page, first.label);
   const b = toggle(page, second.label);
-  await expect(all).toHaveAttribute("aria-expanded", "true");
+  await expect(heading).toBeVisible();
+  await expect(heading.getByRole("button")).toHaveCount(0);
   await expect(sourceHeadings(page)).toHaveText([first.label, second.label]);
   await expectCards(page, first);
   await expectCards(page, second);
@@ -74,42 +79,29 @@ test("the page and its source groups expand independently and keep their state a
   await expect(a).toHaveAttribute("aria-expanded", "false");
   await expect(content(page).getByRole("link", { name: /Zebra mix/ })).toBeHidden();
   await expectCards(page, second);
-  await all.click();
-  await expect(all).toHaveAttribute("aria-expanded", "false");
-  await expect(b).toBeHidden();
-  await expect(content(page).getByRole("link")).toHaveCount(0);
   await content(page).getByRole("button", { name: "刷新推荐", exact: true }).click();
   await expect.poll(() => state.refreshes).toBe(1);
-  await expect(all).toHaveAttribute("aria-expanded", "false");
+  await expect(a).toHaveAttribute("aria-expanded", "false");
+  await expectCards(page, second);
   await page.reload();
-  await expect(all).toHaveAttribute("aria-expanded", "false");
-  await expect(b).toBeHidden();
-
-  await all.press("Enter");
   await expect(a).toHaveAttribute("aria-expanded", "false");
   await expectCards(page, second);
   await b.click();
-  await a.click();
+  await a.press("Enter");
   await expectCards(page, first);
   await expect(b).toHaveAttribute("aria-expanded", "false");
   await expect(content(page).getByRole("link", { name: /Winter mix/ })).toBeHidden();
-  await all.click();
   state.serverId = "restarted-server";
   await page.reload();
-  await expect(all).toHaveAttribute("aria-expanded", "false");
-  await all.click();
   await expect(a).toHaveAttribute("aria-expanded", "true");
   await expect(b).toHaveAttribute("aria-expanded", "false");
-  await all.click();
   state.listener = "other-listener";
   await page.reload();
-  await expect(all).toHaveAttribute("aria-expanded", "true");
   await expectCards(page, first);
   await expectCards(page, second);
   state.listener = "listener";
   await page.reload();
-  await expect(all).toHaveAttribute("aria-expanded", "false");
-  await all.click();
+  await expectCards(page, first);
   await expect(b).toHaveAttribute("aria-expanded", "false");
 });
 

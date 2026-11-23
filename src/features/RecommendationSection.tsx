@@ -3,20 +3,17 @@ import { useServices, useStore } from "../app/services";
 import { SectionToggle } from "../components/ui";
 
 interface Props {
-  sourceId?: string;
+  sourceId: string;
   title: string;
-  actions?: ReactNode;
   children: ReactNode;
 }
 
-export function RecommendationSection({ sourceId, title, actions, children }: Props) {
+export function RecommendationSection({ sourceId, title, children }: Props) {
   const s = useServices();
   const preferences = useStore(s.preferences);
   const bodyId = useId();
-  const isSource = sourceId !== undefined;
-  const key = isSource ? `source:${sourceId}` : "all";
+  const key = `source:${sourceId}`;
   const expanded = !preferences.collapsedRecommendations.includes(key);
-  const Heading = isSource ? "h3" : "h2";
 
   function toggle() {
     const collapsed = s.preferences.value.collapsedRecommendations;
@@ -24,12 +21,11 @@ export function RecommendationSection({ sourceId, title, actions, children }: Pr
     s.preference({ collapsedRecommendations: next });
   }
 
-  return <section className={isSource ? "source-section" : undefined}>
-    <div className={isSource ? "section-title" : "section-title recommendation-heading"}>
-      <Heading>
+  return <section className="source-section">
+    <div className="section-title">
+      <h3>
         <SectionToggle title={title} expanded={expanded} controls={bodyId} onClick={toggle} />
-      </Heading>
-      {actions}
+      </h3>
     </div>
     <div id={bodyId} hidden={!expanded}>{expanded && children}</div>
   </section>;

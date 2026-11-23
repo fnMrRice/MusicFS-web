@@ -62,7 +62,7 @@ export default {
   "推荐歌单": ["Recommended playlists", "推薦歌單", "おすすめのプレイリスト"],
   "时光机": ["Time machine", "時光機", "タイムマシン"],
   "历史推荐（{0}/{1}）": ["Recommendation history ({0}/{1})", "歷史推薦（{0}/{1}）", "過去のおすすめ（{0}/{1}）"],
-  "返回最新推荐": ["Back to latest recommendations", "返回最新推薦", "最新のおすすめに戻る"],
+  "最新推荐": ["Latest recommendations", "最新推薦", "最新のおすすめ"],
   "正在寻找歌单…": ["Finding playlists…", "正在尋找歌單…", "プレイリストを検索中…"],
   "公共推荐 · 匿名": ["Public recommendations · Anonymous", "公開推薦 · 匿名", "公開のおすすめ · 匿名"],
   "推荐已过期，正在展示上次成功获取的内容。": ["Recommendations have expired. Showing the last available results.", "推薦已過期，正在顯示上次成功取得的內容。", "おすすめの有効期限が切れています。前回取得した内容を表示しています。"],

@@ -155,7 +155,7 @@ test("recommendations show cover fallbacks and the playlist preview refreshes de
   expect(reads).toEqual([null, "previous-page", null, null]);
 });
 
-test("recommendations request daily results on open, refresh explicitly, and rewind up to five times", async ({ page }) => {
+test("recommendations load today's results, refresh explicitly, and select any of five saved results", async ({ page }) => {
   await mock(page);
   let latest = 1;
   const reads: string[] = [];
@@ -173,6 +173,8 @@ test("recommendations request daily results on open, refresh explicitly, and rew
 
   const mix = (generation: number) => page.locator(".music-card").getByText(`Mix ${generation}`, { exact: true });
   const machine = page.getByRole("button", { name: "时光机", exact: true });
+  const popup = page.getByRole("dialog", { name: "时光机", exact: true });
+  const history = (offset: number) => popup.getByRole("button", { name: `历史推荐（${offset}/5）`, exact: true });
   const refresh = page.getByRole("button", { name: "刷新推荐", exact: true });
   await page.goto(`${origin}/#/recommendations`);
   await expect(mix(1)).toBeVisible();
@@ -183,21 +185,26 @@ test("recommendations request daily results on open, refresh explicitly, and rew
     await expect(mix(next)).toBeVisible();
   }
   const count = reads.length;
-  for (let offset = 1; offset <= 5; offset++) {
+  const offsets = [5, 1, 4, 2, 3];
+  for (const offset of offsets) {
     await machine.click();
+    await expect(popup).toBeVisible();
+    await expect(popup.getByRole("button", { name: /历史推荐/ })).toHaveCount(5);
+    await history(offset).click();
     await expect(mix(7 - offset)).toBeVisible();
-    await expect(page.getByText(`历史推荐（${offset}/5）`, { exact: true })).toBeVisible();
+    await expect(popup).toBeHidden();
   }
-  await expect(machine).toBeDisabled();
-  expect(reads.slice(count)).toEqual(["history=1", "history=2", "history=3", "history=4", "history=5"]);
-  await page.getByRole("button", { name: "返回最新推荐" }).click();
+  expect(reads.slice(count)).toEqual(offsets.map(offset => "history=" + offset));
+  await machine.click();
+  await popup.getByRole("button", { name: "最新推荐", exact: true }).click();
   await expect(mix(7)).toBeVisible();
   expect(reads).toHaveLength(count + 5);
   await machine.click();
+  await history(1).click();
   await expect(mix(6)).toBeVisible();
   await refresh.click();
   await expect(mix(8)).toBeVisible();
-  await expect(page.getByRole("button", { name: "返回最新推荐" })).toHaveCount(0);
+  await expect(popup).toBeHidden();
   const beforeReopen = reads.length;
   await page.reload();
   await expect(mix(8)).toBeVisible();

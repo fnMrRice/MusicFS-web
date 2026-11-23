@@ -45,9 +45,15 @@ export function useRecommendations(api: ContentApi) {
 
   return {
     page: past?.page ?? latest, offset: past?.offset ?? 0, loading, error,
-    previous: () => void load({ history: (past?.offset ?? 0) + 1 }),
+    select: (offset: number) => {
+      if (offset === 0) {
+        setPast(null);
+        setError(null);
+      } else if (offset !== past?.offset) {
+        void load({ history: offset });
+      }
+    },
     refresh: () => void load("refresh"),
     retry: () => void load(lastRead.current),
-    showLatest: () => { setPast(null); setError(null); },
   };
 }

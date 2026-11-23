@@ -47,11 +47,22 @@
 .section-toggle[aria-expanded="false"] svg { transform: rotate(-90deg); }
 .saved-account-playlists { margin-inline-start: 18px; }
 .recommendation-actions { display: flex; align-items: center; flex-shrink: 0; gap: 8px; }
-.recommendation-history { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
+.recommendation-history { position: relative; }
+.recommendation-history-popup {
+  position: absolute;
+  z-index: 5;
+  inset-block-start: calc(100% + 6px);
+  inset-inline-end: 0;
+  width: max-content;
+  min-width: 100%;
+  max-width: min(18rem, calc(100vw - 72px));
+  max-height: 55dvh;
+  overflow: auto;
+}
 @media (max-width: 480px) {
   .section-title.recommendation-heading h2 { font-size: 18px; }
-  .recommendation-actions:not(:lang(zh)) > button { min-width: 36px; }
-  .recommendation-actions:not(:lang(zh)) > button > span { display: none; }
+  .recommendation-history-trigger:not(:lang(zh)) { min-width: 36px; }
+  .recommendation-history-trigger:not(:lang(zh)) > span { display: none; }
 }
 .search-form {
   background: var(--panel);
@@ -290,7 +301,7 @@
   }
 }
 @media (max-width: 700px) {
-  .recommendation-actions > button { padding-inline: 7px; }
+  .recommendation-history-trigger { padding-inline: 7px; }
   .login-page {
     grid-template-columns: 1fr;
   }
