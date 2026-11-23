@@ -31,10 +31,24 @@
 }
 .section-title.recommendation-heading { gap: 8px; }
 .recommendation-heading h2 { min-width: 0; overflow-wrap: anywhere; }
+.recommendation-toggle {
+  max-width: 100%;
+  gap: 5px;
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  overflow-wrap: anywhere;
+}
+.recommendation-toggle:hover { background: transparent; color: var(--accent); }
+.recommendation-toggle svg { flex-shrink: 0; }
+.recommendation-toggle[aria-expanded="false"] svg { transform: rotate(-90deg); }
 .recommendation-actions { display: flex; align-items: center; flex-shrink: 0; gap: 8px; }
 .recommendation-history { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
 @media (max-width: 480px) {
-  .recommendation-heading:not(:lang(zh)) h2 { font-size: 18px; }
+  .section-title.recommendation-heading h2 { font-size: 18px; }
   .recommendation-actions:not(:lang(zh)) > button { min-width: 36px; }
   .recommendation-actions:not(:lang(zh)) > button > span { display: none; }
 }

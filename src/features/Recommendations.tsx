@@ -2,6 +2,7 @@ import { tr, useLocale, formatDate, statusText } from "../i18n";
 import { Link, useParams } from "react-router-dom";
 import { useState } from "react";
 import { useServices, useStore } from "../app/services";
+import { orderRecommendationSources } from "../app/recommendation-order";
 import type { OnlineInstance } from "../api/content";
 import { useResource } from "../components/query";
 import { Cover, Empty, ErrorNotice, Icon, IconButton } from "../components/ui";
@@ -12,6 +13,7 @@ import { usePlaylistObservation } from "./playlists/usePlaylistObservation";
 import { externalLink } from "./scrapers/fields";
 import { useRecommendations } from "./useRecommendations";
 import { DailySongs } from "./DailySongs";
+import { RecommendationSection } from "./RecommendationSection";
 
 function hasDailySongs(source: OnlineInstance) {
   return source.availability === "available" && !!source.accountId &&
@@ -31,30 +33,28 @@ export function Recommendations() {
 function RecommendationFeed({ dailySources }: { dailySources: OnlineInstance[] }) {
   useLocale();
   const sourceName = useSourceName();
-  const feed = useRecommendations(useServices().content);
+  const services = useServices();
+  const { recommendationOrder } = useStore(services.preferences);
+  const feed = useRecommendations(services.content);
   const daily = feed.offset === 0 ? dailySources : [];
   const recommendations = feed.page?.sources ?? [];
   // 有些账号只提供每日歌曲，公共歌单不可用时仍保留该账号的入口。
-  const groups = [
-    ...recommendations.map(source => ({
-      source, result: source, showDaily: daily.some(account => account.instanceId === source.instanceId),
-    })),
-    ...daily.filter(account => !recommendations.some(source => source.instanceId === account.instanceId))
-      .map(source => ({ source, result: undefined, showDaily: true })),
-  ];
+  const results = new Map(recommendations.map(result => [result.instanceId, result]));
+  const sources = [...recommendations, ...daily.filter(source => !results.has(source.instanceId))];
+  const groups = orderRecommendationSources(sources, recommendationOrder).map(source => ({
+    source, result: results.get(source.instanceId), showDaily: daily.some(account => account.instanceId === source.instanceId),
+  }));
   return (
-    <section>
-      <div className="section-title recommendation-heading">
-        <h2>{tr("推荐歌单")}</h2>
-        <div className="recommendation-actions">
-          <button type="button" aria-label={tr("时光机")} title={tr("时光机")}
-            disabled={feed.loading || feed.offset >= (feed.page?.historyDepth ?? 0)}
-            onClick={feed.previous}>
-            <Icon name="clock" size={16} /><span>{tr("时光机")}</span>
-          </button>
-          <IconButton icon="refresh" label={tr("刷新推荐")} disabled={feed.loading} onClick={feed.refresh} />
-        </div>
+    <RecommendationSection title={tr("推荐歌单")} actions={
+      <div className="recommendation-actions">
+        <button type="button" aria-label={tr("时光机")} title={tr("时光机")}
+          disabled={feed.loading || feed.offset >= (feed.page?.historyDepth ?? 0)}
+          onClick={feed.previous}>
+          <Icon name="clock" size={16} /><span>{tr("时光机")}</span>
+        </button>
+        <IconButton icon="refresh" label={tr("刷新推荐")} disabled={feed.loading} onClick={feed.refresh} />
       </div>
+    }>
       {feed.offset > 0 && (
         <div className="recommendation-history">
           <span className="muted" role="status">{tr("历史推荐（{0}/{1}）", { 0: feed.offset, 1: feed.page!.historyDepth })}</span>
@@ -64,10 +64,7 @@ function RecommendationFeed({ dailySources }: { dailySources: OnlineInstance[] }
       <ErrorNotice error={feed.error} retry={feed.retry} />
       {feed.loading && <p className="loading" role="status">{tr("正在寻找歌单…")}</p>}
       {groups.map(({ source, result, showDaily }) => (
-        <section key={source.instanceId} className="source-section">
-          <div className="section-title">
-            <h3>{sourceName(source)}</h3>
-          </div>
+        <RecommendationSection key={source.instanceId} sourceId={source.instanceId} title={sourceName(source)}>
           {result?.stale && (
             <p className="notice">
               {tr("推荐已过期，正在展示上次成功获取的内容。")}
@@ -112,7 +109,7 @@ function RecommendationFeed({ dailySources }: { dailySources: OnlineInstance[] }
           {!showDaily && !result?.items.length && !result?.error && (
             <p className="muted">{tr("此来源暂时没有推荐歌单。")}</p>
           )}
-        </section>
+        </RecommendationSection>
       ))}
       {feed.page && groups.length === 0 && (
         <Empty title={tr("尚未配置可用的推荐来源。")} icon="home">
@@ -123,7 +120,7 @@ function RecommendationFeed({ dailySources }: { dailySources: OnlineInstance[] }
           </p>
         </Empty>
       )}
-    </section>
+    </RecommendationSection>
   );
 }
 export function DiscoveryPlaylist({ daily = false }: { daily?: boolean }) {

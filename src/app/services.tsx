@@ -23,6 +23,7 @@ import { displaySource, MusicCatalogApi, playlistTrack } from "../api/music-cata
 import { CapabilityEvents } from "./capability-events";
 import { capabilityResources } from "./capability-resources";
 import { SourcePlaylistCatalog } from "./source-playlists";
+import { loadRecommendationLayout, saveRecommendationLayout, type RecommendationLayout } from "./recommendation-order";
 import { ProfileApi } from "../api/profile";
 import { PersonalProfileState } from "./personal-profile";
 import { ScansApi } from "../api/scans";
@@ -49,7 +50,7 @@ interface AuthState {
   busy: boolean;
   error: string | null;
 }
-interface PreferencesState {
+interface PreferencesState extends RecommendationLayout {
   theme: "dark" | "light" | "system";
   accent: "default" | "miku" | "tianyi";
   albumView: "cards" | "list";
@@ -76,6 +77,8 @@ const defaults: PreferencesState = {
   mine: true,
   playlists: true,
   playlistFolders: {},
+  collapsedRecommendations: [],
+  recommendationOrder: [],
   works: false,
   processing: false,
   fades: defaultFadeSettings,
@@ -280,6 +283,7 @@ export class Services {
       ...loadVolumePreferences(),
       lyricsPinned: saved?.lyricsPinned === true,
       queuePinned: saved?.queuePinned === true,
+      ...loadRecommendationLayout(session.user.id),
       mine: saved?.mine !== false,
       playlists: saved?.playlists !== false,
       playlistFolders: saved?.playlistFolders && typeof saved.playlistFolders === "object" && !Array.isArray(saved.playlistFolders)
@@ -405,12 +409,18 @@ export class Services {
     if (patch.fades) this.player.setTransitions(patch.fades);
     this.dsp.setAutoVolume(this.preferences.value.autoVolume);
     const key = this.key();
-    if (key)
+    if (key) {
+      const { collapsedRecommendations, recommendationOrder, ...general } = this.preferences.value;
+      const user = this.auth.value.session?.user.id;
+      if (user && (patch.collapsedRecommendations !== undefined || patch.recommendationOrder !== undefined)) {
+        saveRecommendationLayout(user, patch);
+      }
       try {
-        localStorage.setItem(key, JSON.stringify(this.preferences.value));
+        localStorage.setItem(key, JSON.stringify(general));
       } catch {
         /* Preferences remain in memory. */
       }
+    }
   }
   toggleMute(): void {
     const { volume, lastVolume } = this.preferences.value;

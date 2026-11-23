@@ -52,6 +52,8 @@ export default {
   "仅保存在此浏览器，按账号隔离。": ["Saved in this browser, separately for each account.", "僅儲存在此瀏覽器，依帳號區分。", "このブラウザーにアカウントごとに保存されます。"],
   "删除搜索记录 {0}": ["Remove search {0}", "刪除搜尋紀錄 {0}", "検索履歴 {0} を削除"],
   "刷新推荐": ["Refresh recommendations", "重新整理推薦", "おすすめを更新"],
+  "推荐来源排序": ["Recommendation source order", "推薦來源排序", "おすすめソースの表示順"],
+  "暂无推荐来源。": ["No recommendation sources yet.", "暫無推薦來源。", "おすすめソースはまだありません。"],
   "{0}的每日推荐歌曲": ["Daily song recommendations for {0}", "{0}的每日推薦歌曲", "{0} のデイリーおすすめ曲"],
   "每日推荐歌曲": ["Daily songs", "每日推薦歌曲", "デイリーおすすめ曲"],
   "此来源尚不支持每日推荐歌曲。": ["Daily songs are unavailable for this source.", "此來源尚不支援每日推薦歌曲。", "このソースはデイリーおすすめ曲に対応していません。"],

@@ -1,0 +1,13 @@
+.recommendation-order-settings ol {
+  max-width: 38rem;
+  margin: 0;
+  padding-inline-start: 1.8rem;
+}
+.recommendation-order-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 6px;
+  padding-block: 4px;
+}
+.recommendation-order-row span { overflow-wrap: anywhere; }

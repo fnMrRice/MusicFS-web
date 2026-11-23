@@ -4,6 +4,7 @@ import { tr, useLocale } from "../i18n";
 import { useServices, useStore } from "../app/services";
 import { LanguageSelect } from "../i18n/LanguageSelect";
 import { ThemeChoices } from "../components/ThemeChoices";
+import { RecommendationOrderSettings } from "./RecommendationOrderSettings";
 import { MusicSources } from "./MusicSources";
 import { AlbumAutoSettings } from "./scrapers/AlbumAutoSettings";
 import { PluginStatus } from "./PluginStatus";
@@ -57,7 +58,7 @@ export function Settings() {
           )}
           {tab.id === "playback" && <PlaybackSettings />}
           {tab.id === "dsp" && <DSPSettings />}
-          {tab.id === "appearance" && <AppearanceSettings />}
+          {tab.id === "appearance" && <><AppearanceSettings /><RecommendationOrderSettings /></>}
           {tab.id === "user" && <UserSettings />}
           {tab.id === "about" && <AboutSettings />}
         </section>
