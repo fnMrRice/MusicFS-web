@@ -23,6 +23,21 @@ describe("Playback failure messages", () => {
         .toBe("音乐来源暂不可用，请检查音乐目录及其所在磁盘或网络连接后重试。");
   });
 
+  it("explains how to recover when the playback source changes", () => {
+    const error = new ApiError("RESOURCE_CHANGED", "Private path", 409, "req-change");
+    const message = playbackErrorMessage(error);
+    const translations = {
+      "zh-CN": "曲目来源已变更或无法读取，请重新扫描该来源后播放。 请求编号：req-change",
+      en: "The track’s source has changed or could not be read. Rescan the source and try playing again. Request ID: req-change",
+      "zh-TW": "曲目來源已變更或無法讀取，請重新掃描該來源後播放。 請求編號：req-change",
+      ja: "曲のソースが変更されたか、読み取れません。ソースを再スキャンしてから再生してください。 リクエスト ID：req-change",
+    };
+    for (const locale of ["zh-CN", "en", "zh-TW", "ja"] as const) {
+      setLanguage(locale);
+      expect(statusText(message)).toBe(translations[locale]);
+    }
+  });
+
   it("preserves authentication and unexpected-error handling without exposing details", () => {
     for (const error of [
       new ApiError("UNSUPPORTED", "Private details", 401),
