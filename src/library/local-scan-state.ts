@@ -32,11 +32,10 @@ export class LocalScanState extends Store<LocalScanSnapshot> {
   private pending: PendingScan | null;
   private automatic: boolean;
   private automaticRevision = 0;
-  private readinessAttempts = 0;
   private mounted = false;
   private generation = 0;
   private controller: AbortController | null = null;
-  private timer: ReturnType<typeof setTimeout> | null = null;
+  private invalidated = false;
   private discovery: Promise<void> | null = null;
   private finishedJob: string | null = null;
   constructor(private api: ScansApi, private instance: string, private storage: ScanStorage,
@@ -64,8 +63,7 @@ export class LocalScanState extends Store<LocalScanSnapshot> {
     this.mounted = false;
     ++this.generation;
     this.controller?.abort();
-    if (this.timer) clearTimeout(this.timer);
-    this.timer = null;
+    this.invalidated = false;
     this.patch({ busy: false, checking: false });
   }
   async start(): Promise<void> {
@@ -85,7 +83,6 @@ export class LocalScanState extends Store<LocalScanSnapshot> {
   requestAutomatic(): void {
     this.automatic = true;
     ++this.automaticRevision;
-    this.readinessAttempts = 0;
     this.persist();
     if (!this.value.busy && (!this.pending || this.value.error)) void this.resume();
   }
@@ -97,6 +94,18 @@ export class LocalScanState extends Store<LocalScanSnapshot> {
     if (!this.pending && this.active()) return this.refreshStatus();
     await this.run(!this.pending);
   }
+  /** 合并读取期间收到的通知，完成后再确认一次最新状态。 */
+  invalidate(): void {
+    if (!this.mounted) return;
+    this.invalidated = true;
+    this.flushInvalidation();
+  }
+  private flushInvalidation(): void {
+    if (!this.invalidated || this.discovery || this.value.busy || !this.mounted) return;
+    this.invalidated = false;
+    if (this.automatic && !this.pending && !this.active()) void this.resume();
+    else void this.refreshStatus();
+  }
   /** 状态发现只读；未知提交必须由恢复流程使用原请求和幂等键确认。 */
   async refreshStatus(): Promise<void> {
     if (this.discovery) return this.discovery;
@@ -105,8 +114,6 @@ export class LocalScanState extends Store<LocalScanSnapshot> {
       if (this.pending.jobId) await this.run(false);
       return;
     }
-    if (this.timer) clearTimeout(this.timer);
-    this.timer = null;
     const generation = ++this.generation;
     const controller = new AbortController();
     this.controller = controller;
@@ -140,8 +147,8 @@ export class LocalScanState extends Store<LocalScanSnapshot> {
     finally {
       if (this.discovery === discovery) this.discovery = null;
       if (current() && this.mounted) {
-        if (this.automatic && !this.active()) void this.resume();
-        else this.timer = setTimeout(() => void this.refreshStatus(), 1000);
+        if (this.automatic && !this.active()) this.invalidated = true;
+        this.flushInvalidation();
       }
     }
   }
@@ -163,14 +170,11 @@ export class LocalScanState extends Store<LocalScanSnapshot> {
     if (this.finishedJob !== job.jobId) { this.finishedJob = job.jobId; this.finished(succeeded); }
   }
   private async run(fresh: boolean, rootId?: string): Promise<void> {
-    if (this.timer) clearTimeout(this.timer);
-    this.timer = null;
     const generation = ++this.generation;
     const controller = new AbortController();
     this.controller = controller;
     const current = () => generation === this.generation && !controller.signal.aborted;
     const automaticRevision = this.automaticRevision;
-    let waitForReady = false;
     let continueAutomatic = false;
     this.patch({ busy: true, checking: false, error: null, ...(fresh ? { job: null, metadata: null, refreshing: rootId !== undefined } : {}) });
     let stage: "prepare" | "submit" | "poll" = fresh ? "prepare" : this.pending?.jobId ? "poll" : "submit";
@@ -180,7 +184,6 @@ export class LocalScanState extends Store<LocalScanSnapshot> {
           : await this.api.prepare(this.instance, controller.signal, rootId);
         if (!current()) return;
         if (automaticRevision === this.automaticRevision) this.automatic = false;
-        this.readinessAttempts = 0;
         // 在提交前持久化请求和幂等键，刷新或网络中断后可确认同一次提交。
         this.persist({ request, key: crypto.randomUUID(), jobId: null });
       }
@@ -214,16 +217,12 @@ export class LocalScanState extends Store<LocalScanSnapshot> {
       const missing = stage === "poll" && error instanceof ApiError && error.status === 404;
       if (missing) { this.patch({ job: null }); this.persist(null); }
       continueAutomatic = this.automatic && !this.pending && stage !== "prepare";
-      waitForReady = stage === "prepare" && this.automatic && error instanceof ApiError
-        && ["SOURCE_UNAVAILABLE", "SOURCE_OFFLINE"].includes(error.code) && ++this.readinessAttempts < 30;
       this.patch({ error: missing ? "扫描记录已不可用，请检查音乐库后重新扫描。" : scanError(error) });
     } finally {
       if (current()) {
         this.patch({ busy: false });
-        if (this.mounted && (this.pending && !this.value.error || continueAutomatic || waitForReady))
-          this.timer = setTimeout(() => void this.resume(), 1000);
-        else if (this.mounted && !this.pending && !this.automatic)
-          this.timer = setTimeout(() => void this.refreshStatus(), 1000);
+        if (continueAutomatic) this.invalidated = true;
+        this.flushInvalidation();
       }
     }
   }

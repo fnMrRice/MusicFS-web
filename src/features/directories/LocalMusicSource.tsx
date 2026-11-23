@@ -29,8 +29,8 @@ export function LocalMusicSource({ instance, name, manage }: {
   const statistics = useRootStatistics(s.client, instance.instanceId,
     JSON.stringify([auth.ready?.instanceId, auth.session?.user.id]), scan.job);
   useEffect(() => {
-    const refresh = () => { if (document.visibilityState === "visible") void state.refreshStatus(); };
-    refresh();
+    const refresh = () => { if (document.visibilityState === "visible") state.invalidate(); };
+    if (document.visibilityState === "visible") void state.refreshStatus();
     window.addEventListener("focus", refresh);
     document.addEventListener("visibilitychange", refresh);
     return () => {

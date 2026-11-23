@@ -32,6 +32,25 @@ function fixture() {
 afterEach(() => vi.useRealTimers());
 
 describe("authenticated control channel", () => {
+  it("routes each changed resource once, reconciles on ready and unsubscribes", async () => {
+    vi.useFakeTimers();
+    const s = fixture(), tasks = vi.fn(), scans = vi.fn(), configuration = vi.fn();
+    const unsubscribe = s.events.activity.subscribe("tasks", tasks);
+    s.events.activity.subscribe("scans", scans);
+    s.events.activity.subscribe("configuration", configuration);
+    s.events.start("csrf"); const first = s.sockets[0]; first.ready();
+    first.emit({ type: "event", event: "activity.changed", data: { resources: ["tasks", "tasks", "unknown"] } });
+    for (const data of [null, {}, { resources: "scans" }])
+      first.emit({ type: "event", event: "activity.changed", data });
+    first.changed();
+    expect(tasks).toHaveBeenCalledTimes(2); expect(scans).toHaveBeenCalledOnce();
+    expect(configuration).toHaveBeenCalledTimes(2);
+    unsubscribe(); first.dispatchEvent(new Event("close")); await vi.advanceTimersByTimeAsync(500);
+    first.emit({ type: "event", event: "activity.changed", data: { resources: ["scans"] } });
+    s.sockets[1].ready();
+    expect(tasks).toHaveBeenCalledTimes(2); expect(scans).toHaveBeenCalledTimes(2);
+    s.events.stop();
+  });
   it("uses one connection, authenticates without a URL token and refreshes after reconnect", async () => {
     vi.useFakeTimers();
     const s = fixture(); s.events.start("csrf-1"); s.events.start("csrf-1");

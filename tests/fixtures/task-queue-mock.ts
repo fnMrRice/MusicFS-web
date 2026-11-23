@@ -12,7 +12,7 @@ export async function taskQueueMock(page: Page) {
     cancellations: [] as { id: string; scope: string }[], admin: true, uncertain: "", configWrites: 0, unavailable: false,
     activeCount: null as number | null, listError: false };
   const keys = new Map<string, string>();
-  await routeApi(page, async route => {
+  const control = await routeApi(page, async route => {
     const url = new URL(route.request().url()), path = url.pathname, method = route.request().method();
     if (path.endsWith("/scan-jobs") && method === "POST") {
       const body = route.request().postDataJSON(), key = route.request().headers()["idempotency-key"];
@@ -62,5 +62,5 @@ export async function taskQueueMock(page: Page) {
     }
     await route.fulfill({ json });
   });
-  return state;
+  return Object.assign(state, { control });
 }

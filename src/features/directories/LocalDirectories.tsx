@@ -34,10 +34,22 @@ export function LocalDirectories({ instance, action = { type: "add" }, close }: 
     return () => controller.abort();
   }, [state]);
   useEffect(() => {
-    if (value.busy || value.error || !["applying", "draining"].includes(value.operation?.status ?? "")) return;
-    const timer = setTimeout(() => void state.resume(), 1000);
-    return () => clearTimeout(timer);
-  }, [state, value.operation, value.busy, value.error]);
+    const controller = new AbortController();
+    let observed: string | null = null;
+    let invalidated = false;
+    const refresh = () => {
+      const { busy, operation } = state.value;
+      if (!operation || !["applying", "draining"].includes(operation.status)) return;
+      if (operation.operationId !== observed) { observed = operation.operationId; invalidated = true; }
+      if (!invalidated || busy) return;
+      invalidated = false;
+      void state.resume(controller.signal);
+    };
+    const stopEvents = s.activity.subscribe("configuration", () => { invalidated = true; refresh(); });
+    const stopState = state.subscribe(refresh);
+    refresh();
+    return () => { stopEvents(); stopState(); controller.abort(); };
+  }, [s, state]);
   useEffect(() => {
     if (value.saved && !applied.current) {
       applied.current = true;

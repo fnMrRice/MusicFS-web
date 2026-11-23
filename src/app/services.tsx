@@ -99,6 +99,7 @@ export class Services {
     () => { this.player.stop(); void this.connect(); },
   );
   controlStatus = this.capabilityEvents.channel.status;
+  activity = this.capabilityEvents.activity;
   auth = new Store<AuthState>({
     session: null,
     ready: null,
@@ -169,6 +170,12 @@ export class Services {
   }
   constructor(root: HTMLElement) {
     this.client.controlTransport = this.capabilityEvents.channel;
+    this.activity.subscribe("tasks", () => this.tasks.invalidate());
+    this.activity.subscribe("scans", () => this.scans.invalidate());
+    this.activity.subscribe("configuration", () => {
+      this.configurationScans.invalidate();
+      this.scans.capabilitiesChanged();
+    });
     let config = this.localDSP.value.config;
     this.localDSP.subscribe(() => {
       if (config === this.localDSP.value.config) return;

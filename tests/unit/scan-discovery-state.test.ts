@@ -21,13 +21,30 @@ function fixture() {
 afterEach(() => vi.useRealTimers());
 
 describe("Read-only scan discovery", () => {
+  it("reads once while idle and coalesces updates received during the snapshot", async () => {
+    vi.useFakeTimers();
+    const { api, state } = fixture();
+    let release!: (value: ScanJob | null) => void;
+    api.status.mockImplementationOnce(() => new Promise(resolve => { release = resolve; }))
+      .mockResolvedValue(job("succeeded", 42));
+    const detach = state.attach();
+    state.invalidate();
+    state.invalidate();
+    expect(api.status).toHaveBeenCalledTimes(1);
+    release(null);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(api.status).toHaveBeenCalledTimes(2);
+    expect(state.value.job?.progress.observed).toBe(42);
+    detach();
+  });
   it('adopts a running task even when the previous task is still waiting for its retry', async () => {
     vi.useFakeTimers();
     const { api, state, finished } = fixture();
     api.status.mockResolvedValueOnce(job('retry_wait', 200, 'first')).mockResolvedValue(job('running', 20, 'next'));
     api.job.mockResolvedValueOnce(job('retry_wait', 200, 'first'));
     const detach = state.attach();
-    await vi.advanceTimersByTimeAsync(1000);
+    state.invalidate();
+    await vi.advanceTimersByTimeAsync(0);
     expect(state.value).toMatchObject({ pending: true, job: { jobId: 'next', status: 'running', progress: { observed: 20 } } });
     expect(finished).not.toHaveBeenCalled();
     expect(api.submit).not.toHaveBeenCalled();
@@ -39,7 +56,8 @@ describe("Read-only scan discovery", () => {
     api.status.mockResolvedValueOnce(job('running', 200, 'first')).mockResolvedValue(job('queued', 0, 'next'));
     api.job.mockResolvedValueOnce(job('succeeded', 400, 'first'));
     const detach = state.attach();
-    await vi.advanceTimersByTimeAsync(1000);
+    state.invalidate();
+    await vi.advanceTimersByTimeAsync(0);
     expect(api.job).toHaveBeenCalledExactlyOnceWith('first', 'local', expect.any(AbortSignal));
     expect(finished).toHaveBeenCalledExactlyOnceWith(true);
     expect(state.value).toMatchObject({ pending: true, job: { jobId: 'next', status: 'queued' } });
@@ -53,7 +71,8 @@ describe("Read-only scan discovery", () => {
     const detach = state.attach();
     await vi.advanceTimersByTimeAsync(0);
     expect(state.value.error).toBeTruthy();
-    await vi.advanceTimersByTimeAsync(1000);
+    state.invalidate();
+    await vi.advanceTimersByTimeAsync(0);
     expect(state.value).toMatchObject({ error: null, job: null, pending: false });
     expect(api.submit).not.toHaveBeenCalled();
     detach();
@@ -69,10 +88,12 @@ describe("Read-only scan discovery", () => {
     expect(state.value).toMatchObject({ checking: false, pending: true, job: { progress: { observed: 0 } } });
     await state.start();
     for (const observed of [200, 400]) {
-      await vi.advanceTimersByTimeAsync(1000);
+      state.invalidate();
+      await vi.advanceTimersByTimeAsync(0);
       expect(state.value.job?.progress.observed).toBe(observed);
     }
-    await vi.advanceTimersByTimeAsync(4000);
+    state.invalidate();
+    await vi.advanceTimersByTimeAsync(0);
     expect(state.value).toMatchObject({ pending: false, job: { status: "succeeded" } });
     expect(finished).toHaveBeenCalledExactlyOnceWith(true);
     expect(storage.get()).toBeNull();
@@ -92,9 +113,13 @@ describe("Read-only scan discovery", () => {
     const detach = state.attach();
     await vi.advanceTimersByTimeAsync(0);
     expect(state.value.pending).toBe(false);
-    await vi.advanceTimersByTimeAsync(3000);
+    for (let i = 0; i < 3; i++) {
+      state.invalidate();
+      await vi.advanceTimersByTimeAsync(0);
+    }
     expect(state.value).toMatchObject({ pending: true, error: null, job: { status: "running", progress: { observed: 0 } } });
-    await vi.advanceTimersByTimeAsync(1000);
+    state.invalidate();
+    await vi.advanceTimersByTimeAsync(0);
     expect(state.value.job?.progress.observed).toBe(300);
     expect(api.submit).not.toHaveBeenCalled();
     detach();
@@ -149,7 +174,8 @@ describe("Read-only scan discovery", () => {
     expect(state.value.automaticQueued).toBe(true);
     expect(api.submit).not.toHaveBeenCalled();
     api.status.mockResolvedValue(job("succeeded", 400));
-    await vi.advanceTimersByTimeAsync(1000);
+    state.invalidate();
+    await vi.advanceTimersByTimeAsync(0);
     expect(api.submit).toHaveBeenCalledTimes(1);
     expect(state.value).toMatchObject({ automaticQueued: false, pending: true, job: { jobId: "own" } });
     expect(JSON.parse(storage.get()!).pending.jobId).toBe("own");
@@ -164,9 +190,11 @@ describe("Read-only scan discovery", () => {
     const detach = state.attach();
     await vi.advanceTimersByTimeAsync(0);
     expect(state.value.error).toBeTruthy();
-    await vi.advanceTimersByTimeAsync(1000);
+    state.invalidate();
+    await vi.advanceTimersByTimeAsync(0);
     expect(state.value.error).toBeNull();
-    await vi.advanceTimersByTimeAsync(3000);
+    state.invalidate();
+    await vi.advanceTimersByTimeAsync(0);
     expect(state.value.job?.jobId).toBe("newer");
     expect(finished).toHaveBeenCalledTimes(2);
     expect(api.submit).not.toHaveBeenCalled();

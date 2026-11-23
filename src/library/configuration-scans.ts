@@ -3,7 +3,7 @@ import { DirectoriesApi, type PluginOperation } from "../api/directories";
 
 interface WaitingConfiguration {
   instance: string; operationId: string; controller: AbortController;
-  timer: ReturnType<typeof setTimeout> | null;
+  reading: boolean; invalidated: boolean;
 }
 type SessionStorage = Pick<Storage, "length" | "key" | "getItem" | "setItem" | "removeItem">;
 function browserStorage(): SessionStorage | null {
@@ -37,22 +37,28 @@ export class ConfigurationScans {
   watch(instance: string, operation: PluginOperation): void {
     if (!this.prefix || this.observed.has(operation.operationId)) return;
     this.observed.add(operation.operationId);
-    const waiting: WaitingConfiguration = { instance, operationId: operation.operationId, controller: new AbortController(), timer: null };
+    const waiting: WaitingConfiguration = { instance, operationId: operation.operationId, controller: new AbortController(), reading: false, invalidated: false };
     this.waiting.set(operation.operationId, waiting);
     try { this.storage?.setItem(this.prefix + encodeURIComponent(operation.operationId), JSON.stringify({ instance, operationId: operation.operationId })); }
     catch { /* 存储不可用时保留内存进度。 */ }
-    this.accept(waiting, operation);
+    if (this.pending(operation)) void this.refresh(waiting);
+    else this.accept(waiting, operation);
+  }
+  invalidate(): void {
+    for (const waiting of this.waiting.values()) void this.refresh(waiting);
+  }
+  private pending(operation: PluginOperation): boolean {
+    return operation.status === "applying" || operation.status === "draining";
   }
   private accept(waiting: WaitingConfiguration, operation: PluginOperation): void {
-    if (waiting.controller.signal.aborted) return;
-    if (operation.status === "applying" || operation.status === "draining") {
-      waiting.timer = setTimeout(() => void this.poll(waiting), 1000);
-      return;
-    }
+    if (waiting.controller.signal.aborted || this.pending(operation)) return;
     if (operation.status === "succeeded") this.scan(waiting.instance);
     this.forget(waiting);
   }
-  private async poll(waiting: WaitingConfiguration): Promise<void> {
+  private async refresh(waiting: WaitingConfiguration): Promise<void> {
+    if (waiting.reading) { waiting.invalidated = true; return; }
+    waiting.reading = true;
+    waiting.invalidated = false;
     try {
       const operation = await new DirectoriesApi(this.client, waiting.instance).operation(waiting.operationId, waiting.controller.signal);
       if (operation.operationId !== waiting.operationId || !["applying", "draining", "succeeded", "failed", "superseded"].includes(operation.status))
@@ -61,7 +67,9 @@ export class ConfigurationScans {
     } catch (error) {
       if (waiting.controller.signal.aborted) return;
       if (error instanceof ApiError && error.status === 404) this.forget(waiting);
-      else waiting.timer = setTimeout(() => void this.poll(waiting), 2000);
+    } finally {
+      waiting.reading = false;
+      if (waiting.invalidated && this.waiting.get(waiting.operationId) === waiting) void this.refresh(waiting);
     }
   }
   private forget(waiting: WaitingConfiguration): void {
@@ -70,10 +78,7 @@ export class ConfigurationScans {
     catch { /* 已完成状态仍在当前会话中去重。 */ }
   }
   clear(): void {
-    for (const waiting of this.waiting.values()) {
-      waiting.controller.abort();
-      if (waiting.timer) clearTimeout(waiting.timer);
-    }
+    for (const waiting of this.waiting.values()) waiting.controller.abort();
     this.waiting.clear();
     this.observed.clear();
     this.prefix = null;

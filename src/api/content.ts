@@ -360,12 +360,16 @@ export class ContentApi {
     }
     return this.write("/remote-playlists", { instanceId, externalId, accountId: account.accountId });
   }
-  async sync(p: RemotePlaylist): Promise<SyncJob> {
+  async remotePlaylist(playlistId: string, signal?: AbortSignal): Promise<RemotePlaylist> {
+    return checked(await this.client.request<RemotePlaylist>(`/remote-playlists/${id(playlistId)}`, { signal }),
+      (playlist) => playlist.playlistId === playlistId);
+  }
+  async sync(p: RemotePlaylist): Promise<{ jobId: string }> {
     const receipt = await this.write<{ jobId: string }>(
       `/remote-playlists/${id(p.playlistId)}/sync-jobs`,
       { expectedBindingRevision: p.bindingRevision },
     );
-    return this.syncJob(receipt.jobId);
+    return checked(receipt, (r) => string(r.jobId));
   }
   syncJob(job: string, signal?: AbortSignal): Promise<SyncJob> {
     return this.client.request(`/remote-playlist-sync-jobs/${id(job)}`, {

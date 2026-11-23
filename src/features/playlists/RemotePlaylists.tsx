@@ -1,18 +1,21 @@
 import { tr, useLocale, formatDate } from "../../i18n";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useServices } from "../../app/services";
 import { usePages, useResource } from "../../components/query";
 import { ErrorNotice, Sentinel } from "../../components/ui";
 import { Modal } from "../../components/Modal";
-import { errorMessage } from "../../api/client";
+import { ApiError, errorMessage } from "../../api/client";
 import type { Observation, RemotePlaylist, SyncJob } from "../../api/content";
 import { useSourceName } from "../../components/use-source-name";
 export function RemotePlaylists() {
   useLocale();
   const sourceName = useSourceName();
   const s = useServices();
-  const [version, setVersion] = useState(0);
+  const [updates, setUpdates] = useState(new Map<string, RemotePlaylist>());
+  const updated = useCallback((playlist: RemotePlaylist) => {
+    setUpdates(previous => new Map(previous).set(playlist.playlistId, playlist));
+  }, []);
   const [open, setOpen] = useState(false);
   const [instance, setInstance] = useState("");
   const [external, setExternal] = useState("");
@@ -23,21 +26,23 @@ export function RemotePlaylists() {
     s.content.online(signal),
   );
   const page = usePages(
-    `remote:${version}`,
+    "remote",
     async (after, signal) => {
       const result = await s.content.remote(after, signal);
       return { items: result.items, cursor: result.nextAfter };
     },
     (p) => p.playlistId,
   );
+  const playlists = new Map(page.items.map(playlist => [playlist.playlistId, playlist]));
+  for (const [id, playlist] of updates) playlists.set(id, playlist);
   const submit = async () => {
     setBusy(true);
     setError(null);
     try {
       const bilibili = providers.data?.find((p) => p.instanceId === instance)?.platform === "bilibili";
       const canonical = bilibili ? (await s.content.playlistReference(instance, external)).externalId : external.trim();
-      await s.content.importRemote(instance, canonical);
-      setVersion((v) => v + 1);
+      const result = await s.content.importRemote(instance, canonical);
+      updated(result.playlist);
       setOpen(false);
     } catch (e) {
       setError(errorMessage(e));
@@ -66,7 +71,7 @@ export function RemotePlaylists() {
         {tr("点击同步可以更新已导入歌单的本地快照。")}
       </p>
       <ErrorNotice error={page.error} retry={page.retry} />
-      {page.items.map((p) => (
+      {Array.from(playlists.values(), p => (
         <RemoteRow
           key={p.playlistId}
           playlist={p}
@@ -75,11 +80,11 @@ export function RemotePlaylists() {
               (source) => source.instanceId === p.instanceId,
             ) ?? p.instanceId,
           )}
-          updated={() => setVersion((v) => v + 1)}
+          updated={updated}
         />
       ))}
       {page.loading && <p className="loading">{tr("正在读取…")}</p>}
-      {!page.loading && !page.items.length && !page.error && (
+      {!page.loading && !playlists.size && !page.error && (
         <p className="muted">{tr("还没有导入的远程歌单。")}</p>
       )}
       <Sentinel
@@ -152,38 +157,49 @@ function RemoteRow({
 }: {
   playlist: RemotePlaylist;
   sourceLabel: string;
-  updated: () => void;
+  updated: (playlist: RemotePlaylist) => void;
 }) {
   useLocale();
   const s = useServices();
   const [job, setJob] = useState<SyncJob | null>(null);
+  const [jobId, setJobId] = useState<string | null>(null);
+  const retryStatus = useRef<() => void>(undefined);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
-    if (!job || !["queued", "running"].includes(job.state)) return;
-    const control = new AbortController();
-    const timer = setTimeout(() => {
-      void s.content.syncJob(job.jobId, control.signal).then(
-        (next) => {
-          if (control.signal.aborted) return;
-          setJob(next);
-          if (next.state === "succeeded") updated();
-        },
-        (e) => {
-          if (!control.signal.aborted) setError(errorMessage(e));
-        },
-      );
-    }, 1500);
+    if (!jobId) return;
+    const watcher = s.activity.watch("playlistSync", async (signal) => {
+      try {
+        const next = await s.content.syncJob(jobId, signal);
+        if (signal.aborted) return;
+        setJob(next);
+        setError(null);
+        if (!["queued", "running"].includes(next.state)) {
+          const playlist = await s.content.remotePlaylist(p.playlistId, signal);
+          if (signal.aborted) return;
+          updated(playlist);
+          watcher.stop();
+          setJobId(null);
+        }
+      } catch (cause) {
+        if (signal.aborted) return;
+        setError(errorMessage(cause));
+        if (cause instanceof ApiError && cause.status === 404) setJobId(null);
+      }
+    });
+    retryStatus.current = () => watcher.refresh();
     return () => {
-      clearTimeout(timer);
-      control.abort();
+      watcher.stop();
+      retryStatus.current = undefined;
     };
-  }, [job, s, updated]);
+  }, [jobId, p.playlistId, s, updated]);
   const sync = async () => {
     setBusy(true);
     setError(null);
     try {
-      setJob(await s.content.sync(p));
+      const receipt = await s.content.sync(p);
+      setJob(null);
+      setJobId(receipt.jobId);
     } catch (e) {
       setError(errorMessage(e));
     } finally {
@@ -217,12 +233,10 @@ function RemoteRow({
             {job.error && `（${job.error.code}）`}
           </p>
         )}
-        <ErrorNotice error={error} />
+        <ErrorNotice error={error} retry={jobId ? () => retryStatus.current?.() : undefined} />
       </div>
       <button
-        disabled={
-          busy || (!error && !!job && ["queued", "running"].includes(job.state))
-        }
+        disabled={busy || jobId !== null}
         onClick={() => {
           void sync();
         }}

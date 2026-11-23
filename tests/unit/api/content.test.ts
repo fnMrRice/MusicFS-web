@@ -19,7 +19,9 @@ describe('Content adapters follow current Server contracts', () => {
     const fetcher = vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({ jobId: 'job', merged: false }), { status: 202 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ jobId: 'job', state: 'running', resultRevision: null, error: null })));
     const client = new ApiClient(fetcher); client.csrfToken = 'csrf'; const api = new ContentApi(client);
-    const result = await api.sync({ playlistId: 'p', instanceId: instanceIds.custom, externalId: '123', title: 'name', bindingRevision: 3, revision: 1, stale: true, lastSuccessAt: null, error: null });
+    const receipt = await api.sync({ playlistId: 'p', instanceId: instanceIds.custom, externalId: '123', title: 'name', bindingRevision: 3, revision: 1, stale: true, lastSuccessAt: null, error: null });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    const result = await api.syncJob(receipt.jobId);
     expect(result.state).toBe('running'); expect(fetcher.mock.calls[0][0]).toBe('/api/v1/remote-playlists/p/sync-jobs');
     expect(JSON.parse(fetcher.mock.calls[0][1].body)).toEqual({ expectedBindingRevision: 3 });
     expect(fetcher.mock.calls[0][1].headers.get('X-CSRF-Token')).toBe('csrf');

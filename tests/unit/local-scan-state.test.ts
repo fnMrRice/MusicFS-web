@@ -29,7 +29,7 @@ describe("Local music scan state", () => {
     await state.start();
     expect(api.submit).toHaveBeenCalledTimes(1);
   });
-  it("keeps polling retry_wait and running even when they contain a previous attempt's error", async () => {
+  it("reacts to retry_wait and running updates even when they contain a previous attempt's error", async () => {
     vi.useFakeTimers();
     const { state, api, finished } = fixture();
     const detach = state.attach();
@@ -38,12 +38,15 @@ describe("Local music scan state", () => {
       .mockResolvedValueOnce({ ...job("running"), error: { code: "NETWORK_ERROR", message: "Temporary" } })
       .mockResolvedValueOnce(job("succeeded", true));
     await state.start();
-    await vi.advanceTimersByTimeAsync(1000);
+    state.invalidate();
+    await vi.advanceTimersByTimeAsync(0);
     expect(state.value).toMatchObject({ pending: true, job: { status: "retry_wait" }, error: null });
-    await vi.advanceTimersByTimeAsync(1000);
+    state.invalidate();
+    await vi.advanceTimersByTimeAsync(0);
     expect(state.value).toMatchObject({ pending: true, job: { status: "running" }, error: null });
     expect(finished).not.toHaveBeenCalled();
-    await vi.advanceTimersByTimeAsync(1000);
+    state.invalidate();
+    await vi.advanceTimersByTimeAsync(0);
     expect(state.value).toMatchObject({ pending: false, job: { status: "succeeded" }, error: null });
     expect(finished).toHaveBeenCalledExactlyOnceWith(true);
     detach();
@@ -70,7 +73,7 @@ describe("Local music scan state", () => {
     expect(restored.api.prepare).not.toHaveBeenCalled();
     expect(restored.api.submit).toHaveBeenCalledWith("local", original[1], original[2], expect.any(AbortSignal));
   });
-  it("polls the saved job after navigation without creating another submission", async () => {
+  it("reads the saved job after navigation without creating another submission", async () => {
     const first = fixture();
     await first.state.start();
     const restored = fixture(first.storage.get());
@@ -81,7 +84,7 @@ describe("Local music scan state", () => {
     expect(restored.api.job).toHaveBeenCalledExactlyOnceWith("job-1", "local", expect.any(AbortSignal));
     expect(restored.finished).toHaveBeenCalledExactlyOnceWith(true);
   });
-  it("pauses polling on a transport failure and resumes only the existing job", async () => {
+  it("waits after a transport failure and resumes only the existing job", async () => {
     vi.useFakeTimers();
     const { state, api } = fixture();
     const detach = state.attach();

@@ -20,7 +20,7 @@ test.afterAll(async () => { await new Promise<void>((done) => server?.httpServer
 
 async function mock(page: Page, remote: Remote) {
   const requests = { posts: 0, statuses: 0, statistics: 0, submissions: [] as ScanRequest[] };
-  await routeApi(page, async (route) => {
+  const control = await routeApi(page, async (route) => {
     const path = new URL(route.request().url()).pathname;
     if (path === scanPath && route.request().method() === 'POST') {
       requests.posts++;
@@ -53,7 +53,7 @@ async function mock(page: Page, remote: Remote) {
     if (path.endsWith('/library/tracks')) json = musicPage(remote.published ? [track] : [], remote.published ? '2' : '1');
     await route.fulfill({ json });
   });
-  return requests;
+  return { requests, changed: () => control.event("activity.changed", { resources: ["scans"] }) };
 }
 
 test('independent windows discover progress, reload and continue tracking without extra submissions', async ({ page, browser }) => {
@@ -71,22 +71,27 @@ test('independent windows discover progress, reload and continue tracking withou
     await expect(page.locator('.directory-saved-stats').first()).toHaveText('2 首 · 1.0 GiB');
     await second.goto(`${origin}/#/settings`);
     await second.getByRole('button', { name: '刷新目录 Music 的元数据', exact: true }).click();
+    await expect.poll(() => initiator.requests.posts).toBe(1);
+    observer.changed();
     await expect(progress).toContainText('已发现 0 首');
-    expect(initiator.submissions).toEqual([{ mode: 'full', schemaRevision: 'local-import-v5', rootIds: ['music'], options: { refreshMetadata: true } }]);
-    expect(observer.posts).toBe(0);
+    expect(initiator.requests.submissions).toEqual([{ mode: 'full', schemaRevision: 'local-import-v5', rootIds: ['music'], options: { refreshMetadata: true } }]);
+    expect(observer.requests.posts).toBe(0);
     remote.job = job('running', 200, remote.job!.jobId);
+    observer.changed();
     await expect(progress).toContainText('已发现 200 首');
     await page.reload();
     await expect(progress).toContainText('已发现 200 首');
     expect(await page.evaluate(() => Object.keys(sessionStorage).filter((key) => key.includes(':scan:')))).toEqual([]);
     await page.getByRole('navigation', { name: '设置分类', exact: true }).getByRole('button', { name: '外观与语言', exact: true }).click();
     remote.job = job('running', 400, remote.job!.jobId);
+    observer.changed();
     await page.getByRole('navigation', { name: '设置分类', exact: true }).getByRole('button', { name: '音乐源', exact: true }).click();
     await expect(progress).toContainText('已发现 400 首');
     await expect(page.locator('.directory-saved-stats').first()).toHaveText('2 首 · 1.0 GiB');
     remote.roots = [{ rootId: 'music', trackCount: 400, sizeBytes: 12 * 1024 ** 3 }];
     remote.published = true;
     remote.job = job('succeeded', 400, remote.job!.jobId);
+    observer.changed();
     await expect(progress).toContainText('扫描完成，共发现 400 首');
     await expect(page.locator('.directory-saved-stats').first()).toHaveText('400 首 · 12.0 GiB');
     await expect(page.locator('.directory-saved-stats').nth(1)).toHaveText('0 首 · 0 B');
@@ -96,11 +101,12 @@ test('independent windows discover progress, reload and continue tracking withou
     await page.goto(`${origin}/#/settings`);
     await page.reload();
     await expect(progress).toContainText('扫描完成，共发现 400 首');
-    const beforeFocus = observer.statuses;
+    await page.bringToFront();
+    const beforeFocus = observer.requests.statuses;
     await page.evaluate(() => window.dispatchEvent(new Event('focus')));
-    await expect.poll(() => observer.statuses).toBeGreaterThan(beforeFocus);
-    expect(observer.posts).toBe(0);
-    expect(initiator.posts).toBe(1);
+    await expect.poll(() => observer.requests.statuses).toBeGreaterThan(beforeFocus);
+    expect(observer.requests.posts).toBe(0);
+    expect(initiator.requests.posts).toBe(1);
   } finally { await other.close(); }
 });
 
@@ -108,7 +114,7 @@ test('statistics distinguish loading and errors from zero, retry and fit narrow 
   let release!: () => void;
   const remote: Remote = { job: null, roots: [{ rootId: 'music', trackCount: 946, sizeBytes: Math.round(12.3 * 1024 ** 3) }],
     holdStatistics: new Promise<void>((done) => { release = done; }), failStatistics: true };
-  const requests = await mock(page, remote);
+  const { requests } = await mock(page, remote);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`${origin}/#/settings`);
   await expect(page.locator('.directory-saved-stats').first()).toHaveText('正在读取统计…');

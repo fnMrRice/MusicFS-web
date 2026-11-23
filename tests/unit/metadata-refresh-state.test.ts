@@ -47,7 +47,8 @@ describe("Folder metadata refresh", () => {
     await state.start();
     expect(api.submit).toHaveBeenCalledTimes(1);
     api.metadataResults.mockResolvedValueOnce(completed);
-    await vi.advanceTimersByTimeAsync(1000);
+    state.invalidate();
+    await vi.advanceTimersByTimeAsync(0);
     expect(state.value).toMatchObject({ pending: false, error: null, metadata: completed });
     expect(finished).toHaveBeenCalledExactlyOnceWith(true);
     detach();

@@ -36,9 +36,10 @@ describe("Scans waiting for saved directory operations", () => {
     queue.setSession("server", "user");
     queue.watch("local", operation("applying"));
     expect(stored.size).toBe(1);
-    await vi.advanceTimersByTimeAsync(1000);
+    await vi.advanceTimersByTimeAsync(0);
     expect(scan).not.toHaveBeenCalled();
-    await vi.advanceTimersByTimeAsync(1000);
+    queue.invalidate();
+    await vi.advanceTimersByTimeAsync(0);
     expect(scan).toHaveBeenCalledExactlyOnceWith("local");
     expect(stored.size).toBe(0);
     queue.clear();
@@ -49,7 +50,7 @@ describe("Scans waiting for saved directory operations", () => {
     fetcher.mockResolvedValueOnce(Response.json(operation(status)));
     queue.setSession("server", "user");
     queue.watch("local", operation("applying"));
-    await vi.advanceTimersByTimeAsync(1000);
+    await vi.advanceTimersByTimeAsync(0);
     expect(scan).not.toHaveBeenCalled();
     expect(stored.size).toBe(0);
     queue.clear();
@@ -63,7 +64,7 @@ describe("Scans waiting for saved directory operations", () => {
       ["musicfs:server:someone:scan-configuration:op-1", saved],
     ]);
     queue.setSession("server", "user");
-    await vi.advanceTimersByTimeAsync(1000);
+    await vi.advanceTimersByTimeAsync(0);
     expect(scan).toHaveBeenCalledExactlyOnceWith("local");
     expect(stored.size).toBe(2);
     queue.clear();
@@ -74,7 +75,7 @@ describe("Scans waiting for saved directory operations", () => {
     fetcher.mockRejectedValueOnce(new TypeError("Offline"));
     queue.setSession("server", "user");
     queue.watch("local", operation("applying"));
-    await vi.advanceTimersByTimeAsync(1000);
+    await vi.advanceTimersByTimeAsync(0);
     expect(scan).not.toHaveBeenCalled();
     expect(stored.size).toBe(1);
     queue.clear();

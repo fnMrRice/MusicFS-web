@@ -1,4 +1,5 @@
 import { musicPage } from "../fixtures/music-catalog";
+import { routeApi } from "../fixtures/control-mock";
 import { test, expect, type Page, type Route } from "@playwright/test";
 import { preview, type PreviewServer } from "vite";
 import type { PluginSettings } from "../../src/api/plugin-settings";
@@ -26,7 +27,7 @@ function pluginSettings(): PluginSettings {
 }
 
 async function mockApi(page: Page, special: (route: Route, path: string) => Promise<boolean>, plugin = false) {
-  await page.route("**/api/v1/**", async (route) => {
+  return routeApi(page, async (route) => {
     const path = new URL(route.request().url()).pathname;
     if (await special(route, path)) return;
     let json: unknown = { items: [], nextCursor: null };
@@ -87,7 +88,7 @@ test("manual merge works without a matching plugin and a conflict requires resel
 test("arbitrary plugin declarations render all controls and keep an uncertain action's idempotency key", async ({ page }, info) => {
   let settings = pluginSettings();
   const submissions: { body: unknown; key: string | undefined }[] = [];
-  await mockApi(page, async (route, path) => {
+  const control = await mockApi(page, async (route, path) => {
     if (!path.startsWith(`/api/v1/plugin-settings/${pluginId}`)) return false;
     if (path.endsWith("/actions/analyze")) {
       submissions.push({ body: route.request().postDataJSON(), key: route.request().headers()["idempotency-key"] });
@@ -126,6 +127,11 @@ test("arbitrary plugin declarations render all controls and keep an uncertain ac
   await page.reload();
   await page.getByRole("button", { name: "配置 自定义工具", exact: true }).click();
   await expect(panel).toContainText("已处理 2 / 10 首曲目");
+  await panel.getByLabel("分析关键字", { exact: true }).fill("draft");
+  settings = { ...settings, job: { ...settings.job!, status: "succeeded", processed: 10 } };
+  control.event("activity.changed", { resources: ["pluginJobs"] });
+  await expect(panel).toContainText("已处理 10 / 10 首曲目");
+  await expect(panel.getByLabel("分析关键字", { exact: true })).toHaveValue("draft");
   expect(submissions).toHaveLength(2);
 });
 

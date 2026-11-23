@@ -22,7 +22,7 @@ export class TaskQueueState extends Store<TaskQueueSnapshot> {
   private pages = 1;
   private request: AbortController | null = null;
   private cancellations = new Map<string, AbortController>();
-  private timer: ReturnType<typeof setTimeout> | null = null;
+  private invalidated = false;
   constructor(private api: TasksApi, private finished: (task: RefreshTask) => void = () => {}) { super(initial()); }
   start(admin: boolean): void {
     this.clear(); this.enabled = true; this.admin = admin;
@@ -31,8 +31,7 @@ export class TaskQueueState extends Store<TaskQueueSnapshot> {
   clear(): void {
     this.enabled = false; ++this.generation; this.request?.abort(); this.request = null;
     this.cancellations.forEach(controller => controller.abort()); this.cancellations.clear();
-    if (this.timer) clearTimeout(this.timer);
-    this.timer = null; this.pages = 1; this.set(initial());
+    this.invalidated = false; this.pages = 1; this.set(initial());
   }
   setScope(scope: TaskScope): void {
     if (!this.enabled || scope === this.value.scope || scope === "all" && !this.admin) return;
@@ -44,10 +43,14 @@ export class TaskQueueState extends Store<TaskQueueSnapshot> {
     if (!this.value.nextCursor || this.value.loading) return;
     ++this.pages; await this.refresh();
   }
+  invalidate(): void {
+    if (this.request) this.invalidated = true;
+    else void this.refresh();
+  }
   async refresh(): Promise<void> {
     if (!this.enabled) return;
     this.request?.abort();
-    if (this.timer) clearTimeout(this.timer);
+    this.invalidated = false;
     const controller = new AbortController(); this.request = controller;
     const generation = this.generation, scope = this.value.scope;
     const current = () => this.enabled && generation === this.generation && this.request === controller && !controller.signal.aborted;
@@ -71,7 +74,10 @@ export class TaskQueueState extends Store<TaskQueueSnapshot> {
     } catch (error) {
       if (current()) this.set({ ...this.value, loading: false, error: errorMessage(error) });
     } finally {
-      if (current()) { this.request = null; this.timer = setTimeout(() => void this.refresh(), this.value.activeCount ? 1500 : 8000); }
+      if (current()) {
+        this.request = null;
+        if (this.invalidated) void this.refresh();
+      }
     }
   }
   async cancel(id: string): Promise<void> {

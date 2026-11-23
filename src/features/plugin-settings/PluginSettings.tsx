@@ -23,45 +23,42 @@ export function PluginSettings({ pluginId, busyChanged, cancel }: {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [pollError, setPollError] = useState<string | null>(null);
+  const [jobError, setJobError] = useState<string | null>(null);
   const [conflict, setConflict] = useState(false);
   const [message, setMessage] = useState("");
   const [epoch, setEpoch] = useState(0);
-  const [pollEpoch, setPollEpoch] = useState(0);
   const [uncertain, setUncertain] = useState(false);
   const pending = useRef<Pending | null>(null);
   const control = useRef<AbortController | null>(null);
+  const refreshJob = useRef<() => void>(() => {});
+  const mutation = useRef(0);
   const dirty = !!data && JSON.stringify(values) !== JSON.stringify(settingsValues(data));
   const active = job?.status === "running" || job?.status === "queued";
   useEffect(() => {
-    const controller = new AbortController();
-    setLoading(true); setError(null); setMessage("");
-    void api.get(controller.signal).then((result) => {
-      if (controller.signal.aborted) return;
-      setData(result); setValues(settingsValues(result)); setJob(result.job); setLoading(false);
-      pending.current = null; setUncertain(false); setConflict(false);
-    }, (cause) => {
-      if (!controller.signal.aborted) { setError(errorMessage(cause)); setLoading(false); }
-    });
-    return () => controller.abort();
-  }, [api, epoch]);
-  useEffect(() => {
-    if (!data || busy) return;
-    const controller = new AbortController();
-    let timer: ReturnType<typeof setTimeout>;
-    async function poll() {
+    let initial = true, hasJobs = true;
+    setLoading(true); setError(null); setJobError(null); setMessage("");
+    const watcher = services.activity.watch("pluginJobs", async signal => {
+      if (!hasJobs || control.current) return;
+      const generation = mutation.current;
       try {
-        const result = await api.get(controller.signal);
-        if (controller.signal.aborted) return;
-        setJob(result.job); setPollError(null);
+        const result = await api.get(signal);
+        if (signal.aborted || generation !== mutation.current) return;
+        if (initial) {
+          setData(result); setValues(settingsValues(result)); setLoading(false); setError(null);
+          pending.current = null; setUncertain(false); setConflict(false);
+          initial = false;
+        }
+        hasJobs = result.schema.actions.length > 0 || !!result.job;
+        setJob(result.job); setJobError(null);
       } catch (cause) {
-        if (!controller.signal.aborted) setPollError(errorMessage(cause));
+        if (signal.aborted || generation !== mutation.current) return;
+        if (initial) { setError(errorMessage(cause)); setLoading(false); }
+        else setJobError(errorMessage(cause));
       }
-      if (!controller.signal.aborted) timer = setTimeout(() => { void poll(); }, active ? 1500 : 8000);
-    }
-    timer = setTimeout(() => { void poll(); }, active ? 1500 : 8000);
-    return () => { controller.abort(); clearTimeout(timer); };
-  }, [api, data, active, busy, pollEpoch]);
+    });
+    refreshJob.current = watcher.refresh;
+    return watcher.stop;
+  }, [api, services, epoch]);
   useEffect(() => () => control.current?.abort(), []);
   async function submit(input?: Pending) {
     if (control.current || conflict) return;
@@ -69,6 +66,7 @@ export function PluginSettings({ pluginId, busyChanged, cancel }: {
     const operation = pending.current;
     if (!operation) return;
     const controller = new AbortController();
+    ++mutation.current;
     control.current = controller;
     setBusy(true); busyChanged?.(true); setError(null); setMessage("");
     try {
@@ -93,7 +91,7 @@ export function PluginSettings({ pluginId, busyChanged, cancel }: {
           ? "配置内容无效，请检查填写格式后重试。" : errorMessage(cause));
     } finally {
       control.current = null;
-      if (!controller.signal.aborted) { setBusy(false); busyChanged?.(false); }
+      if (!controller.signal.aborted) { setBusy(false); busyChanged?.(false); refreshJob.current(); }
     }
   }
   const title = data ? localizedPluginText(data.schema.title, data.schema.localizedTitles, locale) : tr("插件设置");
@@ -130,7 +128,7 @@ export function PluginSettings({ pluginId, busyChanged, cancel }: {
       </div>)}</div>
       {message && <p className="feedback" role="status">{tr(message)}</p>}
       {(data.schema.actions.length > 0 || job && job.status !== "idle") && <PluginJobStatus job={job} />}
-      <ErrorNotice error={pollError} retry={() => setPollEpoch((value) => value + 1)} />
+      <ErrorNotice error={jobError} retry={() => refreshJob.current()} />
     </>}
     {!data && cancel && <div className="plugin-settings-footer"><button type="button" disabled={busy} onClick={cancel}>{tr("取消")}</button></div>}
   </section>;

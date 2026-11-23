@@ -14,14 +14,26 @@ function fixture(items: RefreshTask[] = [refreshTask()]) {
 const settle = async () => { await Promise.resolve(); await Promise.resolve(); };
 afterEach(() => { states.splice(0).forEach(state => state.clear()); vi.useRealTimers(); });
 describe("global task queue", () => {
-  it("restores server tasks, polls metadata until terminal, and reports completion once", async () => {
+  it("restores tasks, waits for notifications and reports completion once", async () => {
     const { api, state, finished } = fixture([refreshTask({ status: "running", phase: "metadata" })]);
     state.start(false); await settle();
     expect(state.value.items[0].phase).toBe("metadata");
     api.list.mockResolvedValue({ items: [refreshTask({ status: "succeeded", phase: "finished" })], nextCursor: null, activeCount: 0 });
-    await vi.advanceTimersByTimeAsync(1500);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(api.list).toHaveBeenCalledTimes(1);
+    state.invalidate(); await settle();
     expect(state.value.activeCount).toBe(0); expect(finished).toHaveBeenCalledTimes(1);
     await state.refresh(); expect(finished).toHaveBeenCalledTimes(1);
+  });
+  it("coalesces notifications during a read and reconciles after that read", async () => {
+    const { api, state } = fixture();
+    let resolve!: (value: unknown) => void;
+    api.list.mockImplementationOnce(() => new Promise(done => { resolve = done; }));
+    state.start(false); state.invalidate(); state.invalidate();
+    expect(api.list).toHaveBeenCalledTimes(1);
+    resolve({ items: [], nextCursor: null, activeCount: 0 }); await settle();
+    expect(api.list).toHaveBeenCalledTimes(2);
+    expect(state.value.items[0].id).toBe("task-1");
   });
   it("defaults to mine and prevents non-admin all requests", async () => {
     const { api, state } = fixture(); state.start(false); await settle(); state.setScope("all");

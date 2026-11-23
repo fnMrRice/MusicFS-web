@@ -10,12 +10,12 @@
 | 推荐 | recommendations 逐来源卡片和 stale/error | 原始来源顺序，失败不遮挡其他来源；点击只预览 |
 | 推荐歌单详情 | 既有在线 playlist observation | 显示真实歌单摘要，显式导入；新增曲目展示分页待适配，不把 external ID 伪装成曲名 |
 | 个人歌单 | 列表、创建、读取、带 expectedRevision 编辑、重建、固定快照 | 按顺序聚合本地／远程／个人歌单；旧修订拒绝后提示刷新；不写回平台 |
-| 远程歌单 | 显式导入、读取、sync-jobs、任务轮询 | POST 返回 jobId 收据，必须读任务终态；保留 stale、错误与上次成功时间 |
+| 远程歌单 | 显式导入、读取、sync-jobs、WebSocket 变更通知 | 按 POST 返回的 jobId 读取任务终态，保留 stale、错误与上次成功时间 |
 | 专辑 | source-albums 列表与详情 | 来源身份；成员按当前库读取，不按同名合并 |
 | 播放器 | 原有 session、seek、recover、关闭和同源 stream | 独立全局服务、曲目时间映射、一次一个活动 audio、暂停意图和音量重应用 |
 | 歌词／封面 | media-selection 和 media 内容 | 仅当前来源有效绑定；文本展示，不启用逐句定位；列表使用占位封面 |
 | 收藏、最近播放 | 保留页面 | Server 已有账号隔离读写、清理与分页接口；页面和实际播放上报待适配 |
-| 能力变更 | events 的 capabilities.changed SSE | 登录后单连接，初次及重连后刷新当前页面的授权来源列表；注销关闭；[接入说明](capability-events.md) |
+| 能力变更 | 控制 WebSocket 的 capabilities.changed 事件 | 登录后单连接，初次及重连后刷新当前页面的授权来源列表，注销时关闭。[接入说明](capability-events.md) |
 
 ## Server 已交付、Web 待接入
 

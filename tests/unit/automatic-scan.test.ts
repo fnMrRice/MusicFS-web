@@ -40,10 +40,9 @@ describe("Automatic scans after applying directory settings", () => {
     expect(api.submit).toHaveBeenCalledTimes(1);
     expect(JSON.parse(storage.get()!).automatic).toBe(true);
     api.job.mockResolvedValueOnce(job("failed"));
-    await vi.advanceTimersByTimeAsync(1000);
-    expect(state.value.automaticQueued).toBe(true);
     api.prepare.mockResolvedValueOnce({ ...request, schemaRevision: "v6" });
-    await vi.advanceTimersByTimeAsync(1000);
+    state.invalidate();
+    await vi.advanceTimersByTimeAsync(0);
     expect(api.submit).toHaveBeenCalledTimes(2);
     expect(api.submit.mock.calls[1][1].schemaRevision).toBe("v6");
     expect(api.submit.mock.calls[1][2]).not.toBe(api.submit.mock.calls[0][2]);
@@ -63,7 +62,8 @@ describe("Automatic scans after applying directory settings", () => {
     await vi.advanceTimersByTimeAsync(0);
     expect(state.value.automaticQueued).toBe(true);
     api.job.mockResolvedValueOnce(job("succeeded"));
-    await vi.advanceTimersByTimeAsync(2000);
+    state.invalidate();
+    await vi.advanceTimersByTimeAsync(0);
     expect(api.submit).toHaveBeenCalledTimes(2);
     detach();
   });
@@ -76,7 +76,8 @@ describe("Automatic scans after applying directory settings", () => {
     await vi.advanceTimersByTimeAsync(0);
     expect(api.submit).not.toHaveBeenCalled();
     expect(JSON.parse(storage.get()!).automatic).toBe(true);
-    await vi.advanceTimersByTimeAsync(1000);
+    state.invalidate();
+    await vi.advanceTimersByTimeAsync(0);
     expect(api.submit).toHaveBeenCalledTimes(1);
     detach();
   });
@@ -89,8 +90,6 @@ describe("Automatic scans after applying directory settings", () => {
     next.api.job.mockResolvedValueOnce(job("paused"));
     const detach = next.state.attach();
     await vi.advanceTimersByTimeAsync(0);
-    expect(next.api.submit).not.toHaveBeenCalled();
-    await vi.advanceTimersByTimeAsync(1000);
     expect(next.api.submit).toHaveBeenCalledTimes(1);
     expect(next.state.value.automaticQueued).toBe(false);
     detach();

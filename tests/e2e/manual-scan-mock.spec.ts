@@ -2,6 +2,7 @@ import { musicPage } from "../fixtures/music-catalog";
 import { test, expect, type Page, type Route } from '@playwright/test';
 import { preview, type PreviewServer } from 'vite';
 import { instanceIds, localPlugin } from '../fixtures/plugins';
+import { routeApi } from '../fixtures/control-mock';
 import { track } from '../fixtures/dto';
 
 let server: PreviewServer;
@@ -13,7 +14,7 @@ test.afterAll(async () => { await new Promise<void>(resolve => server?.httpServe
 
 async function mockApi(page: Page, scan: (route: Route, path: string) => Promise<void>, state = 'ready', published = () => false,
   latest: () => unknown = () => null) {
-  await page.route('**/api/v1/**', async route => {
+  return routeApi(page, async route => {
     const path = new URL(route.request().url()).pathname;
     if (path === scanPath || path.includes('/scan-jobs/')) return scan(route, path);
     let json: unknown = { items: [], nextCursor: null };
@@ -42,19 +43,20 @@ test('manual scan keeps one job across reload and shows progress without a fake 
   let posts = 0;
   let reads = 0;
   let done = false;
-  await mockApi(page, async (route, path) => {
+  const control = await mockApi(page, async (route, path) => {
     if (path === scanPath) {
       posts++;
-      expect(route.request().postDataJSON()).toEqual({ mode: 'full', schemaRevision: 'local-import-v5', rootIds: ['music'], options: {} });
+      expect(route.request().postDataJSON()).toEqual({ mode: 'full', schemaRevision: 'local-import-v5', rootIds: ['music'], options: { refreshMetadata: true } });
       return route.fulfill({ status: 202, json: { jobId: 'fixture-job', merged: false } });
     }
-    reads++;
     await route.fulfill({ json: done ? job('succeeded', 12, true) : job('running', 7) });
-  }, 'ready', () => false, () => posts ? done ? job('succeeded', 12, true) : job('running', 7) : null);
+  }, 'ready', () => false, () => {
+    reads++;
+    return posts ? done ? job('succeeded', 12, true) : job('running', 7) : null;
+  });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`${origin}/#/settings`);
-  await page.getByRole('button', { name: '扫描音乐', exact: true }).click();
-  await expect(page.getByRole('button', { name: '正在扫描…', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: '刷新全部目录', exact: true }).click();
   await expect(page.getByRole('status').filter({ hasText: /7/ })).toBeVisible();
   const panel = page.locator('.local-music-source');
   expect(await panel.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
@@ -62,31 +64,34 @@ test('manual scan keeps one job across reload and shows progress without a fake 
   const previousReads = reads;
   await page.reload();
   await expect.poll(() => reads).toBeGreaterThan(previousReads);
-  await expect(page.getByRole('button', { name: '正在扫描…', exact: true })).toBeDisabled();
+  await expect(page.locator('.local-scan-status')).toContainText('已发现 7 首');
   expect(posts).toBe(1);
   done = true;
+  control.event('activity.changed', { resources: ['scans'] });
   await expect(page.getByRole('status').filter({ hasText: '扫描完成' })).toContainText('12');
-  await expect(page.getByRole('button', { name: '扫描音乐', exact: true })).toBeEnabled();
+  await expect(page.getByRole('button', { name: '刷新全部目录', exact: true })).toBeEnabled();
   expect(posts).toBe(1);
 });
 
 test('uncertain scan submission reuses the request and paused jobs never report success', async ({ page }) => {
   const submitted: { body: unknown; key: string | undefined }[] = [];
+  const paused = { ...job('paused', 2), error: { code: 'SOURCE_OFFLINE', message: 'Source is offline' } };
   await mockApi(page, async (route, path) => {
     if (path === scanPath) {
       submitted.push({ body: route.request().postDataJSON(), key: route.request().headers()['idempotency-key'] });
       if (submitted.length === 1) return route.abort('failed');
       return route.fulfill({ status: 202, json: { jobId: 'fixture-job', merged: true } });
     }
-    await route.fulfill({ json: { ...job('paused', 2), error: { code: 'SOURCE_OFFLINE', message: 'Source is offline' } } });
-  });
+    await route.fulfill({ json: paused });
+  }, 'ready', () => false, () => submitted.length > 1 ? paused : null);
   await page.goto(`${origin}/#/settings`);
-  await page.getByRole('button', { name: '扫描音乐', exact: true }).click();
-  await expect(page.getByRole('alert')).toBeVisible();
-  await page.getByRole('button', { name: '继续确认扫描结果', exact: true }).click();
-  await expect(page.getByRole('alert')).toContainText('暂停');
+  const panel = page.locator('.local-music-source');
+  await panel.getByRole('button', { name: '刷新全部目录', exact: true }).click();
+  await expect(panel.getByRole('alert')).toBeVisible();
+  await panel.getByRole('button', { name: '继续确认', exact: true }).click();
+  await expect(panel.getByRole('alert')).toContainText('暂停');
   await expect(page.getByText(/扫描完成/)).toHaveCount(0);
-  await expect(page.getByRole('button', { name: '扫描音乐', exact: true })).toBeEnabled();
+  await expect(panel.getByRole('button', { name: '刷新全部目录', exact: true })).toBeEnabled();
   expect(submitted).toHaveLength(2);
   expect(submitted[0].key).toBeTruthy();
   expect(submitted[1]).toEqual(submitted[0]);
@@ -96,7 +101,7 @@ test('disabled local music cannot submit a scan', async ({ page }) => {
   let requests = 0;
   await mockApi(page, async route => { requests++; await route.fulfill({ status: 503 }); }, 'disabled');
   await page.goto(`${origin}/#/settings`);
-  await expect(page.getByRole('button', { name: '扫描音乐', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: '刷新全部目录', exact: true })).toBeDisabled();
   await expect(page.locator('.local-music-source')).toContainText(/启用|不可用/);
   expect(requests).toBe(0);
 });
@@ -104,22 +109,23 @@ test('disabled local music cannot submit a scan', async ({ page }) => {
 test('leaving settings while scanning still refreshes an open cached library', async ({ page }) => {
   let done = false;
   let posts = 0;
-  await mockApi(page, async (route, path) => {
+  const control = await mockApi(page, async (route, path) => {
     if (path === scanPath) {
       posts++;
       return route.fulfill({ status: 202, json: { jobId: 'fixture-job', merged: false } });
     }
     await route.fulfill({ json: done ? job('succeeded', 1, true) : job('running') });
-  }, 'ready', () => done);
+  }, 'ready', () => done, () => posts ? done ? job('succeeded', 1, true) : job('running') : null);
   await page.goto(`${origin}/#/library`);
   await expect(page.getByText('音乐库还很安静', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: '设置', exact: true }).click();
-  await page.getByRole('button', { name: '扫描音乐', exact: true }).click();
-  await expect(page.getByRole('button', { name: '正在扫描…', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: '刷新全部目录', exact: true }).click();
+  await expect(page.locator('.local-scan-status')).toContainText('正在扫描音乐');
   await page.getByRole('button', { name: '展开作品库', exact: true }).click();
   await page.getByRole('link', { name: '曲目列表', exact: true }).click();
   await expect(page.getByText('音乐库还很安静', { exact: true })).toBeVisible();
   done = true;
+  control.event('activity.changed', { resources: ['scans'] });
   await expect(page.getByText(track.displayName, { exact: true }).first()).toBeVisible();
   expect(posts).toBe(1);
 });
@@ -128,7 +134,7 @@ test('a saved folder automatically scans after applying even after back navigati
   let configured = false;
   let published = false;
   let posts = 0;
-  await mockApi(page, async (route, path) => {
+  const control = await mockApi(page, async (route, path) => {
     if (path === scanPath) {
       expect(configured).toBe(true);
       posts++;
@@ -161,6 +167,7 @@ test('a saved folder automatically scans after applying even after back navigati
   await page.reload();
   await expect(page.getByText('音乐库还很安静', { exact: true })).toBeVisible();
   configured = true;
+  control.event('capabilities.changed', { revision: 'configured', sequence: 1 });
   await expect(page.getByText(track.displayName, { exact: true }).first()).toBeVisible();
   expect(posts).toBe(1);
 });

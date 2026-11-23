@@ -45,7 +45,7 @@ describe("Session-owned local scans", () => {
       scans.clear();
     },
   );
-  it("continues polling and refreshes the library after the source view unsubscribes", async () => {
+  it("reacts to scan notifications and refreshes the library after the source view unsubscribes", async () => {
     vi.useFakeTimers();
     const { scans, api, finished } = fixture();
     scans.setSession("server", "user");
@@ -54,7 +54,8 @@ describe("Session-owned local scans", () => {
     await state.start();
     unsubscribe();
     api.job.mockResolvedValueOnce(job("succeeded"));
-    await vi.advanceTimersByTimeAsync(1000);
+    scans.invalidate();
+    await vi.advanceTimersByTimeAsync(0);
     expect(finished).toHaveBeenCalledExactlyOnceWith("local", true);
     expect(state.value).toMatchObject({ pending: false, job: { status: "succeeded" } });
     expect(scans.get("local")).toBe(state);
@@ -73,13 +74,14 @@ describe("Session-owned local scans", () => {
     expect(api.submit).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(0);
     api.job.mockResolvedValueOnce(job("succeeded"));
-    await vi.advanceTimersByTimeAsync(1000);
+    scans.invalidate();
+    await vi.advanceTimersByTimeAsync(0);
     expect(finished).toHaveBeenCalledExactlyOnceWith("local", true);
     expect(stored.has("musicfs:server:user:scan:local")).toBe(false);
     expect(stored.size).toBe(2);
     scans.clear();
   });
-  it("stops timers on logout and cancels in-flight confirmation when the session changes", async () => {
+  it("stops consuming updates on logout and cancels in-flight confirmation when the session changes", async () => {
     vi.useFakeTimers();
     const { scans, api, finished, stored } = fixture();
     scans.setSession("server", "user");

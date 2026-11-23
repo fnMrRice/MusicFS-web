@@ -43,6 +43,12 @@ export class LocalScans {
     }
     return this.states.get(instance)!;
   }
+  invalidate(): void {
+    for (const state of this.states.values()) state.invalidate();
+  }
+  capabilitiesChanged(): void {
+    for (const state of this.states.values()) if (state.value.automaticQueued) state.invalidate();
+  }
   clear(): void {
     this.states.forEach((state) => state.detach());
     this.states.clear();

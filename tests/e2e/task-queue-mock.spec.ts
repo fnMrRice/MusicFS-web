@@ -8,6 +8,29 @@ const origin = "http://127.0.0.1:18158";
 test.beforeAll(async () => { server = await preview({ preview: { host: "127.0.0.1", port: 18158, strictPort: true } }); });
 test.afterAll(async () => { await new Promise<void>(resolve => server?.httpServer.close(() => resolve())); });
 
+test("idle queues stay quiet and reconcile changes on push and reconnect", async ({ page }) => {
+  const state = await taskQueueMock(page);
+  await page.clock.install(); await page.goto(`${origin}/#/library`);
+  await page.getByRole("button", { name: "任务队列", exact: true }).click();
+  const panel = page.getByRole("region", { name: "任务队列详情" });
+  await expect(panel).toContainText("暂无刷新任务");
+  const idleReads = state.scopes.length;
+  await page.clock.fastForward(9000);
+  expect(state.scopes.length).toBe(idleReads);
+  state.tasks.push(refreshTask());
+  state.control.event("activity.changed", { resources: ["tasks"] });
+  await expect(panel.getByRole("listitem")).toHaveCount(1);
+  const reads = state.scopes.length;
+  await page.clock.fastForward(9000);
+  expect(state.scopes.length).toBe(reads);
+  state.tasks.push(refreshTask({ id: "task-2" }));
+  const sessionCheck = page.waitForRequest(request => request.url().endsWith("/auth/session"));
+  state.control.disconnect();
+  await sessionCheck;
+  await page.clock.runFor(1000);
+  await expect(panel.getByRole("listitem")).toHaveCount(2);
+});
+
 test("refresh all enqueues one task per folder with independent keys", async ({ page }, info) => {
   const state = await taskQueueMock(page); await page.goto(`${origin}/#/settings`);
   const all = page.getByRole("button", { name: "刷新全部目录", exact: true });
@@ -26,6 +49,7 @@ test("running work allows other directories to join and queued tasks can be canc
   await page.getByRole("button", { name: "刷新目录 Music 的元数据", exact: true }).click();
   await expect.poll(() => state.tasks.length).toBe(1);
   Object.assign(state.tasks[0], { status: "running", phase: "metadata" });
+  state.control.event("activity.changed", { resources: ["tasks"] });
   await page.getByRole("button", { name: "刷新目录 Other 的元数据", exact: true }).click();
   await expect.poll(() => state.tasks.length).toBe(2);
   await page.getByRole("button", { name: "任务队列", exact: true }).click();
