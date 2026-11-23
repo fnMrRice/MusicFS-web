@@ -5,6 +5,7 @@ import { track } from "../../fixtures/dto";
 
 const key = "musicfs:playback-queue:v1";
 const server = "https://musicfs.test/api/v1";
+const user = "listener";
 const saved = new Map<string, string>();
 const first = { ...track, sourceTrackId: "first" };
 const second = { ...track, sourceTrackId: "second" };
@@ -25,7 +26,7 @@ afterEach(() => { vi.unstubAllGlobals(); });
 function connected() {
   const queue = new PlaybackQueue(() => 0);
   const persistence = new QueuePersistence(queue);
-  persistence.setServer(server);
+  persistence.setServer(server, user);
   return { queue, persistence };
 }
 function cache(queue: unknown) {
@@ -49,15 +50,25 @@ describe("queue persistence", () => {
   it("clears the shared cache on server changes and cannot restore an earlier server", () => {
     const { queue, persistence } = connected();
     queue.enqueue([first]);
-    persistence.setServer("https://other.test/api/v1");
+    persistence.setServer("https://other.test/api/v1", user);
     expect(queue.value).toEqual(empty);
     expect(saved.has(key)).toBe(false);
     queue.enqueue([second]);
-    persistence.setServer(server);
+    persistence.setServer(server, user);
     expect(queue.value).toEqual(empty);
     expect(saved.has(key)).toBe(false);
-    persistence.setServer("https://other.test/api/v1");
+    persistence.setServer("https://other.test/api/v1", user);
     expect(queue.value).toEqual(empty);
+  });
+
+  it("restores a legacy queue for the current account and clears it when the account changes", () => {
+    cache({ items: [first], index: 0, mode: "sequence" });
+    const { queue, persistence } = connected();
+    expect(queue.value.items[queue.value.index]).toMatchObject(first);
+    expect(JSON.parse(saved.get(key)!)).toMatchObject({ serverAddress: server, userId: user });
+    persistence.setServer(server, "another-user");
+    expect(queue.value).toEqual(empty);
+    expect(saved.has(key)).toBe(false);
   });
 
   it("detaches without deleting saved entries and clears both memory and cache on logout", () => {
@@ -127,6 +138,27 @@ describe("queue persistence", () => {
     for (const field of ["versions", "playback", "unknown"]) expect(restored).not.toHaveProperty(field);
   });
 
+  it("restores the track identity and source choice for playlist and favorite entries", () => {
+    const { queue } = connected();
+    const followDefault = { trackId: "song", forcedSourceTrackId: null };
+    const forced = { trackId: "song", forcedSourceTrackId: second.sourceTrackId };
+    queue.enqueue([{ ...first, playbackSelection: followDefault }, { ...second, playbackSelection: forced }]);
+    queue.select(1);
+    const restored = connected().queue.value;
+    expect(restored.index).toBe(1);
+    expect(restored.items.map(item => item.playbackSelection)).toEqual([followDefault, forced]);
+  });
+
+  it("restores the outgoing track until the selection has completed its fade", () => {
+    const { queue } = connected();
+    queue.replace(first, [first, second]);
+    queue.commitSelection();
+    queue.advance(1);
+    expect(connected().queue.value.index).toBe(0);
+    queue.commitSelection();
+    expect(connected().queue.value.index).toBe(1);
+  });
+
   it("restores shuffle history and forward navigation across refresh", () => {
     const { queue } = connected();
     queue.replace(first, [first, second, third]);
@@ -166,7 +198,7 @@ describe("queue persistence", () => {
     queue.setMode("repeat-all");
     const current = queue.snapshot();
     saved.delete(key);
-    persistence.setServer(server);
+    persistence.setServer(server, user);
     expect(queue.snapshot()).toEqual(current);
     expect(connected().queue.value).toMatchObject(queue.value);
   });

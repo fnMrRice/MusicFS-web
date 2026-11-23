@@ -41,7 +41,12 @@ export class PlayerController {
     this.volume = Math.max(0, Math.min(1, value));
     this.audio?.setVolume?.(this.volume);
   }
-  toggle(): void {
+  toggle(preferences?: Preferences): void {
+    // 刷新后只展示选中曲目，首次手动播放时才解析来源并创建新会话。
+    if (this.state.phase === "paused" && this.state.track && !this.controller) {
+      void this.select(this.state.track, preferences);
+      return;
+    }
     if (this.state.wantsPlay) {
       this.state.wantsPlay = false;
       this.transitions.pause(this.audio, this.state.phase === "playing" && !this.seekingOut && this.pendingSelection === null);
@@ -164,13 +169,16 @@ export class PlayerController {
       if (generation === this.generation) this.fail(playbackErrorMessage(error));
     }
   }
-  stop(): void {
+  stop(): void { this.restorePaused(null); }
+
+  restorePaused(track: SourceTrack | null): void {
     ++this.selection;
     this.pendingSelection = null;
     this.seekingOut = false;
     this.transitions.stop();
     ++this.generation;
     this.controller?.abort();
+    this.controller = null;
     this.queue?.dispose();
     this.queue = null;
     this.clearBufferingTimer();
@@ -178,7 +186,7 @@ export class PlayerController {
     this.audio = null;
     if (this.state.playback)
       void this.api.close(this.state.playback.sessionId).catch(() => {});
-    this.state = initialState();
+    this.state = track ? { ...initialState(), track, phase: "paused" } : initialState();
     this.emit();
   }
   private attach(playback: Playback, generation: number): void {

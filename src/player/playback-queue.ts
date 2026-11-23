@@ -33,11 +33,13 @@ export class PlaybackQueue extends Store<PlaybackQueueState> {
   }
 
   snapshot(): PlaybackQueueSnapshot {
-    const history = [...this.history], future = [...this.future];
-    // 刷新只恢复导航状态，不恢复尚未完成的淡出切歌事务。
-    while (history.at(-1) === this.value.index) history.pop();
-    while (future.at(-1) === this.value.index) future.pop();
-    return { ...this.value, history, future, priority: [...this.priority] };
+    // 淡出结束前，缓存仍指向实际播放的那一项及其导航历史。
+    const settled = this.pending ? this.settled : null;
+    const { items, index } = settled ?? this.value;
+    const history = [...(settled?.history ?? this.history)], future = [...(settled?.future ?? this.future)];
+    while (history.at(-1) === index) history.pop();
+    while (future.at(-1) === index) future.pop();
+    return { items, index, mode: this.value.mode, history, future, priority: [...(settled?.priority ?? this.priority)] };
   }
 
   restore(snapshot: PlaybackQueueSnapshot): void {
@@ -56,6 +58,7 @@ export class PlaybackQueue extends Store<PlaybackQueueState> {
     this.pending = false;
     this.pendingRecorded = false;
     this.settled = { items, index, history: this.history, future: this.future, priority: this.priority };
+    this.set(this.value);
   }
 
   rollbackSelection(): void {

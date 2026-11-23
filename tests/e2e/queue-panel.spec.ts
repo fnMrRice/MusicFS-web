@@ -162,7 +162,8 @@ test('both pinned panels stay visible and fit together on desktop and mobile', a
   expect(await original!.evaluate((element) => element === document.querySelector('audio'))).toBe(true);
   expect(await audio.getAttribute('src')).toBe(source); expect(creates).toEqual(['Alpha']); expect(errors).toEqual([]);
   await page.reload();
-  await expectQueue(page); await expect(lyrics(page)).toBeDisabled();
+  await expectQueue(page); await expect(lyricsDialog).toBeVisible();
+  await expect(page.locator('audio')).toHaveCount(0);
   await queueDialog.getByRole('button', { name: 'Alpha.wav', exact: true }).click();
   await waitPlaying(page); await expect(lyricsDialog).toBeVisible(); await expectQueue(page);
   await page.getByRole('button', { name: '取消固定播放队列' }).click();
@@ -265,6 +266,9 @@ test('refresh restores shuffled pinned queue, selected entry and mode without re
   const selectedIndex = await buttons.evaluateAll((items) => items.findIndex((item) => item.getAttribute('aria-current') === 'true'));
   expect(selectedIndex).toBeGreaterThanOrEqual(0);
   await expect(buttons.nth(selectedIndex)).toHaveText('Beta.wav');
+  const player = page.getByRole('region', { name: '播放器', exact: true });
+  const timeline = player.getByRole('slider', { name: '曲目进度', exact: true });
+  await expect.poll(async () => Number(await timeline.inputValue())).toBeGreaterThanOrEqual(1000);
   await page.reload();
   await expectQueue(page);
   await expect(queue(page)).toHaveAttribute('aria-pressed', 'true');
@@ -272,8 +276,15 @@ test('refresh restores shuffled pinned queue, selected entry and mode without re
   await expect(buttons.nth(selectedIndex)).toHaveAttribute('aria-current', 'true');
   await expect(page.locator('.queue-list button[aria-current="true"]')).toHaveCount(1);
   await expect(page.getByRole('button', { name: '播放模式：列表循环', exact: true })).toBeVisible();
+  await expect(player.locator('.now-playing strong')).toHaveText('Beta.wav');
+  await expect(timeline).toHaveValue('0');
+  await expect(player.getByRole('button', { name: '当前时间，点击显示剩余时间' })).toHaveText('00:00');
+  const start = player.getByRole('button', { name: '播放', exact: true });
+  await expect(start).toBeEnabled();
   await expect(page.locator('audio')).toHaveCount(0);
   expect(creates).toEqual(['Beta']);
-  await buttons.nth(selectedIndex).click(); await waitPlaying(page);
+  await start.click(); await waitPlaying(page);
+  await expect(buttons).toHaveText(shuffled);
+  await expect(buttons.nth(selectedIndex)).toHaveAttribute('aria-current', 'true');
   expect(creates).toEqual(['Beta', 'Beta']); expect(errors).toEqual([]);
 });

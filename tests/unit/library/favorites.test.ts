@@ -140,6 +140,16 @@ describe("Personal favorites state", () => {
     expect(state.has(track.sourceTrackId)).toBe(true);
     await state.setFavorite(track, false); expect(state.has(track.sourceTrackId)).toBe(false);
   });
+  it("favorites the song when the currently playing source came from a playlist selection", async () => {
+    const { api, state } = fixture();
+    const source = { ...track, playbackSelection: { trackId: "song", forcedSourceTrackId: track.sourceTrackId } };
+    await state.setFavorite(source, true);
+    expect(api.add).toHaveBeenCalledWith("song", expect.any(AbortSignal), undefined);
+    expect(state.has("song")).toBe(true);
+    await state.setFavorite(source, false);
+    expect(api.remove).toHaveBeenCalledWith("song", expect.any(AbortSignal));
+    expect(state.has("song")).toBe(false);
+  });
   it("does not let a late list overwrite confirmed add and remove operations", async () => {
     const { api, state } = fixture();
     const read = deferred<FavoritePage>(); api.page.mockReturnValueOnce(read.promise);

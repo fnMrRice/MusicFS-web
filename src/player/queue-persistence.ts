@@ -13,6 +13,10 @@ function trackMetadata(value: unknown): SourceTrack | null {
   if (!record(value) || typeof value.sourceTrackId !== "string" || !value.sourceTrackId ||
     typeof value.providerInstanceId !== "string" || !value.providerInstanceId ||
     typeof value.displayName !== "string" || value.availability !== "available") return null;
+  const selection = value.playbackSelection;
+  const playbackSelection = record(selection) && typeof selection.trackId === "string" && selection.trackId &&
+    (selection.forcedSourceTrackId === null || typeof selection.forcedSourceTrackId === "string" && selection.forcedSourceTrackId)
+    ? { trackId: selection.trackId, forcedSourceTrackId: selection.forcedSourceTrackId } : undefined;
   // 只保留播放和展示所需元数据，不缓存版本树、未知字段及播放会话。
   return {
     sourceTrackId: value.sourceTrackId, providerInstanceId: value.providerInstanceId,
@@ -21,7 +25,7 @@ function trackMetadata(value: unknown): SourceTrack | null {
     durationMs: number(value.durationMs), codec: text(value.codec), container: text(value.container),
     bitrateBps: number(value.bitrateBps), sampleRateHz: number(value.sampleRateHz),
     assetId: text(value.assetId), recordingId: text(value.recordingId), coverObjectId: text(value.coverObjectId),
-    album: text(value.album), genre: text(value.genre),
+    album: text(value.album), genre: text(value.genre), playbackSelection,
   };
 }
 
@@ -41,30 +45,34 @@ function readSnapshot(value: unknown): PlaybackQueueSnapshot | null {
 
 export class QueuePersistence {
   private serverAddress: string | null = null;
+  private userId: string | null = null;
 
   constructor(private queue: PlaybackQueue) {
     queue.subscribe(() => this.save());
   }
 
-  setServer(serverAddress: string): void {
-    if (serverAddress === this.serverAddress) {
+  setServer(serverAddress: string, userId: string): void {
+    if (serverAddress === this.serverAddress && userId === this.userId) {
       this.queue.restore(this.queue.snapshot());
       return;
     }
-    this.serverAddress = null;
+    this.detach();
     this.queue.clear();
+    this.serverAddress = serverAddress;
+    this.userId = userId;
     try {
       const saved: unknown = JSON.parse(localStorage.getItem(storageKey) ?? "null");
-      const snapshot = record(saved) && saved.serverAddress === serverAddress ? readSnapshot(saved.queue) : null;
+      // 旧缓存只有地址，首次恢复后按当前账号重新保存。
+      const snapshot = record(saved) && saved.serverAddress === serverAddress &&
+        (saved.userId === undefined || saved.userId === userId) ? readSnapshot(saved.queue) : null;
       if (snapshot) this.queue.restore(snapshot);
       else localStorage.removeItem(storageKey);
     } catch {
       // 存储不可用或缓存损坏时仍允许使用内存队列。
     }
-    this.serverAddress = serverAddress;
   }
 
-  detach(): void { this.serverAddress = null; }
+  detach(): void { this.serverAddress = null; this.userId = null; }
 
   clear(): void {
     this.detach();
@@ -78,6 +86,7 @@ export class QueuePersistence {
       const snapshot = this.queue.snapshot();
       localStorage.setItem(storageKey, JSON.stringify({
         serverAddress: this.serverAddress,
+        userId: this.userId,
         queue: { ...snapshot, items: snapshot.items.map(trackMetadata) },
       }));
     } catch {

@@ -87,6 +87,8 @@
 .now-playing > div {
   min-width: 0;
 }
+.player-favorite[aria-pressed="true"] { color: var(--accent); }
+.player-favorite[aria-pressed="true"] svg { fill: currentColor; }
 .now-playing strong {
   font-size: 14px;
   display: block;
@@ -346,6 +348,7 @@
   }
   .now-playing {
     width: auto;
+    gap: 6px;
   }
   .transport {
     justify-content: flex-end;

@@ -258,13 +258,14 @@ export class Services {
   private accept(session: AuthSession): void {
     this.onlinePlaylistPlayback.cancel();
     this.recordingCovers.clear();
-    this.player.stop();
+    this.queuePersistence.setServer(new URL(this.client.url(""), window.location.href).href, session.user.id);
+    const { items, index } = this.queue.value;
+    this.player.restorePaused(items[index] ?? null);
     this.dsp.dispose();
     this.sourcePlaylists.clear();
     this.content.clearOnlineInstances();
     this.libraryApi.clearProviderInstances();
     this.auth.set({ ...this.auth.value, session, busy: false, error: null });
-    this.queuePersistence.setServer(new URL(this.client.url(""), window.location.href).href);
     this.scans.setSession(this.auth.value.ready!.instanceId, session.user.id);
     this.refreshSubmissions.setSession(new URL(this.client.url(""), window.location.href).href, session.user.id);
     this.tasks.start(session.user.role === "admin");

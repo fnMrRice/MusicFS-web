@@ -9,6 +9,10 @@ interface FavoritesSnapshot {
 }
 const initial = (): FavoritesSnapshot => ({ items: [], loaded: false, loading: false, error: null, pending: [] });
 
+export function favoriteTrackId(track: TrackItem): string {
+  return track.playbackSelection?.trackId ?? trackKey(track);
+}
+
 export class FavoritesState extends Store<FavoritesSnapshot> {
   private session: string | null = null;
   private generation = 0;
@@ -119,7 +123,7 @@ export class FavoritesState extends Store<FavoritesSnapshot> {
   setFavorite(track: TrackItem, favorite: boolean, forcedSourceTrackId?: string | null): Promise<void> {
     if (!this.session) return Promise.reject(new ApiError("AUTH_REQUIRED", "Sign in to manage favorites", 401));
     const generation = this.generation;
-    const id = this.canonicalId(trackKey(track));
+    const id = this.canonicalId(favoriteTrackId(track));
     // 同一曲目的连续操作串行提交，确保服务端最终状态与最后一次选择一致。
     const previous = Promise.allSettled([this.writes.get(id), this.writes.get("@batch")]);
     const operation = previous.catch(() => {}).then(async () => {

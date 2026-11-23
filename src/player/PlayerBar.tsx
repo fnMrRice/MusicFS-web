@@ -7,6 +7,7 @@ import { playbackFormat, playbackFormatTitle } from "./format";
 import type { PlaybackMode } from "./playback-queue";
 import { useTrackCover } from "../components/use-track-cover";
 import { PlayerTime } from "./PlayerTime";
+import { PlayerFavorite } from "./PlayerFavorite";
 
 const playbackModes: { mode: PlaybackMode; icon: string; label: string }[] = [
   { mode: "sequence", icon: "sequence", label: "顺序播放" },
@@ -92,6 +93,7 @@ export function PlayerBar() {
             {playback && localEffects && ` · ${tr("本地音效")}`}
           </small>
         </div>
+        <PlayerFavorite key={state.track?.sourceTrackId} track={state.track} />
       </div>
       <div className="transport">
         <IconButton
@@ -110,8 +112,8 @@ export function PlayerBar() {
           className="play-main"
           icon={state.wantsPlay ? "pause" : "play"}
           label={state.wantsPlay ? tr("暂停") : tr("播放")}
-          disabled={!playback || state.phase === "error"}
-          onClick={() => s.player.toggle()}
+          disabled={!state.track || state.phase === "error" || (!playback && state.phase !== "paused")}
+          onClick={() => s.player.toggle(s.playbackPreferences())}
         />
         <IconButton
           icon="next"

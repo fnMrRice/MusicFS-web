@@ -46,8 +46,9 @@ describe("temporary queue lifecycle", () => {
     const restored = await connect();
     expect(restored.queue.value.items.map((item) => item.sourceTrackId)).toEqual([track.sourceTrackId, "second", track.sourceTrackId]);
     expect(restored.queue.value).toMatchObject({ index: 2, mode: "repeat-all" });
-    expect(restored.player.state.track).toBeNull();
-    expect(restored.player.state.playback).toBeNull();
+    expect(restored.player.state).toMatchObject({ phase: "paused", positionMs: 0, wantsPlay: false, playback: null });
+    expect(restored.player.state.track).toBe(restored.queue.value.items[2]);
+    expect(restored.currentTrack.value).toBe(track.sourceTrackId);
   });
 
   it("clears both saved and in-memory queues on logout", async () => {
@@ -97,6 +98,8 @@ describe("temporary queue lifecycle", () => {
     first.clear({ preserveQueue: true });
     expect(first.queue.value.items).toEqual([]);
     expect(saved.has(key)).toBe(true);
-    expect((await connect()).queue.value.items[0].sourceTrackId).toBe(track.sourceTrackId);
+    const restored = await connect();
+    expect(restored.queue.value.items[0].sourceTrackId).toBe(track.sourceTrackId);
+    expect(restored.player.state).toMatchObject({ phase: "idle", track: null, playback: null });
   });
 });

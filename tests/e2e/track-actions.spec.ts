@@ -86,7 +86,7 @@ async function setup(page: Page, missingLast = false) {
       const sourceTrackId = request.postDataJSON().sourceTrackId as string;
       creates.push(sourceTrackId);
       const attempt = `attempt-${creates.length}`;
-      json = { ...playback(attempt), assetId: tracks.find((item) => item.sourceTrackId === sourceTrackId)?.assetId,
+      json = { ...playback(attempt), sourceTrackId, assetId: tracks.find((item) => item.sourceTrackId === sourceTrackId)?.assetId,
         sessionId: `session-${creates.length}`, streamUrl: `/api/v1/playback/sessions/session-${creates.length}/attempts/${attempt}/stream` };
     }
     return route.fulfill({ json });
@@ -116,11 +116,13 @@ test('track titles and context play append to the existing queue and start the c
   await page.getByRole('button', { name: '播放 Alpha.wav', exact: true }).click();
   await waitPlaying(page);
   await page.getByRole('button', { name: '播放 Beta.wav', exact: true }).click();
+  await expect(page.locator('.now-playing strong')).toHaveText('Beta.wav');
   await waitPlaying(page);
   await queue(page, ['Alpha.wav', 'Beta.wav'], 'Beta.wav');
   await rightClick(page, 'Gamma.wav');
   await expect(menu(page).getByRole('menuitem')).toHaveText(actions);
   await item(page, '播放').click();
+  await expect(page.locator('.now-playing strong')).toHaveText('Gamma.wav');
   await waitPlaying(page);
   await queue(page, titles, 'Gamma.wav');
   expect(creates).toEqual(['track-1', 'track-2', 'track-3']);
@@ -158,6 +160,47 @@ test('favorite and unfavorite use account storage and survive a full reload', as
   await rightClick(page, 'Alpha.wav');
   await expect(item(page, '收藏')).toBeEnabled();
   expect(favoriteWrites).toEqual(['PUT track-1', 'DELETE track-1']);
+  expect(errors).toEqual([]);
+});
+
+test('the player heart follows the current track and stays in sync with library favorites', async ({ page }) => {
+  const { favoriteWrites, creates, errors } = await setup(page);
+  const player = page.getByRole('region', { name: '播放器', exact: true });
+  const heart = player.getByRole('button', { name: /收藏/ });
+  const alpha = row(page, 'Alpha.wav').getByRole('button', { name: /收藏/ });
+  await expect(heart).toBeDisabled();
+  await alpha.click();
+  await page.reload();
+  await page.getByRole('button', { name: '播放 Alpha.wav', exact: true }).click();
+  await waitPlaying(page);
+  await expect(heart).toHaveAttribute('aria-pressed', 'true');
+  const accent = await alpha.evaluate(button => getComputedStyle(button).color);
+  await expect(heart.locator('path')).toHaveCSS('fill', accent);
+  await heart.click();
+  await expect(alpha).toHaveAttribute('aria-pressed', 'false');
+  await expect(heart.locator('path')).toHaveCSS('fill', 'none');
+  await alpha.click();
+  await expect(heart).toHaveAttribute('aria-pressed', 'true');
+
+  await page.getByRole('button', { name: '播放 Beta.wav', exact: true }).click();
+  await expect(player.locator('.now-playing strong')).toHaveText('Beta.wav');
+  await waitPlaying(page);
+  await expect(heart).toHaveAttribute('aria-pressed', 'false');
+  await expect(heart.locator('path')).toHaveCSS('fill', 'none');
+  await heart.click();
+  await expect(row(page, 'Beta.wav').getByRole('button', { name: /收藏/ })).toHaveAttribute('aria-pressed', 'true');
+  await expect(heart.locator('path')).toHaveCSS('fill', accent);
+  await page.reload();
+  await expect(player.locator('.now-playing strong')).toHaveText('Beta.wav');
+  await expect(heart).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('audio')).toHaveCount(0);
+  await page.setViewportSize({ width: 375, height: 812 });
+  await expect(heart).toBeInViewport({ ratio: 1 });
+  const heartBox = (await heart.boundingBox())!;
+  const modeBox = (await player.getByRole('button', { name: /播放模式/ }).boundingBox())!;
+  expect(heartBox.x + heartBox.width).toBeLessThanOrEqual(modeBox.x);
+  expect(favoriteWrites).toEqual(['PUT track-1', 'DELETE track-1', 'PUT track-1', 'PUT track-2']);
+  expect(creates).toEqual(['track-1', 'track-2']);
   expect(errors).toEqual([]);
 });
 

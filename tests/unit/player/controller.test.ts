@@ -14,6 +14,18 @@ function setup(create = vi.fn().mockResolvedValue(playback())) {
   return { controller, api, audio, factory, event: (type: MediaObservation['type'], seconds = 0, paused = false, readyToPlay = false) => observe({ type, seconds, paused, readyToPlay }) };
 }
 describe('Player controller (Mock media; not decoder validation)', () => {
+  it('starts a new session on demand after restoring a paused track on an existing player', async () => {
+    const s = setup();
+    await s.controller.select(track);
+    s.event('playing', 10);
+    s.controller.restorePaused(track);
+    expect(s.controller.state).toMatchObject({ track, phase: 'paused', playback: null, positionMs: 0, wantsPlay: false });
+    expect(s.api.create).toHaveBeenCalledTimes(1);
+    s.controller.toggle();
+    await vi.waitFor(() => expect(s.audio.play).toHaveBeenCalledTimes(2));
+    expect(s.api.create).toHaveBeenCalledTimes(2);
+    s.controller.stop();
+  });
   it('reports history once after the active media attempt actually starts playing', async () => {
     const s = setup();
     const reported = vi.fn().mockResolvedValue(undefined);

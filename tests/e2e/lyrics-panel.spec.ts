@@ -138,13 +138,13 @@ test('pinned lyrics stays open outside, toggles visibility and unpins without cl
   expect(creates).toEqual(['Alpha']); expect(errors).toEqual([]);
 });
 
-test('the saved pin waits for a track after refresh and then opens current lyrics', async ({ page }) => {
+test('a pinned lyrics panel opens for the restored paused track after refresh', async ({ page }) => {
   const { creates, errors } = await setup(page);
   await play(page); await openPinned(page);
   await page.reload();
-  await expect(lyrics(page)).toBeDisabled();
-  await expect(panel(page)).toHaveCount(0);
+  await expectLyrics(page, 'Alpha');
   await expect(page.locator('audio')).toHaveCount(0);
+  expect(creates).toEqual(['Alpha']);
   await expect.poll(() => preferences(page)).toMatchObject({ lyricsPinned: true });
   await play(page, 'Beta'); await expectLyrics(page, 'Beta');
   await expect(lyrics(page)).toHaveAttribute('aria-pressed', 'true');
