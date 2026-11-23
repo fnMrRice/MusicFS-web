@@ -1,8 +1,8 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { preview, type PreviewServer } from "vite";
 import { audioFixture } from "../fixtures/audio";
 import { routeApi } from "../fixtures/control-mock";
-import { playback, track as sourceTrack } from "../fixtures/dto";
+import { deferred, playback, track as sourceTrack } from "../fixtures/dto";
 import { instanceIds, neteasePlugin } from "../fixtures/plugins";
 import { waitPlaying } from "./helpers";
 
@@ -16,7 +16,7 @@ test.beforeAll(async () => {
 });
 test.afterAll(async () => { await new Promise<void>(resolve => server?.httpServer.close(() => resolve())); });
 
-test("online playlist rows show their own artwork and play the chosen track without importing", async ({ page }, testInfo) => {
+async function openPlaylist(page: Page) {
   const source = instanceIds.netease;
   const base = `/api/v1/online-instances/${source}`;
   const path = base + "/playlists/mix";
@@ -78,6 +78,21 @@ test("online playlist rows show their own artwork and play the chosen track with
   await page.goto(`${origin}/#/discover/${source}/mix`);
   const row = (title: string) => page.getByRole("row").filter({ has: page.getByRole("button", { name: "播放 " + title, exact: true }) });
   await expect(page.getByRole("heading", { name: playlist.title })).toBeVisible();
+  return { row, songs, coverRequests, starts, resolutions, playlistWrites };
+}
+
+async function holdNextResolve(page: Page, externalId: string) {
+  const received = deferred<void>(), resume = deferred<void>(), released = deferred<void>();
+  await page.route(`**/tracks/${externalId}/resolve`, async route => {
+    received.resolve();
+    await resume.promise;
+    try { await route.fallback(); } finally { released.resolve(); }
+  }, { times: 1 });
+  return { received: received.promise, release: () => resume.resolve(), released: released.promise };
+}
+
+test("online playlist rows show their own artwork and play the chosen track without importing", async ({ page }, testInfo) => {
+  const { row, songs, coverRequests, starts, resolutions, playlistWrites } = await openPlaylist(page);
   for (const song of songs.slice(0, 2)) {
     const image = row(song.title).locator(".cover img");
     await expect(image).toHaveAttribute("src", song.coverUrl!);
@@ -116,4 +131,54 @@ test("online playlist rows show their own artwork and play the chosen track with
   await expect(queued).toHaveText(songs.map(song => song.title));
   await expect(queued.first()).toHaveAttribute("aria-current", "true");
   expect(playlistWrites).toEqual([]);
+});
+
+test("play all supersedes a pending row even when the row resolves after playback starts", async ({ page }) => {
+  const { starts, songs } = await openPlaylist(page);
+  const stale = await holdNextResolve(page, "102");
+  const second = page.getByRole("button", { name: "播放 海潮", exact: true });
+  try {
+    await second.click();
+    await stale.received;
+    await page.getByRole("button", { name: "播放全部", exact: true }).click();
+    await waitPlaying(page);
+    expect(starts).toEqual(["source-101"]);
+    stale.release();
+    await stale.released;
+    await expect(second).toBeEnabled();
+    await page.getByRole("button", { name: "播放队列", exact: true }).click();
+    const queue = page.getByRole("dialog", { name: "播放队列", exact: true });
+    await expect(queue.getByRole("listitem").getByRole("button")).toHaveText(songs.map(song => song.title));
+    await expect(queue.getByRole("button", { name: "山色", exact: true })).toHaveAttribute("aria-current", "true");
+    expect(starts).toEqual(["source-101"]);
+  } finally {
+    stale.release();
+  }
+});
+
+test("a row supersedes a pending playlist before either track resolves", async ({ page }) => {
+  const { starts } = await openPlaylist(page);
+  const first = await holdNextResolve(page, "101");
+  const second = await holdNextResolve(page, "102");
+  const playAll = page.getByRole("button", { name: "播放全部", exact: true });
+  try {
+    await playAll.click();
+    await first.received;
+    await page.getByRole("button", { name: "播放 海潮", exact: true }).click();
+    await second.received;
+    first.release();
+    await first.released;
+    await expect(playAll).toBeEnabled();
+    expect(starts).toEqual([]);
+    second.release();
+    await waitPlaying(page);
+    await page.getByRole("button", { name: "播放队列", exact: true }).click();
+    const queue = page.getByRole("dialog", { name: "播放队列", exact: true });
+    await expect(queue.getByRole("listitem").getByRole("button")).toHaveText(["海潮"]);
+    await expect(queue.getByRole("button", { name: "海潮", exact: true })).toHaveAttribute("aria-current", "true");
+    expect(starts).toEqual(["source-102"]);
+  } finally {
+    first.release();
+    second.release();
+  }
 });

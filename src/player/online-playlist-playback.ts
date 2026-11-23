@@ -19,6 +19,7 @@ export function supportsOnlinePlayback(source: OnlineInstance) {
 
 export class OnlinePlaylistPlayback extends Store<Preparation> {
   private active: { controller: AbortController; source: OnlineInstance; started: boolean } | null = null;
+  private singleTrack: AbortController | null = null;
 
   constructor(
     private client: ApiClient,
@@ -29,9 +30,18 @@ export class OnlinePlaylistPlayback extends Store<Preparation> {
   }
 
   cancel() {
+    this.singleTrack?.abort();
+    this.singleTrack = null;
     this.active?.controller.abort();
     this.active = null;
     this.set({ key: "", busy: false, error: null });
+  }
+
+  // 单曲和整单共用播放意图，较早的解析即使晚到也不能切走刚选中的曲目。
+  beginSingleTrack(controller: AbortController) {
+    this.cancel();
+    this.singleTrack = controller;
+    return () => { if (this.singleTrack === controller) this.singleTrack = null; };
   }
 
   leave(key: string) {

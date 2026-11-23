@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type RefObject } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useServices } from "../app/services";
 import { errorMessage } from "../api/client";
 import { resolveOnlineAudio } from "../api/online-audio";
@@ -6,7 +6,7 @@ import { withRateLimitRetry } from "../api/rate-limit";
 import { ErrorNotice } from "../components/ui";
 import { tr } from "../i18n";
 
-export function useOnlineAudioActions(instance: string, external: string | undefined, latestPlay?: RefObject<AbortController | null>) {
+export function useOnlineAudioActions(instance: string, external: string | undefined) {
   const s = useServices();
   const request = useRef<AbortController | null>(null);
   const [busy, setBusy] = useState(false);
@@ -15,10 +15,7 @@ export function useOnlineAudioActions(instance: string, external: string | undef
   async function resolve(play: boolean) {
     if (!external || request.current) return;
     const controller = new AbortController();
-    if (play && latestPlay) {
-      latestPlay.current?.abort();
-      latestPlay.current = controller;
-    }
+    const release = play ? s.onlinePlaylistPlayback.beginSingleTrack(controller) : undefined;
     request.current = controller;
     setBusy(true);
     setError(null);
@@ -30,7 +27,7 @@ export function useOnlineAudioActions(instance: string, external: string | undef
     } catch (e) {
       if (!controller.signal.aborted) setError(errorMessage(e));
     } finally {
-      if (latestPlay?.current === controller) latestPlay.current = null;
+      release?.();
       if (request.current === controller) {
         request.current = null;
         setBusy(false);

@@ -1,4 +1,4 @@
-import { useRef, useState, type RefObject } from "react";
+import { useState } from "react";
 import type { OnlineInstance, OnlineTrack } from "../api/content";
 import { Cover, Icon, duration } from "../components/ui";
 import { tr } from "../i18n";
@@ -9,12 +9,11 @@ import { externalLink } from "./scrapers/fields";
 
 interface Row { position: number; track: OnlineTrack | null }
 
-function OnlineTrackRow({ row, instance, playable, add, latestPlay }: {
+function OnlineTrackRow({ row, instance, playable, add }: {
   row: Row; instance: string; playable: boolean; add?: (track: OnlineTrack) => void;
-  latestPlay: RefObject<AbortController | null>;
 }) {
   const { track, position } = row;
-  const actions = useOnlineAudioActions(instance, track?.externalId, latestPlay);
+  const actions = useOnlineAudioActions(instance, track?.externalId);
   const title = track?.title ?? tr("内容已失效或不可用");
   const cover = <Cover src={externalLink(track?.coverUrl ?? undefined)} />;
   return <tr>
@@ -42,12 +41,11 @@ export function OnlineTrackTable({ source, rows }: { source: OnlineInstance; row
   const playable = supportsOnlinePlayback(source);
   const accountId = source.capabilities.some((c) => c.name === "playlist.addTracks" && c.supported) ? source.accountId : undefined;
   const [adding, setAdding] = useState<OnlineTrack | null>(null);
-  const latestPlay = useRef<AbortController | null>(null);
   return <>
     <div className="table-wrap"><table className="tracks">
       <thead><tr><th>#</th><th>{tr("曲名")}</th><th>{tr("歌手")}</th><th>{tr("时长")}</th>{(playable || accountId) && <th>{tr("操作")}</th>}</tr></thead>
       <tbody>{rows.map(row => <OnlineTrackRow key={row.position} row={row} instance={source.instanceId}
-        playable={playable} add={accountId ? setAdding : undefined} latestPlay={latestPlay} />)}</tbody>
+        playable={playable} add={accountId ? setAdding : undefined} />)}</tbody>
     </table></div>
     {adding && accountId && <AddToPlaylist tracks={[]} online={{ instanceId: source.instanceId, accountId, tracks: [adding] }} close={() => setAdding(null)} />}
   </>;
