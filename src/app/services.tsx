@@ -59,6 +59,7 @@ interface PreferencesState {
   queuePinned: boolean;
   mine: boolean;
   playlists: boolean;
+  playlistFolders: Record<string, boolean>;
   works: boolean;
   processing: boolean;
   fades: FadeSettings;
@@ -74,6 +75,7 @@ const defaults: PreferencesState = {
   queuePinned: false,
   mine: true,
   playlists: true,
+  playlistFolders: {},
   works: false,
   processing: false,
   fades: defaultFadeSettings,
@@ -280,6 +282,8 @@ export class Services {
       queuePinned: saved?.queuePinned === true,
       mine: saved?.mine !== false,
       playlists: saved?.playlists !== false,
+      playlistFolders: saved?.playlistFolders && typeof saved.playlistFolders === "object" && !Array.isArray(saved.playlistFolders)
+        ? saved.playlistFolders : {},
       works: saved?.works === true,
       processing: saved?.processing === true,
       fades: loadFadePreferences(saved),

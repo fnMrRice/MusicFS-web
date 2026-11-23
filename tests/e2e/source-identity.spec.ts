@@ -93,9 +93,11 @@ test("one music-source settings section uses arbitrary plugin translations and k
   await page.getByRole("button", { name: "登录搜索", exact: true }).click();
   await expect(page.getByText("Actual account listener", { exact: true })).toBeVisible();
   await expect(page.getByRole("img", { name: "默认头像", exact: true }).first()).toBeVisible();
-  await expect(page.getByRole("link", { name: "搜索 · Actual account listener playlists", exact: true })).toBeVisible();
+  const accountPage = page.locator(`aside a[href="#/sources/${instanceIds.custom}/playlists"]`);
+  await expect(accountPage).toBeVisible();
+  await expect(accountPage).toHaveAccessibleName(/搜索 · Actual account listener/);
   await page.getByRole("button", { name: "退出搜索账号", exact: true }).click();
-  await expect(page.getByRole("link", { name: "搜索 · Actual account listener playlists", exact: true })).toHaveCount(0);
+  await expect(accountPage).toHaveCount(0);
   expect(requests.some((r) => r.path === `/api/v1/online-instances/${instanceIds.custom}/account` && r.method === "POST")).toBe(true);
   await page.goto(`${origin}/#/recommendations`);
   await expect(page.getByRole("heading", { name: "搜索", exact: true })).toBeVisible();
@@ -205,7 +207,7 @@ test("recommendations request daily results on open, refresh explicitly, and rew
 test("sidebar source playlists page reads and paginates the signed-in account without implicit import", async ({ page }) => {
   const requests = await mock(page);
   await page.goto(`${origin}/#/settings`);
-  await page.getByRole("link", { name: "自定义节拍 · Actual account listener 的歌单", exact: true }).click();
+  await page.locator(`aside a[href="#/sources/${instanceIds.custom}/playlists"]`).click();
   await expect(page.getByRole("heading", { name: "自定义节拍 · Actual account listener 的歌单", exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: "Morning mix 2 首" })).toHaveCount(1);
   await page.getByRole("button", { name: "加载更多歌单" }).click();
@@ -356,7 +358,8 @@ test("NetEase playlists appear in management and navigation, link once, accept t
   const sidebar = page.getByRole("complementary", { name: "侧栏" });
   const sidebarLink = sidebar.locator(`a[href="#/discover/${instanceId}/100"]`);
   await expect(sidebarLink).toHaveAccessibleName("网易云音乐-通勤");
-  await expect(sidebar.getByRole("link", { name: "网易云音乐-睡前" })).toHaveCount(2);
+  await expect(sidebar.getByRole("link", { name: "网易云音乐-睡前" })).toHaveCount(0);
+  await expect(sidebar.getByRole("button", { name: /收藏的歌单/ })).toHaveCount(2);
   await expect(group.getByText("只读")).toHaveCount(1);
   await expect(group.getByRole("button", { name: "关联本地歌单" })).toHaveCount(1);
   await group.getByRole("button", { name: "关联本地歌单" }).click();

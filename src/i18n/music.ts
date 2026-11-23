@@ -1,4 +1,6 @@
 export default {
+  "收藏的歌单": ["Saved playlists", "收藏的歌單", "お気に入りのプレイリスト"],
+  "查看 {0}": ["View {0}", "查看 {0}", "{0} を表示"],
   "编辑收藏来源": ["Edit favorite source", "編輯收藏來源", "お気に入りのソースを編集"],
   "指定来源不可用": ["Selected source unavailable", "指定來源無法使用", "指定のソースを利用できません"],
   "跟随曲目默认来源": ["Follow track default", "使用曲目預設來源", "曲の既定ソースを使う"],

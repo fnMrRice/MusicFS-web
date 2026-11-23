@@ -13,6 +13,7 @@ import { NicknameEditor } from "../features/profile/NicknameEditor";
 import { ServiceStatus } from "./ServiceStatus";
 import { TaskQueue } from "./TaskQueue";
 import { LibraryNavigation } from "./LibraryNavigation";
+import { NeteasePlaylistFolder } from "./NeteasePlaylistFolder";
 import { useWorkTypes, workSectionTitle } from "../features/works/navigation";
 import { remotePlaylistLabel, remotePlaylistPath } from "../features/playlists/AccountPlaylistList";
 import { useForeground } from "../components/use-foreground";
@@ -224,13 +225,19 @@ export function AppShell() {
           {prefs.playlists && accountSources.map((source) => {
             const page = sourcePlaylists[source.instanceId];
             const label = tr("{0} 的歌单", { 0: sourceName(source) });
+            const more = page.nextCursor && <button className={styles.morePlaylists} disabled={playlistStatus[source.instanceId]?.loading}
+              aria-label={tr("显示更多：{0}", { 0: label })} onClick={() => s.sourcePlaylists.more(source.instanceId)}>
+              {tr("加载更多歌单")}
+            </button>;
+            if (source.platform === "netease") {
+              return <NeteasePlaylistFolder key={source.instanceId} source={source} label={label} items={page.items}>
+                {more}
+              </NeteasePlaylistFolder>;
+            }
             return <div key={source.instanceId}>
               {nav(`/sources/${encodeURIComponent(source.instanceId)}/playlists`, "folder", label)}
               {page.items.map((item) => nav(remotePlaylistPath(source.instanceId, item.externalId), "album", remotePlaylistLabel(source, item, locale)))}
-              {page.nextCursor && <button className={styles.morePlaylists} disabled={playlistStatus[source.instanceId]?.loading}
-                aria-label={tr("显示更多：{0}", { 0: label })} onClick={() => s.sourcePlaylists.more(source.instanceId)}>
-                {tr("加载更多歌单")}
-              </button>}
+              {more}
             </div>;
           })}
         </nav>
