@@ -33,6 +33,11 @@
 .recommendation-heading h2 { min-width: 0; overflow-wrap: anywhere; }
 .recommendation-actions { display: flex; align-items: center; flex-shrink: 0; gap: 8px; }
 .recommendation-history { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
+@media (max-width: 480px) {
+  .recommendation-heading:not(:lang(zh)) h2 { font-size: 18px; }
+  .recommendation-actions:not(:lang(zh)) > button { min-width: 36px; }
+  .recommendation-actions:not(:lang(zh)) > button > span { display: none; }
+}
 .search-form {
   background: var(--panel);
   border: 1px solid var(--line);

@@ -47,9 +47,10 @@ function RecommendationFeed({ dailySources }: { dailySources: OnlineInstance[] }
       <div className="section-title recommendation-heading">
         <h2>{tr("推荐歌单")}</h2>
         <div className="recommendation-actions">
-          <button type="button" disabled={feed.loading || feed.offset >= (feed.page?.historyDepth ?? 0)}
+          <button type="button" aria-label={tr("时光机")} title={tr("时光机")}
+            disabled={feed.loading || feed.offset >= (feed.page?.historyDepth ?? 0)}
             onClick={feed.previous}>
-            <Icon name="clock" size={16} />{tr("时光机")}
+            <Icon name="clock" size={16} /><span>{tr("时光机")}</span>
           </button>
           <IconButton icon="refresh" label={tr("刷新推荐")} disabled={feed.loading} onClick={feed.refresh} />
         </div>
