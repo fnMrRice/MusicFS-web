@@ -57,10 +57,11 @@
   transition: transform 160ms;
 }
 .playback-settings input.playback-switch:checked {
-  background: var(--accent);
+  background: var(--accent-fill);
   border-color: var(--accent);
 }
 .playback-switch:checked::after {
+  background: var(--on-accent);
   transform: translateX(16px);
 }
 .playback-settings input.playback-switch:disabled {

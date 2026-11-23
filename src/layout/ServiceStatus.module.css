@@ -17,7 +17,7 @@
 }
 .healthy { background: #73b59a; }
 .warning { background: #e3ad54; }
-.failed { background: var(--accent); }
+.failed { background: var(--danger); }
 .checking { background: var(--muted); }
 .panel:global(.popover) {
   position: absolute;

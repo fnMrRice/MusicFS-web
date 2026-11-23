@@ -51,6 +51,7 @@ interface AuthState {
 }
 interface PreferencesState {
   theme: "dark" | "light" | "system";
+  accent: "default" | "miku" | "tianyi";
   albumView: "cards" | "list";
   volume: number;
   lastVolume: number;
@@ -65,6 +66,7 @@ interface PreferencesState {
 }
 const defaults: PreferencesState = {
   theme: "system",
+  accent: "default",
   albumView: "cards",
   volume: 0.8,
   lastVolume: 0.8,
@@ -271,6 +273,7 @@ export class Services {
         saved?.theme === "system"
           ? saved.theme
           : defaults.theme,
+      accent: saved?.accent === "miku" || saved?.accent === "tianyi" ? saved.accent : defaults.accent,
       albumView: saved?.albumView === "list" ? "list" : defaults.albumView,
       ...loadVolumePreferences(),
       lyricsPinned: saved?.lyricsPinned === true,

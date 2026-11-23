@@ -3,6 +3,7 @@ import { version as webVersion } from "../../package.json";
 import { tr, useLocale } from "../i18n";
 import { useServices, useStore } from "../app/services";
 import { LanguageSelect } from "../i18n/LanguageSelect";
+import { ThemeChoices } from "../components/ThemeChoices";
 import { MusicSources } from "./MusicSources";
 import { AlbumAutoSettings } from "./scrapers/AlbumAutoSettings";
 import { PluginStatus } from "./PluginStatus";
@@ -66,35 +67,14 @@ export function Settings() {
 }
 
 function AppearanceSettings() {
-  const s = useServices();
-  const prefs = useStore(s.preferences);
   return (
-      <div className="settings-card appearance-language">
-        <div className="theme-choices">
-          <button
-            aria-pressed={prefs.theme === "dark"}
-            onClick={() => s.preference({ theme: "dark" })}
-          >
-            {tr("深夜 · 深色")}
-          </button>
-          <button
-            aria-pressed={prefs.theme === "light"}
-            onClick={() => s.preference({ theme: "light" })}
-          >
-            {tr("晨光 · 浅色")}
-          </button>
-          <button
-            aria-pressed={prefs.theme === "system"}
-            onClick={() => s.preference({ theme: "system" })}
-          >
-            {tr("跟随系统")}
-          </button>
-        </div>
-        <LanguageSelect />
-        <p className="muted">
-          {tr("语言偏好保存在当前浏览器，对登录页和所有账号生效。")}
-        </p>
-      </div>
+    <div className="settings-card appearance-language">
+      <ThemeChoices />
+      <LanguageSelect />
+      <p className="muted">
+        {tr("语言偏好保存在当前浏览器，对登录页和所有账号生效。")}
+      </p>
+    </div>
   );
 }
 

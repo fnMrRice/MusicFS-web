@@ -145,15 +145,6 @@
   color: var(--muted);
   white-space: nowrap;
 }
-.theme-choices {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-.theme-choices button[aria-pressed="true"] {
-  border-color: var(--accent);
-  color: var(--accent);
-}
 .language-select {
   display: flex;
   align-items: center;
@@ -174,6 +165,7 @@
   color: #edf0f2;
 }
 .login-page {
+  --accent: var(--accent-fill);
   min-height: 100dvh;
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -182,7 +174,7 @@
 .login-art {
   background: radial-gradient(
     ellipse at 40% 35%,
-    #493040,
+    color-mix(in srgb, var(--accent) 18%, #20232d),
     #191e29 55%,
     #10151b
   );
@@ -195,7 +187,7 @@
 .login-art > p:first-of-type {
   font-size: 10px;
   letter-spacing: 3px;
-  color: #db8295;
+  color: color-mix(in srgb, var(--accent) 55%, #edf0f2);
   margin-top: 36px;
 }
 .login-art h1 {
@@ -212,7 +204,7 @@
   width: 180px;
   height: 180px;
   border-radius: 50%;
-  background: repeating-radial-gradient(circle, #15151e 0 2px, #30242e 3px 4px);
+  background: repeating-radial-gradient(circle, #15151e 0 2px, color-mix(in srgb, var(--accent) 10%, #24232b) 3px 4px);
   box-shadow: 0 20px 70px #07090d80;
   display: grid;
   place-items: center;
@@ -221,8 +213,8 @@
   display: block;
   height: 58px;
   width: 58px;
-  background: #e8476588;
-  border: 19px solid #b4415b;
+  background: color-mix(in srgb, var(--accent) 50%, transparent);
+  border: 19px solid color-mix(in srgb, var(--accent) 68%, #241f29);
   border-radius: 50%;
 }
 .login-panel {

@@ -35,6 +35,9 @@ function Application() {
   const auth = useStore(s.auth);
   const prefs = useStore(s.preferences);
   useLayoutEffect(() => {
+    document.documentElement.dataset.accent = prefs.accent;
+  }, [prefs.accent]);
+  useLayoutEffect(() => {
     const systemTheme = window.matchMedia("(prefers-color-scheme: dark)");
     const applyTheme = () => {
       document.documentElement.dataset.theme =

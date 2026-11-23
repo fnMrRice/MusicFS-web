@@ -13,8 +13,16 @@
   --line: #ffffff0e;
   --text: #edf0f2;
   --muted: #8a949f;
-  --accent: #ff3658;
-  --accent-soft: #ff365817;
+  --accent-default: #ff3658;
+  --accent-miku: #39c5bb;
+  --accent-tianyi: #66ccff;
+  --accent-fill: var(--accent-default);
+  --on-accent: white;
+  --accent: var(--accent-fill);
+  --accent-soft: color-mix(in srgb, var(--accent-fill) 9%, transparent);
+  --accent-shadow: color-mix(in srgb, var(--accent-fill) 13%, transparent);
+  --timeline-start: #ff9a76;
+  --danger: #ef8192;
   --input: #191f25;
   --shadow: #0008;
   color-scheme: dark;
@@ -29,7 +37,22 @@
   --muted: #697581;
   --input: #fff;
   --shadow: #25344e26;
+  --accent: var(--accent-on-light, var(--accent-fill));
+  --danger: #ae324b;
+  --timeline-rest: #c6ccd2;
   color-scheme: light;
+}
+:root[data-accent="miku"] {
+  --accent-fill: var(--accent-miku);
+  --accent-on-light: #006960;
+}
+:root[data-accent="tianyi"] {
+  --accent-fill: var(--accent-tianyi);
+  --accent-on-light: #075e8a;
+}
+:root:is([data-accent="miku"], [data-accent="tianyi"]) {
+  --on-accent: #101419;
+  --timeline-start: var(--accent);
 }
 * {
   box-sizing: border-box;
@@ -74,12 +97,12 @@ button:disabled {
 }
 button.primary,
 .button.primary {
-  background: var(--accent);
+  background: var(--accent-fill);
   border-color: transparent;
-  color: white;
+  color: var(--on-accent);
 }
 button.primary:hover {
-  background: #f04a65;
+  background: color-mix(in srgb, var(--accent-fill) 88%, var(--on-accent));
 }
 input,
 select {
@@ -214,8 +237,8 @@ p {
   margin-left: 12px;
 }
 .notice.error {
-  color: #ef8192;
-  border-color: #ff365833;
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 35%, transparent);
 }
 .feedback {
   font-size: 12px;

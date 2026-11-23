@@ -37,9 +37,9 @@
   background: var(--hover);
 }
 .nav.active {
-  background: var(--accent);
-  color: white;
-  box-shadow: 0 5px 20px #ff3b5720;
+  background: var(--accent-fill);
+  color: var(--on-accent);
+  box-shadow: 0 5px 20px var(--accent-shadow);
 }
 .group {
   display: flex;
@@ -202,29 +202,10 @@
   position: absolute;
   right: 0;
   top: 48px;
-  width: 220px;
+  width: min(220px, calc(100vw - 64px));
+  max-height: calc(100dvh - 84px);
+  overflow-y: auto;
   z-index: 40;
-}
-.themeMenu strong {
-  font-size: 13px;
-  display: block;
-  padding: 10px;
-}
-.swatch {
-  background: #151a20;
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  border: 2px solid #ff4860;
-  display: inline-block;
-  margin-right: 12px;
-  vertical-align: middle;
-}
-.swatch.light {
-  background: #faf7f5;
-}
-.swatch.system {
-  background: linear-gradient(90deg, #151a20 50%, #faf7f5 50%);
 }
 .content {
   overflow: auto;

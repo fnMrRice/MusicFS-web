@@ -20,8 +20,8 @@
   /* 原生滑块中心的移动范围比轨道窄一个滑块宽度。 */
   --timeline-fill-width: calc(var(--timeline-thumb-size) / 2 +
     (100% - var(--timeline-thumb-size)) * var(--timeline-progress, 0));
-  --timeline-track: linear-gradient(to right, #ff9a76, var(--accent))
-    left / var(--timeline-fill-width) 100% no-repeat #fff;
+  --timeline-track: linear-gradient(to right, var(--timeline-start), var(--accent))
+    left / var(--timeline-fill-width) 100% no-repeat var(--timeline-rest, #fff);
   appearance: none;
   background: transparent;
   position: absolute;
@@ -114,8 +114,8 @@
   flex-shrink: 0;
 }
 .transport .play-main {
-  background: var(--accent);
-  color: white;
+  background: var(--accent-fill);
+  color: var(--on-accent);
   border-radius: 50%;
   width: 52px;
   height: 52px;
@@ -266,7 +266,7 @@
   bottom: 110px;
   left: 27px;
   max-width: calc(100vw - 54px);
-  border: 1px solid #ff36584a;
+  border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent);
   background: var(--panel);
   border-radius: 10px;
   box-shadow: 0 10px 40px var(--shadow);

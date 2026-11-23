@@ -3,6 +3,8 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useServices, useStore } from "../app/services";
 import { ErrorNotice, Icon, IconButton } from "../components/ui";
+import { ThemeChoices } from "../components/ThemeChoices";
+import { BrandMark } from "../components/BrandMark";
 import { PlayerBar } from "../player/PlayerBar";
 import styles from "./Shell.module.css";
 import { ErrorBoundary } from "../app/ErrorBoundary";
@@ -96,6 +98,9 @@ export function AppShell() {
     const key = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         if (account) accountButton.current?.focus();
+        if (themeRoot.current?.contains(document.activeElement)) {
+          themeRoot.current.querySelector("button")?.focus();
+        }
         setAccount(false);
         setTheme(false);
       }
@@ -150,8 +155,8 @@ export function AppShell() {
   return (
     <div className={styles.shell}>
       <aside className={styles.sidebar} aria-label={tr("侧栏")}>
-        <a className="brand" href="#/library">
-          <Icon name="music" size={32} />
+        <a className="brand" href="#/library" aria-label="MusicFS">
+          <BrandMark size={32} />
           <strong>MusicFS</strong>
         </a>
         <nav
@@ -255,30 +260,17 @@ export function AppShell() {
                 icon="theme"
                 label={tr("换肤")}
                 aria-expanded={theme}
+                aria-controls={theme ? "theme-options" : undefined}
                 onClick={() => setTheme(!theme)}
               />
               {theme && (
                 <div
+                  id="theme-options"
                   className={`${styles.themeMenu} popover`}
+                  role="group"
                   aria-label={tr("选择主题")}
                 >
-                  <strong>{tr("为音乐换个心情")}</strong>
-                  {(["dark", "light", "system"] as const).map((t) => (
-                    <button
-                      key={t}
-                      aria-pressed={prefs.theme === t}
-                      onClick={() => s.preference({ theme: t })}
-                    >
-                      <span
-                        className={`${styles.swatch} ${t === "system" ? styles.system : t === "light" ? styles.light : ""}`}
-                      />
-                      {t === "dark"
-                        ? tr("深夜 · 深色")
-                        : t === "light"
-                          ? tr("晨光 · 浅色")
-                          : tr("跟随系统")}
-                    </button>
-                  ))}
+                  <ThemeChoices />
                 </div>
               )}
             </div>

@@ -2,7 +2,8 @@
 .header { display: flex; align-items: center; justify-content: flex-start; gap: 0; width: 100%; padding: 0; border: 0; border-radius: 8px; background: transparent; color: var(--text); text-align: left; }
 .header:hover { background: var(--hover); }
 .header.within { background: var(--accent-soft); color: var(--accent); }
-.header.selected { background: var(--accent); color: white; box-shadow: 0 5px 20px #ff3b5720; }
+.header.selected { background: var(--accent-fill); color: var(--on-accent); box-shadow: 0 5px 20px var(--accent-shadow); }
+.header.selected .toggle:hover { background: color-mix(in srgb, var(--on-accent) 12%, transparent); }
 .parent { display: flex; align-items: center; gap: 16px; flex: 1; min-width: 0; padding: 13px 0 13px 16px; text-decoration: none; color: inherit; font-size: 15px; }
 .parent span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .parent svg, .child svg { flex-shrink: 0; }

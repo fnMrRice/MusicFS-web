@@ -1,0 +1,61 @@
+.theme-choices {
+  display: grid;
+  gap: 18px;
+}
+.theme-choices fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.theme-choices legend {
+  margin-bottom: 8px;
+  padding: 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+.theme-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.theme-options button[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.theme-options button::after {
+  content: "";
+  width: 8px;
+  height: 4px;
+  border: solid currentColor;
+  border-width: 0 0 2px 2px;
+  transform: rotate(-45deg);
+  visibility: hidden;
+}
+.theme-options button[aria-pressed="true"]::after {
+  visibility: visible;
+}
+.accent-swatch {
+  width: 12px;
+  height: 12px;
+  flex: none;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px #0002;
+}
+.popover .theme-choices {
+  padding: 4px;
+  gap: 12px;
+}
+.popover .theme-options {
+  display: grid;
+  gap: 2px;
+}
+.popover .theme-options button {
+  justify-content: flex-start;
+  padding: 6px 10px;
+}
+.popover .theme-options button::after {
+  margin-inline-start: auto;
+}

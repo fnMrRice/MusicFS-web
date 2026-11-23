@@ -1,7 +1,8 @@
 import { tr, useLocale } from "../i18n";
 import { useState } from "react";
 import { useServices, useStore } from "./services";
-import { ErrorNotice, Icon } from "../components/ui";
+import { ErrorNotice } from "../components/ui";
+import { BrandMark } from "../components/BrandMark";
 import { LanguageSelect } from "../i18n/LanguageSelect";
 export function Login() {
   useLocale();
@@ -25,7 +26,7 @@ export function Login() {
       <div className="login-panel">
         <LanguageSelect />
         <div className="brand">
-          <Icon name="music" size={34} />
+          <BrandMark size={34} />
           <strong>MusicFS</strong>
         </div>
         <h2>{tr("连接你的音乐世界")}</h2>

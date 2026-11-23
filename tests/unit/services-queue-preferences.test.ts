@@ -42,10 +42,10 @@ describe("persisted queue pinning", () => {
 
   it("restores both pin states without changing lyrics, mute or other preferences", async () => {
     const first = await connect();
-    first.preference({ volume: 0.32, lyricsPinned: true, mine: false });
+    first.preference({ volume: 0.32, lyricsPinned: true, mine: false, theme: "light", accent: "tianyi" });
     first.toggleMute();
     first.preference({ queuePinned: true });
-    const preserved = { lyricsPinned: true, volume: 0, lastVolume: 0.32, mine: false };
+    const preserved = { lyricsPinned: true, volume: 0, lastVolume: 0.32, mine: false, theme: "light", accent: "tianyi" };
     expect(JSON.parse(saved.get(key)!)).toMatchObject({ ...preserved, queuePinned: true });
     const restored = await connect();
     expect(restored.preferences.value).toMatchObject({ ...preserved, queuePinned: true });
