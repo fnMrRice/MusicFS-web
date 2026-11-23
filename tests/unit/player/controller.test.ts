@@ -35,7 +35,7 @@ describe('Player controller (Mock media; not decoder validation)', () => {
     const fade = deferred<void>();
     s.audio.fadeOut = vi.fn().mockReturnValue(fade.promise);
     s.audio.fadeIn = vi.fn();
-    s.controller.setTransitions(true, false, 500);
+    s.controller.setTransitions({ enabled: true, trackMs: 500, seekMs: 0, pauseMs: 0 });
     await s.controller.select(track);
     expect(s.audio.fadeIn).toHaveBeenCalledWith(500);
     s.event('playing');
@@ -50,7 +50,7 @@ describe('Player controller (Mock media; not decoder validation)', () => {
   it('a stop during fade cancels the pending selection', async () => {
     const s = setup(); const fade = deferred<void>();
     s.audio.fadeOut = vi.fn().mockReturnValue(fade.promise);
-    s.controller.setTransitions(true, false, 300);
+    s.controller.setTransitions({ enabled: true, trackMs: 300, seekMs: 0, pauseMs: 0 });
     await s.controller.select(track); s.event('playing');
     const changing = s.controller.select({ ...track, sourceTrackId: 'other' });
     s.controller.stop(); fade.resolve(); await changing;
@@ -60,12 +60,68 @@ describe('Player controller (Mock media; not decoder validation)', () => {
   it('a pause during the outgoing fade leaves the next selection paused', async () => {
     const s = setup(); const fade = deferred<void>();
     s.audio.fadeOut = vi.fn().mockReturnValue(fade.promise);
-    s.controller.setTransitions(true, false, 300);
+    s.audio.fadeIn = vi.fn();
+    s.controller.setTransitions({ enabled: true, trackMs: 300, seekMs: 0, pauseMs: 0 });
     await s.controller.select(track); s.event('playing');
     const changing = s.controller.select({ ...track, sourceTrackId: 'other' });
     s.controller.toggle(); fade.resolve(); await changing;
     expect(s.audio.play).toHaveBeenCalledOnce();
     expect(s.controller.state.phase).toBe('paused');
+    s.controller.toggle();
+    expect(s.audio.fadeIn).toHaveBeenCalledTimes(1);
+    s.controller.stop();
+  });
+  it('uses the pause duration before pausing and when resuming the same audio', async () => {
+    const s = setup(), fade = deferred<void>();
+    s.audio.fadeOut = vi.fn().mockReturnValue(fade.promise);
+    s.audio.fadeIn = vi.fn();
+    s.controller.setTransitions({ enabled: true, trackMs: 190, pauseMs: 815, seekMs: 930 });
+    await s.controller.select(track); s.event('playing');
+    expect(s.audio.fadeIn).toHaveBeenCalledWith(190);
+    s.controller.toggle();
+    expect(s.audio.fadeOut).toHaveBeenCalledWith(815);
+    expect(s.audio.pause).not.toHaveBeenCalled();
+    s.event('playing'); s.event('ended', 30, true);
+    expect(s.controller.state.phase).toBe('paused');
+    fade.resolve(); await fade.promise;
+    expect(s.audio.pause).toHaveBeenCalledOnce();
+    s.controller.toggle();
+    expect(s.audio.fadeIn).toHaveBeenLastCalledWith(815);
+    expect(s.audio.play).toHaveBeenCalledTimes(2);
+    expect(s.api.create).toHaveBeenCalledOnce();
+    s.controller.stop();
+  });
+  it('reverses an unfinished pause from its current gain and ignores the cancelled completion', async () => {
+    const s = setup(), fade = deferred<void>();
+    s.audio.fadeOut = vi.fn().mockReturnValue(fade.promise);
+    s.audio.fadeIn = vi.fn();
+    await s.controller.select(track); s.event('playing');
+    s.controller.toggle(); s.controller.toggle();
+    expect(s.audio.fadeIn).toHaveBeenLastCalledWith(300, true);
+    fade.resolve(); await fade.promise;
+    expect(s.audio.pause).not.toHaveBeenCalled();
+    expect(s.controller.state.phase).toBe('playing');
+    s.controller.stop();
+  });
+  it('disabling fades completes an active pause and skips the resume envelope', async () => {
+    const s = setup(), fade = deferred<void>();
+    s.audio.fadeOut = vi.fn().mockReturnValue(fade.promise);
+    s.audio.fadeIn = vi.fn();
+    await s.controller.select(track); s.event('playing'); s.controller.toggle();
+    s.controller.setTransitions({ enabled: false, trackMs: 300, pauseMs: 300, seekMs: 300 });
+    expect(s.audio.pause).toHaveBeenCalledOnce();
+    s.controller.toggle(); fade.resolve(); await fade.promise;
+    expect(s.audio.fadeIn).toHaveBeenCalledTimes(1);
+    expect(s.audio.pause).toHaveBeenCalledOnce();
+    s.controller.stop();
+  });
+  it('observes native playback after a completed user pause', async () => {
+    const s = setup();
+    await s.controller.select(track); s.event('playing'); s.controller.toggle();
+    s.event('pause', 2, true); s.event('playing', 2);
+    expect(s.controller.state.wantsPlay).toBe(true);
+    s.event('ended', 30, true);
+    expect(s.controller.state.phase).toBe('ended');
     s.controller.stop();
   });
   it('a valid native seek cancels every pending fading selection before its promise resumes', async () => {
@@ -73,7 +129,7 @@ describe('Player controller (Mock media; not decoder validation)', () => {
     const cancelled = vi.fn(); s.controller.onSelectionCancelled = cancelled;
     s.audio.fadeOut = vi.fn().mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
     s.audio.cancelFade = vi.fn(() => { first.resolve(); second.resolve(); });
-    s.controller.setTransitions(true, false, 300);
+    s.controller.setTransitions({ enabled: true, trackMs: 300, seekMs: 0, pauseMs: 0 });
     await s.controller.select(track); s.event('playing');
     const one = s.controller.select({ ...track, sourceTrackId: 'next' });
     const two = s.controller.select({ ...track, sourceTrackId: 'later' });
@@ -90,7 +146,7 @@ describe('Player controller (Mock media; not decoder validation)', () => {
     const cancelled = vi.fn(); s.controller.onSelectionCancelled = cancelled;
     s.audio.fadeOut = vi.fn().mockReturnValue(fade.promise); s.audio.cancelFade = vi.fn();
     Object.defineProperty(s.audio, 'seekable', { value: [{ start: 0, end: 5 }] });
-    s.controller.setTransitions(true, false, 300);
+    s.controller.setTransitions({ enabled: true, trackMs: 300, seekMs: 0, pauseMs: 0 });
     await s.controller.select(track); s.event('playing');
     const changing = s.controller.select({ ...track, sourceTrackId: 'next' });
     s.controller.seek(40_000); s.controller.seek(10_000);
@@ -107,7 +163,7 @@ describe('Player controller (Mock media; not decoder validation)', () => {
     s.audio.fadeOut = vi.fn().mockReturnValue(fade.promise);
     s.audio.cancelFade = vi.fn(() => fade.resolve());
     s.api.control.mockResolvedValue({ ...descriptor, attemptId: 'seeked', positionOriginMs: 10_000 });
-    s.controller.setTransitions(true, false, 300);
+    s.controller.setTransitions({ enabled: true, trackMs: 300, seekMs: 0, pauseMs: 0 });
     await s.controller.select(track); s.event('playing');
     const changing = s.controller.select({ ...track, sourceTrackId: 'next' });
     s.controller.seek(10_000); await changing; await Promise.resolve();
@@ -121,7 +177,7 @@ describe('Player controller (Mock media; not decoder validation)', () => {
   it('fades a natural ending once and cancels the envelope on a seek', async () => {
     const s = setup();
     s.audio.fadeOut = vi.fn().mockResolvedValue(undefined); s.audio.cancelFade = vi.fn();
-    s.controller.setTransitions(true, false, 500);
+    s.controller.setTransitions({ enabled: true, trackMs: 500, seekMs: 0, pauseMs: 0 });
     await s.controller.select(track); s.event('playing');
     s.event('timeupdate', 29.6); s.event('timeupdate', 29.8);
     expect(s.audio.fadeOut).toHaveBeenCalledOnce();
@@ -137,7 +193,7 @@ describe('Player controller (Mock media; not decoder validation)', () => {
     const outgoing = deferred<void>();
     s.audio.fadeOut = vi.fn().mockReturnValue(outgoing.promise);
     s.audio.fadeIn = vi.fn();
-    s.controller.setTransitions(false, true, 450);
+    s.controller.setTransitions({ enabled: true, trackMs: 0, seekMs: 450, pauseMs: 0 });
     await s.controller.select(track); s.event('playing');
     expect(s.audio.fadeIn).not.toHaveBeenCalled();
     const seeking = s.controller.seek(10_000);
@@ -199,7 +255,7 @@ describe('Player controller (Mock media; not decoder validation)', () => {
   it('never applies a fading seek after switching tracks or stopping', async () => {
     const s = setup(); const one = deferred<void>(), two = deferred<void>();
     s.audio.fadeOut = vi.fn().mockReturnValueOnce(one.promise).mockReturnValueOnce(two.promise);
-    s.controller.setTransitions(false, true, 300);
+    s.controller.setTransitions({ enabled: true, trackMs: 0, seekMs: 300, pauseMs: 0 });
     await s.controller.select(track); s.event('playing');
     const first = s.controller.seek(10_000);
     await s.controller.select({ ...track, sourceTrackId: 'next' }); s.event('playing');
@@ -212,7 +268,7 @@ describe('Player controller (Mock media; not decoder validation)', () => {
     const s = setup(); const outgoing = deferred<void>();
     s.audio.fadeOut = vi.fn().mockReturnValue(outgoing.promise);
     s.audio.fadeIn = vi.fn();
-    s.controller.setTransitions(false, true, 300);
+    s.controller.setTransitions({ enabled: true, trackMs: 0, seekMs: 300, pauseMs: 0 });
     await s.controller.select(track); s.event('playing');
     const seeking = s.controller.seek(10_000);
     s.controller.toggle(); outgoing.resolve(); await seeking;

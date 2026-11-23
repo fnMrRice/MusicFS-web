@@ -46,7 +46,7 @@ async function recordOutput(page: Page): Promise<void> {
       const rms = Math.sqrt(buffer.reduce((sum, value) => sum + value * value, 0) / buffer.length);
       recording.samples.push({ at: performance.now(), rms, src: document.querySelector('audio')?.currentSrc ?? '' });
     }, 20);
-    for (const type of ['playing', 'seeking', 'seeked']) {
+    for (const type of ['playing', 'pause', 'seeking', 'seeked']) {
       document.addEventListener(type, (event) => {
         if (event.target instanceof HTMLMediaElement) recording.events.push({ type, at: performance.now(), src: event.target.currentSrc });
       }, true);
@@ -125,8 +125,8 @@ async function installCatalog(page: Page, onSecondStream?: () => Promise<void>) 
 
 test('byte-range seeking fades out the old position and restores audio at the target with track fades off', async ({ page }, info) => {
   await recordOutput(page);
-  await page.addInitScript((fadeDurationMs) => {
-    localStorage.setItem('musicfs:transition-dsp:listener:preferences', JSON.stringify({ trackFadeEnabled: false, fadeDurationMs }));
+  await page.addInitScript((seekMs) => {
+    localStorage.setItem('musicfs:transition-dsp:listener:preferences', JSON.stringify({ fades: { enabled: true, trackMs: 0, pauseMs: 0, seekMs } }));
   }, duration);
   const creates = await installCatalog(page);
   await page.goto(`${origin}/#/library`);
@@ -163,6 +163,38 @@ test('byte-range seeking fades out the old position and restores audio at the ta
   expect(creates).toHaveLength(1);
 });
 
+test('pause and resume apply their duration to the same audio without track or seek fades', async ({ page }, info) => {
+  await recordOutput(page);
+  await page.addInitScript((pauseMs) => {
+    localStorage.setItem('musicfs:transition-dsp:listener:preferences', JSON.stringify({ fades: { enabled: true, trackMs: 0, pauseMs, seekMs: 0 } }));
+  }, duration);
+  const creates = await installCatalog(page);
+  await page.goto(`${origin}/#/library`);
+  await page.getByRole('button', { name: '播放全部', exact: true }).click();
+  await waitPlaying(page);
+  await expect.poll(async () => (await outputSignal(page)).rms).toBeGreaterThan(0.105);
+  const baseline = (await outputSignal(page)).rms;
+  const audio = page.locator('audio');
+  await page.getByRole('button', { name: '暂停', exact: true }).click();
+  await expect.poll(() => audio.evaluate((el: HTMLAudioElement) => el.paused)).toBe(true);
+  const position = await audio.evaluate((el: HTMLAudioElement) => el.currentTime);
+  await page.getByRole('button', { name: '播放', exact: true }).click();
+  await expect.poll(() => audio.evaluate((el: HTMLAudioElement) => el.currentTime)).toBeGreaterThan(position + 1.4);
+  const recording = await page.evaluate(() => {
+    const log = (window as unknown as ProbeWindow).musicfsTransitionRecording;
+    clearInterval(log.timer);
+    return { samples: log.samples, events: log.events };
+  });
+  await info.attach('pause-output-envelope', { body: JSON.stringify({ baseline, ...recording }), contentType: 'application/json' });
+  const click = recording.events.find(event => event.type === 'click' && event.label === '暂停')!;
+  const pause = recording.events.find(event => event.type === 'pause' && event.at >= click.at)!;
+  const resume = recording.events.find(event => event.type === 'playing' && event.at > pause.at)!;
+  expect(pause.at - click.at).toBeGreaterThanOrEqual(duration - 80);
+  expectFadeOut(recording.samples, click.at, 'attempt-1', baseline);
+  expectFadeIn(recording.samples, resume.at, 'attempt-1', baseline);
+  expect(creates).toHaveLength(1);
+});
+
 test('switching waits for audible fade-out, fades in after delayed playing and logout cancels a pending switch', async ({ page }, info) => {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
@@ -177,8 +209,8 @@ test('switching waits for audible fade-out, fades in after delayed playing and l
     await page.goto(`${origin}/#/library`);
     await page.getByRole('button', { name: '设置', exact: true }).click();
     await page.getByRole('navigation', { name: '设置分类', exact: true }).getByRole('button', { name: '播放配置', exact: true }).click();
-    await page.getByRole('checkbox', { name: '切歌淡出淡入', exact: true }).check();
-    await page.getByLabel('淡出淡入时长（毫秒）', { exact: true }).fill(String(duration));
+    await page.getByRole('checkbox', { name: '淡出淡入', exact: true }).check();
+    await page.getByLabel('切歌淡出淡入时长（毫秒）', { exact: true }).fill(String(duration));
     await page.getByRole('checkbox', { name: '自动音量平衡', exact: true }).uncheck();
     await page.getByRole('button', { name: '展开作品库', exact: true }).click();
     await page.getByRole('link', { name: '曲目列表', exact: true }).click();

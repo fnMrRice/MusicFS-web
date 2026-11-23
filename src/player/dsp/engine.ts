@@ -10,7 +10,7 @@ export interface LocalDSPAttachment {
   reset(holdSilence?: boolean): void;
   fadeOut(durationMs: number): Promise<void>;
   prepareFadeIn(): void;
-  fadeIn(durationMs: number): void;
+  fadeIn(durationMs: number, fromCurrent?: boolean): void;
   setVolume(volume: number): void;
   detach(): void;
 }
@@ -223,10 +223,11 @@ export class LocalDSPEngine {
               }, duration);
             });
           },
-          fadeIn: (durationMs) => {
+          fadeIn: (durationMs, fromCurrent = false) => {
             if (detached) return;
-            cancelFade();
-            attachedGraph.fadeIn(durationMs);
+            cancelFade(false);
+            if (fromCurrent) attachedGraph.fadeTo(1, durationMs);
+            else attachedGraph.fadeIn(durationMs);
           },
           prepareFadeIn: () => {
             if (detached) return;

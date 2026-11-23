@@ -198,8 +198,11 @@ test('random mode changes the current track for manual and natural transitions',
 test('shuffling preserves queue members, current audio, selected item and pause state', async ({ page }, info) => {
   const { creates, errors } = await setup(page);
   await playAll(page);
-  await page.getByRole('button', { name: '下一首', exact: true }).click(); await waitPlaying(page);
-  const audio = page.locator('audio'), original = await audio.elementHandle();
+  await page.getByRole('button', { name: '下一首', exact: true }).click();
+  const audio = page.locator('audio');
+  await expect(audio).toHaveAttribute('src', /\/attempt-2\/stream$/);
+  await waitPlaying(page);
+  const original = await audio.elementHandle();
   const src = await audio.getAttribute('src');
   await page.getByRole('button', { name: '播放队列', exact: true }).click();
   await page.getByRole('button', { name: '固定播放队列', exact: true }).click();
@@ -216,6 +219,7 @@ test('shuffling preserves queue members, current audio, selected item and pause 
   expect(creates).toEqual(['track-1', 'track-2']);
   await page.screenshot({ path: info.outputPath('desktop-shuffled-queue.png') });
   await page.getByRole('button', { name: '暂停', exact: true }).click();
+  await expect(audio).toHaveJSProperty('paused', true);
   const pausedAt = await audio.evaluate((element: HTMLAudioElement) => element.currentTime);
   await page.getByRole('button', { name: '打乱队列', exact: true }).click();
   await expect(selected(page)).toHaveText('Beta.wav');
@@ -255,6 +259,7 @@ test('time displays toggle independently without disturbing audio and retain the
   await playAll(page);
   await page.getByRole('button', { name: '暂停', exact: true }).click();
   const audio = page.locator('audio'), original = await audio.elementHandle();
+  await expect(audio).toHaveJSProperty('paused', true);
   await audio.evaluate((element: HTMLAudioElement) => { element.currentTime = 12; });
   await expect.poll(() => audio.evaluate((element: HTMLAudioElement) => element.seeking)).toBe(false);
   await expect(left).toHaveText('00:12');
@@ -292,6 +297,7 @@ test('time displays toggle independently without disturbing audio and retain the
   await page.getByRole('button', { name: '下一首', exact: true }).click();
   await waitPlaying(page);
   await page.getByRole('button', { name: '暂停', exact: true }).click();
+  await expect(audio).toHaveJSProperty('paused', true);
   await audio.evaluate((element: HTMLAudioElement) => { element.currentTime = 8; });
   await expect(left).toHaveAccessibleName('剩余时间，点击显示当前时间');
   await expect(right).toHaveAccessibleName('剩余时间，点击显示总时间');

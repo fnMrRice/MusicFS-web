@@ -25,7 +25,7 @@ export interface AudioPort {
   seek(seconds: number): void;
   setVolume?(volume: number): void;
   fadeOut?(durationMs: number): Promise<void>;
-  fadeIn?(durationMs: number): void;
+  fadeIn?(durationMs: number, fromCurrent?: boolean): void;
   cancelFade?(): void;
   readonly seconds: number;
   readonly ended?: boolean;
@@ -108,7 +108,15 @@ export function audioFactory(root: HTMLElement, dsp?: LocalDSPEngine): AudioFact
         fadeInDuration = 0;
         return processing?.fadeOut(durationMs) ?? Promise.resolve();
       },
-      fadeIn: (durationMs) => { fadeInDuration = durationMs; processing?.prepareFadeIn(); },
+      fadeIn: (durationMs, fromCurrent = false) => {
+        if (fromCurrent && !audio.paused) {
+          fadeInDuration = 0;
+          processing?.fadeIn(durationMs, true);
+        } else {
+          fadeInDuration = durationMs;
+          processing?.prepareFadeIn();
+        }
+      },
       cancelFade: () => { fadeInDuration = 0; processing?.fadeIn(0); },
       seek: (seconds) => {
         audio.currentTime = seconds;

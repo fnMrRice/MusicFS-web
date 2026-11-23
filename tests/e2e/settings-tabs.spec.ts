@@ -150,15 +150,16 @@ test("settings keep every section mounted and preserve playback preferences afte
   const processing = playback.getByRole("checkbox", { name: processingLabel, exact: true });
   expect(await volume.evaluate((element) => !!(element.compareDocumentPosition(document.querySelector(".playback-switch")!) & Node.DOCUMENT_POSITION_FOLLOWING))).toBe(true);
   await expect(page.getByText("服务端负责格式转换与转码；音效和输出声道在浏览器中实时调整。", { exact: true })).toHaveCount(0);
-  const trackFade = playback.getByRole("checkbox", { name: "切歌淡出淡入", exact: true });
-  const seekFade = playback.getByRole("checkbox", { name: "进度跳转淡出淡入", exact: true });
-  await expect(trackFade).toBeChecked();
-  await expect(seekFade).toBeChecked();
+  const fades = playback.getByRole("checkbox", { name: "淡出淡入", exact: true });
+  const durations = ["切歌", "暂停", "跳转"].map((action) =>
+    playback.getByRole("spinbutton", { name: `${action}淡出淡入时长（毫秒）`, exact: true }));
+  await expect(fades).toBeChecked();
+  for (const field of durations) await expect(field).toHaveValue("300");
   await expect(page.getByLabel("自动音量平衡", { exact: true })).not.toBeChecked();
   await processing.check();
-  await seekFade.uncheck();
-  await expect(page.getByLabel("淡出淡入时长（毫秒）", { exact: true })).toHaveValue("300");
-  await page.getByLabel("淡出淡入时长（毫秒）", { exact: true }).fill("750");
+  await durations[0].fill("750");
+  await durations[1].fill("100");
+  await durations[2].fill("0");
   await page.getByLabel("自动音量平衡", { exact: true }).check();
   await volume.fill("0.42");
   await navigate(page, "外观与语言");
@@ -181,9 +182,10 @@ test("settings keep every section mounted and preserve playback preferences afte
   await expect(page).toHaveURL(/\/settings\?tab=playback$/);
   await expectAnchor(page, "播放配置");
   await expect(processing).toBeChecked();
-  await expect(trackFade).toBeChecked();
-  await expect(seekFade).not.toBeChecked();
-  await expect(page.getByLabel("淡出淡入时长（毫秒）", { exact: true })).toHaveValue("750");
+  await expect(fades).toBeChecked();
+  await expect(durations[0]).toHaveValue("750");
+  await expect(durations[1]).toHaveValue("100");
+  await expect(durations[2]).toHaveValue("0");
   await expect(page.getByLabel("自动音量平衡", { exact: true })).toBeChecked();
   await expect(volume).toHaveValue("0.42");
   await page.screenshot({ path: info.outputPath("settings-playback-desktop.png") });
@@ -193,6 +195,10 @@ test("settings keep every section mounted and preserve playback preferences afte
   await expect(nav.getByRole("button", { name: "播放配置", exact: true })).toBeInViewport();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: info.outputPath("settings-playback-mobile.png") });
+  const boxes = await Promise.all([fades, ...durations].map(control => control.boundingBox()));
+  const sharedTop = Math.max(...boxes.map(box => box!.y));
+  const sharedBottom = Math.min(...boxes.map(box => box!.y + box!.height));
+  expect(sharedTop, JSON.stringify(boxes)).toBeLessThan(sharedBottom);
   await navigate(page, "外观与语言");
   await expect(page.locator(".language-select select")).toBeInViewport();
   await section(page, "外观与语言").getByRole("button", { name: "深夜 · 深色", exact: true }).click();
@@ -307,7 +313,7 @@ test("effects and output share one divided card and keep unsaved effects while n
   await page.screenshot({ path: info.outputPath("settings-dsp-mobile.png") });
 });
 
-test("legacy track fade preference is preserved and the two switches share a duration", async ({ page }) => {
+test("legacy fade settings preserve disabled actions and durations survive a master switch toggle", async ({ page }) => {
   const requests = await mock(page);
   await page.addInitScript(() => {
     const key = "musicfs:settings-test:listener:preferences";
@@ -315,24 +321,24 @@ test("legacy track fade preference is preserved and the two switches share a dur
   });
   await page.goto(`${origin}/#/settings?tab=playback`);
   await expectAnchor(page, "播放配置");
-  const trackFade = page.getByLabel("切歌淡出淡入", { exact: true });
-  const seekFade = page.getByLabel("进度跳转淡出淡入", { exact: true });
-  await expect(trackFade).not.toBeChecked();
-  await expect(seekFade).toBeChecked();
-  const duration = page.getByLabel("淡出淡入时长（毫秒）", { exact: true });
+  const fades = page.getByLabel("淡出淡入", { exact: true });
+  const duration = page.getByLabel("跳转淡出淡入时长（毫秒）", { exact: true });
+  await expect(fades).toBeChecked();
+  await expect(page.getByLabel("切歌淡出淡入时长（毫秒）")).toHaveValue("0");
+  await expect(page.getByLabel("暂停淡出淡入时长（毫秒）")).toHaveValue("300");
   await expect(duration).toHaveValue("650");
-  await duration.fill("50");
+  await duration.fill("-10");
   await page.getByRole("heading", { name: "播放", exact: true }).click();
-  await expect(duration).toHaveValue("100");
+  await expect(duration).toHaveValue("0");
   await duration.fill("3000");
   await page.getByRole("heading", { name: "播放", exact: true }).click();
   await expect(duration).toHaveValue("2000");
-  await seekFade.uncheck();
-  await expect(duration).toHaveCount(0);
+  await fades.uncheck();
+  await expect(duration).toBeDisabled();
   await page.reload();
-  await expect(seekFade).not.toBeChecked();
-  await expect(trackFade).not.toBeChecked();
-  await trackFade.check();
+  await expect(fades).not.toBeChecked();
+  await expect(duration).toBeDisabled();
+  await fades.check();
   await expect(duration).toHaveValue("2000");
   expect(requests.filter((path) => path.includes("/dsp/settings") || path.includes("/playback/sessions"))).toEqual([]);
 });

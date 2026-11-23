@@ -11,6 +11,8 @@ import type {
   Preferences,
 } from "../api/types";
 import { PlayerController } from "../player/controller";
+import { defaultFadeSettings, type FadeSettings } from "../player/playback-transitions";
+import { loadFadePreferences } from "./fade-preferences";
 import { PlaybackQueue, type PlaybackMode } from "../player/playback-queue";
 import { QueuePersistence } from "../player/queue-persistence";
 import { audioFactory } from "../player/audio-adapter";
@@ -58,9 +60,7 @@ interface PreferencesState {
   playlists: boolean;
   works: boolean;
   processing: boolean;
-  trackFadeEnabled: boolean;
-  seekFadeEnabled: boolean;
-  fadeDurationMs: number;
+  fades: FadeSettings;
   autoVolume: boolean;
 }
 const defaults: PreferencesState = {
@@ -74,9 +74,7 @@ const defaults: PreferencesState = {
   playlists: true,
   works: false,
   processing: false,
-  trackFadeEnabled: true,
-  seekFadeEnabled: true,
-  fadeDurationMs: 300,
+  fades: defaultFadeSettings,
   autoVolume: false,
 };
 export class Services {
@@ -260,7 +258,7 @@ export class Services {
     this.audioOutput.setSession(new URL(this.client.url(""), window.location.href).href, session.user.id);
     this.reloadSourceNames();
     this.capabilityEvents.start(session.csrfToken);
-    let saved: Partial<PreferencesState> & { fadeEnabled?: boolean } = {};
+    let saved: Partial<PreferencesState> = {};
     try {
       saved = JSON.parse(localStorage.getItem(this.key()!) ?? "{}");
     } catch {
@@ -281,15 +279,11 @@ export class Services {
       playlists: saved?.playlists !== false,
       works: saved?.works === true,
       processing: saved?.processing === true,
-      // 原有的淡出淡入开关只控制切歌。
-      trackFadeEnabled: typeof saved?.trackFadeEnabled === "boolean" ? saved.trackFadeEnabled : saved?.fadeEnabled !== false,
-      seekFadeEnabled: saved?.seekFadeEnabled !== false,
-      fadeDurationMs: typeof saved?.fadeDurationMs === "number" && Number.isFinite(saved.fadeDurationMs)
-        ? Math.max(100, Math.min(2000, saved.fadeDurationMs)) : defaults.fadeDurationMs,
+      fades: loadFadePreferences(saved),
       autoVolume: saved?.autoVolume === true,
     });
     this.player.setVolume(this.preferences.value.volume);
-    this.applyTransitions();
+    this.player.setTransitions(this.preferences.value.fades);
     this.dsp.setAutoVolume(this.preferences.value.autoVolume);
     void this.reloadPlaylists().catch(() => {});
   }
@@ -384,7 +378,7 @@ export class Services {
     this.playlists.set([]);
     this.client.csrfToken = null;
     this.preferences.set({ ...defaults });
-    this.applyTransitions();
+    this.player.setTransitions(defaultFadeSettings);
     this.dsp.setAutoVolume(false);
     this.localDSP.clear();
     this.audioOutput.clear();
@@ -401,7 +395,7 @@ export class Services {
     this.preferences.set({ ...this.preferences.value, ...patch, ...volume });
     if (patch.volume !== undefined || patch.lastVolume !== undefined) saveVolumePreferences(volume);
     this.player.setVolume(this.preferences.value.volume);
-    this.applyTransitions();
+    if (patch.fades) this.player.setTransitions(patch.fades);
     this.dsp.setAutoVolume(this.preferences.value.autoVolume);
     const key = this.key();
     if (key)
@@ -410,10 +404,6 @@ export class Services {
       } catch {
         /* Preferences remain in memory. */
       }
-  }
-  private applyTransitions(): void {
-    const { trackFadeEnabled, seekFadeEnabled, fadeDurationMs } = this.preferences.value;
-    this.player.setTransitions(trackFadeEnabled, seekFadeEnabled, fadeDurationMs);
   }
   toggleMute(): void {
     const { volume, lastVolume } = this.preferences.value;

@@ -124,29 +124,31 @@
   font-size: 14px;
   text-align: right;
 }
-.playback-duration {
-  margin: 0 0 20px;
-  padding: 4px 0 4px 16px;
-  border-left: 2px solid var(--line);
+.fade-row {
+  flex-wrap: wrap;
+  cursor: default;
 }
-.playback-duration-label {
+.fade-toggle, .fade-durations, .fade-duration {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
+}
+.fade-toggle {
+  gap: 10px;
+  cursor: pointer;
+}
+.fade-durations {
+  flex-wrap: wrap;
+  gap: 8px 14px;
   color: var(--muted);
   font-size: 13px;
-  line-height: 1.6;
 }
-.playback-duration input {
-  flex: 0 0 100px;
-  width: 100px;
-  padding: 8px 10px;
+.fade-duration {
+  gap: 6px;
+}
+.fade-duration input {
+  width: 68px;
+  padding: 6px;
   font-variant-numeric: tabular-nums;
-}
-.playback-duration p {
-  margin: 10px 0 0;
-  font-size: 12px;
 }
 @media (max-width: 600px) {
   .playback-settings {
@@ -164,12 +166,32 @@
   .playback-volume-row .volume-slider {
     width: 100%;
   }
-  .playback-duration-label {
-    flex-wrap: wrap;
-    gap: 8px;
+  .fade-row, .fade-durations {
+    gap: 8px 6px;
   }
-  .playback-duration-label > span {
-    flex-basis: 100%;
+  .fade-toggle {
+    flex-direction: column;
+    gap: 3px;
+  }
+  .fade-toggle input.playback-switch {
+    flex: none;
+  }
+  .fade-duration {
+    flex-direction: column;
+    gap: 2px;
+  }
+  .fade-duration input {
+    appearance: textfield;
+    width: 46px;
+    text-align: center;
+    padding-inline: 2px;
+  }
+  .fade-duration input::-webkit-inner-spin-button {
+    appearance: none;
+  }
+  .fade-durations > span {
+    align-self: end;
+    line-height: 32px;
   }
 }
 @media (prefers-reduced-motion: reduce) {

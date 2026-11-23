@@ -154,11 +154,40 @@ function AboutSettings() {
   );
 }
 
+const fadeDurations = [["trackMs", "切歌"], ["pauseMs", "暂停"], ["seekMs", "跳转"]] as const;
+
+function FadeDuration({ label, value, disabled, change }: {
+  label: string; value: number; disabled: boolean; change: (value: number) => void;
+}) {
+  const [draft, setDraft] = useState<string | null>(null);
+  return (
+    <label className="fade-duration">
+      <span>{tr(label)}</span>
+      <input
+        aria-label={tr("{action}淡出淡入时长（毫秒）", { action: tr(label) })}
+        type="number" min={0} max={2000} step={1} disabled={disabled}
+        value={draft ?? value}
+        onChange={({ currentTarget }) => {
+          setDraft(currentTarget.value);
+          if (Number.isInteger(currentTarget.valueAsNumber) && currentTarget.validity.valid) change(currentTarget.valueAsNumber);
+        }}
+        onBlur={({ currentTarget }) => {
+          const number = currentTarget.valueAsNumber;
+          if (Number.isFinite(number)) {
+            const bounded = Math.max(0, Math.min(2000, Math.round(number)));
+            if (bounded !== value) change(bounded);
+          }
+          setDraft(null);
+        }}
+      />
+    </label>
+  );
+}
+
 function PlaybackSettings() {
   const s = useServices();
   const prefs = useStore(s.preferences);
   const { supported } = useStore(s.localDSP);
-  const [fadeDraft, setFadeDraft] = useState<string | null>(null);
   return (
     <div className="settings-card playback-settings">
       <h3>{tr("播放")}</h3>
@@ -179,56 +208,26 @@ function PlaybackSettings() {
           onChange={(e) => s.preference({ processing: e.target.checked })}
         />
       </label>
-      <div className="playback-setting-divider">
-        <label className="playback-setting-row">
-          <span className="playback-setting-label">{tr("进度跳转淡出淡入")}</span>
+      <div className="playback-setting-row playback-setting-divider fade-row">
+        <label className="fade-toggle">
+          <span className="playback-setting-label">{tr("淡出淡入")}</span>
           <input
             className="playback-switch"
             type="checkbox"
-            checked={prefs.seekFadeEnabled}
+            checked={prefs.fades.enabled}
             disabled={!supported}
-            onChange={(event) => s.preference({ seekFadeEnabled: event.target.checked })}
+            onChange={(event) => s.preference({ fades: { ...s.preferences.value.fades, enabled: event.target.checked } })}
           />
         </label>
-        <label className="playback-setting-row">
-          <span className="playback-setting-label">{tr("切歌淡出淡入")}</span>
-          <input
-            className="playback-switch"
-            type="checkbox"
-            aria-label={tr("切歌淡出淡入")}
-            checked={prefs.trackFadeEnabled}
-            disabled={!supported}
-            onChange={(event) => s.preference({ trackFadeEnabled: event.target.checked })}
-          />
-        </label>
-        {(prefs.seekFadeEnabled || prefs.trackFadeEnabled) && <div className="playback-duration">
-          <label className="playback-duration-label">
-            <span>{tr("淡出淡入时长（毫秒）")}</span>
-            <input
-              aria-label={tr("淡出淡入时长（毫秒）")}
-              aria-describedby="playback-fade-help"
-              type="number"
-              min={100}
-              max={2000}
-              step={1}
-              disabled={!supported}
-              value={fadeDraft ?? prefs.fadeDurationMs}
-              onChange={(event) => {
-                const value = event.target.value;
-                setFadeDraft(value);
-                const number = Number(value);
-                if (value.trim() && Number.isInteger(number) && number >= 100 && number <= 2000) s.preference({ fadeDurationMs: number });
-              }}
-              onBlur={() => {
-                if (fadeDraft !== null && fadeDraft.trim() && Number.isFinite(Number(fadeDraft))) {
-                  s.preference({ fadeDurationMs: Math.max(100, Math.min(2000, Math.round(Number(fadeDraft)))) });
-                }
-                setFadeDraft(null);
-              }}
+        <div className="fade-durations">
+          {fadeDurations.map(([field, label]) => (
+            <FadeDuration key={field} label={label} value={prefs.fades[field]}
+              disabled={!supported || !prefs.fades.enabled}
+              change={(value) => s.preference({ fades: { ...s.preferences.value.fades, [field]: value } })}
             />
-          </label>
-          <p className="muted" id="playback-fade-help">{tr("100–2000 毫秒，默认 300 毫秒。此时长分别用于淡出和淡入。")}</p>
-        </div>}
+          ))}
+          <span aria-hidden="true">ms</span>
+        </div>
       </div>
       <label className="playback-setting-row playback-setting-divider">
         <span className="playback-setting-label">{tr("自动音量平衡")}</span>

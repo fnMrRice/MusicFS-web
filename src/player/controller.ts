@@ -15,7 +15,7 @@ import { ControlQueue, isUncertain } from "./control-queue";
 import { RecoveryBudget } from "./recovery";
 import { trackPosition, seekAllowed } from "./timeline";
 import { playbackErrorMessage } from "./errors";
-import { PlaybackTransitions } from "./playback-transitions";
+import { PlaybackTransitions, type FadeSettings } from "./playback-transitions";
 
 export class PlayerController {
   state = initialState();
@@ -34,8 +34,8 @@ export class PlayerController {
   private pendingSelection: number | null = null;
   private seekingOut = false;
   private transitions = new PlaybackTransitions();
-  setTransitions(trackFadeEnabled: boolean, seekFadeEnabled: boolean, durationMs: number): void {
-    this.transitions.configure(trackFadeEnabled, seekFadeEnabled, durationMs, this.audio);
+  setTransitions(settings: FadeSettings): void {
+    this.transitions.configure(settings, this.audio);
   }
   setVolume(value: number): void {
     this.volume = Math.max(0, Math.min(1, value));
@@ -44,7 +44,7 @@ export class PlayerController {
   toggle(): void {
     if (this.state.wantsPlay) {
       this.state.wantsPlay = false;
-      this.audio?.pause();
+      this.transitions.pause(this.audio, this.state.phase === "playing" && !this.seekingOut && this.pendingSelection === null);
       this.clearBufferingTimer();
       this.state.phase = "paused";
       this.emit();
@@ -53,9 +53,11 @@ export class PlayerController {
       this.state.wantsPlay = true;
       const generation = this.generation;
       const audio = this.audio;
+      if (this.transitions.resume(audio)) this.state.phase = "playing";
       if (audio)
-        void audio.play().catch(() => {
-          if (generation !== this.generation || this.audio !== audio) return;
+        void audio.play().catch((error: unknown) => {
+          if (generation !== this.generation || this.audio !== audio || !this.state.wantsPlay ||
+              (error instanceof DOMException && error.name === "AbortError")) return;
           this.state.wantsPlay = false;
           this.state.phase = "paused";
           this.state.message = "播放未能开始，请再次点击播放。";
@@ -80,7 +82,7 @@ export class PlayerController {
     this.seekingOut = false;
     let wantsPlay = true;
     if (this.state.wantsPlay && this.state.phase === "playing") {
-      const outgoing = this.transitions.fadeOut("track", this.audio);
+      const outgoing = this.transitions.fadeOut("trackMs", this.audio);
       if (outgoing) {
         this.pendingSelection = selection;
         await outgoing;
@@ -90,7 +92,7 @@ export class PlayerController {
       }
     }
     this.stop();
-    this.transitions.prepareIncoming("track");
+    this.transitions.prepareIncoming("trackMs");
     // 浏览器音效始终由本地执行；旧服务端配置不得叠加到新会话。
     preferences = { ...preferences, gainDb: 0, dspExecution: "client" };
     const generation = this.generation;
@@ -166,7 +168,7 @@ export class PlayerController {
     ++this.selection;
     this.pendingSelection = null;
     this.seekingOut = false;
-    this.transitions.reset();
+    this.transitions.stop();
     ++this.generation;
     this.controller?.abort();
     this.queue?.dispose();
@@ -210,7 +212,7 @@ export class PlayerController {
       this.observe(event);
     }, playback.outputProfile.channels);
     this.audio.setVolume?.(this.volume);
-    this.transitions.fadeIn(this.audio);
+    if (this.state.wantsPlay) this.transitions.fadeIn(this.audio);
     this.emit();
     if (this.state.wantsPlay) this.playAttached(playback, generation);
     else {
@@ -240,6 +242,7 @@ export class PlayerController {
     });
   }
   private observe(event: MediaObservation): void {
+    if (event.type === "ended" && this.transitions.userPaused) return;
     // 淡出定位期间若旧位置自然播完，仍以用户刚选择的位置继续。
     if (this.seekingOut && (event.type === "ended" || (event.type === "pause" && this.audio?.ended))) return;
     if (this.state.playback)
@@ -254,6 +257,8 @@ export class PlayerController {
         break;
       }
       case "playing":
+        if (this.transitions.pausing || event.paused) return;
+        this.transitions.userPaused = false;
         this.reportStarted();
         this.clearBufferingTimer();
         this.state.phase = "playing";
@@ -347,7 +352,7 @@ export class PlayerController {
       this.onSelectionCancelled?.();
     }
     const outgoing = this.state.wantsPlay && this.state.phase === "playing"
-      ? this.transitions.fadeOut("seek", audio) : undefined;
+      ? this.transitions.fadeOut("seekMs", audio) : undefined;
     this.seekingOut = !!outgoing;
     if (outgoing) {
       await outgoing;
@@ -355,7 +360,7 @@ export class PlayerController {
       this.seekingOut = false;
       if (this.audio !== audio) return;
     } else this.transitions.reset(audio);
-    if (this.state.wantsPlay) this.transitions.prepareIncoming("seek");
+    if (this.state.wantsPlay) this.transitions.prepareIncoming("seekMs");
     if (serverSeek) {
       this.clearBufferingTimer();
       audio?.destroy();
