@@ -18,6 +18,7 @@ import graphicEqualizer from "./graphic-equalizer";
 import audioOutput from "./audio-output";
 import workNavigation from "./work-navigation";
 import bilibili from "./bilibili";
+import onlineDownloads from "./online-downloads";
 
 export type Locale = "en" | "zh-CN" | "zh-TW" | "ja";
 export type Language = "browser" | Locale;
@@ -42,6 +43,7 @@ const messages: Record<string, readonly string[]> = {
   ...audioOutput,
   ...workNavigation,
   ...bilibili,
+  ...onlineDownloads,
 };
 const columns: Record<Locale, number> = {
   en: 0,

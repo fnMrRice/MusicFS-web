@@ -192,7 +192,7 @@ function DiscoveryDetails({ source, external }: { source: OnlineInstance; extern
               <ErrorNotice error={playback.error} />
             </div>
           </div>
-          <OnlinePlaylistTracks key={query.data.observedAt} source={source} external={external} />
+          <OnlinePlaylistTracks key={query.data.observedAt} source={source} observation={query.data} />
         </>
       )}
       {jobId && <div className="notice"><PlaylistSyncStatus key={jobId} jobId={jobId} />

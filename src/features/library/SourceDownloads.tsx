@@ -15,7 +15,7 @@ function qualityLabel(version: DownloadVersion): string {
   return Object.hasOwn(qualityNames, version.quality) ? tr(qualityNames[version.quality]) : version.quality;
 }
 
-function versionLabel(version: DownloadVersion): string {
+export function versionLabel(version: DownloadVersion): string {
   return [qualityLabel(version), (version.codec || version.container || version.mime).toUpperCase(),
     version.bitrateBps && `${Math.round(version.bitrateBps / 1000)} kbps`].filter(Boolean).join(" · ");
 }

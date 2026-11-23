@@ -1,7 +1,7 @@
-import { useServices } from "../../app/services";
+import { useServices, useStore } from "../../app/services";
 import { usePages } from "../../components/query";
 import { ApiError } from "../../api/client";
-import type { OnlineInstance, OnlinePlaylist, OnlineTrack } from "../../api/content";
+import type { Observation, OnlineInstance, OnlinePlaylist, OnlineTrack } from "../../api/content";
 import { ErrorNotice, Sentinel } from "../../components/ui";
 import { OnlineTrackTable } from "../OnlineTrackTable";
 import { tr } from "../../i18n";
@@ -10,8 +10,13 @@ import { withRateLimitRetry } from "../../api/rate-limit";
 interface Item { position: number; externalId: string; track: OnlineTrack | null; errorCode: string | null }
 interface TrackPage { playlist: OnlinePlaylist; items: Item[]; nextCursor: string | null; complete: boolean }
 
-export function OnlinePlaylistTracks({ source, external }: { source: OnlineInstance; external: string }) {
+export function OnlinePlaylistTracks({ source, observation }: { source: OnlineInstance; observation: Observation }) {
   const s = useServices();
+  const external = observation.playlist.externalId;
+  const { ready, session } = useStore(s.auth);
+  const downloadScope = ready && session ? JSON.stringify([
+    ready.instanceId, session.user.id, source.instanceId, source.accountId ?? "", external,
+  ]) : undefined;
   const instance = source.instanceId;
   const pages = usePages(`online-playlist:${instance}:${external}`, async (cursor, signal) => {
     const query = new URLSearchParams({ limit: "30" });
@@ -27,7 +32,7 @@ export function OnlinePlaylistTracks({ source, external }: { source: OnlineInsta
     return { items: page.items, cursor: page.nextCursor };
   }, (item) => String(item.position));
   return <>
-    <OnlineTrackTable source={source} rows={pages.items} />
+    <OnlineTrackTable key={downloadScope} source={source} rows={pages.items} downloadScope={downloadScope} observation={observation} />
     <ErrorNotice error={pages.error} retry={pages.retry} />
     {pages.loading && <p className="loading">{tr("正在读取歌单…")}</p>}
     <Sentinel active={!!pages.cursor && !pages.loading && !pages.error} load={pages.more} />
