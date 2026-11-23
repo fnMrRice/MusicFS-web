@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import QRCode from "qrcode";
+import { version as webVersion } from "../../../package.json";
 import { useServices, useStore } from "../../app/services";
 import { errorMessage } from "../../api/client";
 import type { OnlineInstance } from "../../api/content";
@@ -194,7 +195,7 @@ export function usePlatformAccount(instance: OnlineInstance) {
         if (!options.developerToken) return;
         const api = await loadMusicKit();
         if (!current(version)) return;
-        const kit = await api.configure({ developerToken: options.developerToken, app: { name: "MusicFS", build: "0.1.0" } });
+        const kit = await api.configure({ developerToken: options.developerToken, app: { name: "MusicFS", build: webVersion } });
         if (!current(version)) return;
         // Clear a previous browser authorization before requesting a new account.
         await kit.unauthorize();

@@ -66,6 +66,30 @@ async function mockAccounts(
   return { actions, completed, get csrfSeen() { return csrfSeen; }, get searches() { return searches; } };
 }
 
+test("Apple Music authorization uses the published Web version as its build number", async ({ page }) => {
+  await mockAccounts(page, () => ({ state: "waiting", method: "musicKit", loginId: "apple" }));
+  await page.route("**/api/v1/online-instances", route => route.fulfill({ json: { items: [{
+    instanceId: instanceIds.applemusic, name: "Apple Music", platform: "applemusic", availability: "loginRequired",
+    plugin: { id: "musicfs.plugin.source.applemusic", name: "Apple Music", features: ["music-source"], localizedNames: {} },
+    capabilities: [],
+  }] } }));
+  await page.route("**/account/options", route => route.fulfill({
+    json: { method: "musicKit", configured: true, developerToken: "fixture" },
+  }));
+  await page.addInitScript(() => {
+    window.MusicKit = { configure: async ({ app }) => {
+      document.documentElement.dataset.musicKitBuild = app.build;
+      return { authorize: async () => "fixture", unauthorize: async () => {} };
+    } };
+  });
+  const manifest = await page.request.get(`${server.origin}/version.json`);
+  expect(manifest.ok()).toBe(true);
+  const { webVersion } = await manifest.json();
+  await page.goto(`${server.origin}/#/settings`);
+  await page.getByRole("button", { name: "登录Apple Music", exact: true }).click();
+  await expect(page.locator("html")).toHaveAttribute("data-music-kit-build", webVersion);
+});
+
 test("platform login opens a loading dialog, renders QR pixels and account identity, and logs out only the platform", async ({ page }) => {
   const begin = deferred<Account | undefined>();
   const mock = await mockAccounts(page, ({ action }) => action === "begin" ? begin.promise : undefined);
