@@ -10,6 +10,7 @@ import { useSourceName } from "../components/use-source-name";
 import { OnlinePlaylistTracks } from "./playlists/OnlinePlaylistTracks";
 import { externalLink } from "./scrapers/fields";
 import { useRecommendations } from "./useRecommendations";
+import { DailySongs } from "./DailySongs";
 
 export function Recommendations() {
   const s = useServices();
@@ -17,15 +18,19 @@ export function Recommendations() {
   const sources = useStore(s.content.onlineInstances);
   const scope = [ready?.instanceId, session?.user.id, sources.map((source) =>
     [source.instanceId, source.accountId, source.accountRevision, source.availability])];
-  return <RecommendationFeed key={JSON.stringify(scope)} />;
+  const dailySources = sources.filter((source) => source.accountId && source.availability === "available" &&
+    source.capabilities.some((capability) => capability.name === "recommendations.tracks" && capability.supported));
+  return <RecommendationFeed key={JSON.stringify(scope)} dailySources={dailySources} />;
 }
 
-function RecommendationFeed() {
+function RecommendationFeed({ dailySources }: { dailySources: OnlineInstance[] }) {
   useLocale();
   const sourceName = useSourceName();
   const feed = useRecommendations(useServices().content);
   return (
     <section>
+      {feed.offset === 0 && dailySources.map((source) => <DailySongs key={source.instanceId} source={source} />)}
+      {dailySources.length > 0 && <h2>{tr("推荐歌单")}</h2>}
       <div className="recommendation-actions">
         {feed.offset > 0 && (
           <>
