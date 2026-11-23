@@ -58,7 +58,7 @@ export function PlaylistLinkDialog({ target, title, linkedId, close, changed }: 
           {!choice && <label>{tr("歌单名称")}
             <input required maxLength={256} value={name} disabled={busy} onChange={(event) => setName(event.target.value)} />
           </label>}
-          <p className="muted">{tr("关联后，在本地歌单中新增的同平台曲目会同步到这张远程歌单。")}</p>
+          <p className="muted">{tr("远程曲目将加入曲库和所选歌单。以后在本地添加的同平台曲目也会同步到远程歌单。")}</p>
         </>}
       <ErrorNotice error={error} />
       <button className="primary" disabled={busy || (!linkedId && !choice && !name.trim())}>

@@ -76,8 +76,6 @@ export default {
   "{0} 请求编号：{1}": ["{0} Request ID: {1}", "{0} 請求編號：{1}", "{0} リクエスト ID：{1}"],
   "需要已就绪的 MusicFS API v1 服务。": ["A ready MusicFS API v1 server is required.", "需要已就緒的 MusicFS API v1 服務。", "利用可能な MusicFS API v1 サーバーが必要です。"],
   "关键词过长，请缩短后重试。": ["Your keywords are too long. Shorten them and try again.", "關鍵字過長，請縮短後重試。", "キーワードが長すぎます。短くしてお試しください。"],
-  "此歌单已经导入，可在歌单管理中同步和绑定。": ["This playlist is already imported. Sync or bind it in Playlists.", "此歌單已匯入，可在歌單管理中同步和綁定。", "このプレイリストはインポート済みです。管理画面で同期や連携を行えます。"],
-  "已记录导入，可在歌单管理中同步和绑定。": ["Import registered. Sync or bind it in Playlists.", "已記錄匯入，可在歌單管理中同步和綁定。", "インポートを登録しました。管理画面で同期や連携を行えます。"],
   "收藏接口尚未提供": ["Favorites are not supported yet", "收藏介面尚未提供", "お気に入りは未対応です"],
   "等待收藏接口": ["Awaiting favorites support", "等待收藏介面", "お気に入り機能への対応待ちです"],
   "等待服务端提供全库关键词查询": ["Awaiting library-wide search support", "等待伺服器提供全庫關鍵字查詢", "ライブラリ全体の検索への対応待ちです"],

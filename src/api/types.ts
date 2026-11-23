@@ -12,6 +12,10 @@ export interface Provider {
   configuration?: { schemaRevision: string } | null;
   roots?: { id: string; name: string }[];
 }
+export interface DownloadVersion {
+  versionId: string; quality: string; mime: string; codec: string; container: string;
+  sizeBytes: number; bitrateBps?: number; downloadedAt: string;
+}
 export interface SourceTrack {
   sourceTrackId: string; providerInstanceId: string; displayName: string;
   title: string | null; artists: string[] | null; durationMs: number | null;
@@ -22,6 +26,8 @@ export interface SourceTrack {
   availability: string; assetId: string | null; recordingId?: string | null;
   asset?: { fileSizeBytes?: number | null } | null;
   manualSourceTrackId?: string | null;
+  downloaded?: boolean;
+  downloadVersions?: DownloadVersion[];
   versions?: SourceTrack[];
   playbackSelection?: { trackId: string; forcedSourceTrackId: string | null };
 }

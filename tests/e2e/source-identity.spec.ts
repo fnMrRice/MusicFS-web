@@ -1,4 +1,5 @@
 import { instanceIds, neteasePlugin } from "../fixtures/plugins";
+import { musicTrack } from "../fixtures/music-catalog";
 import { expect, test, type Page } from "@playwright/test";
 import { preview, type PreviewServer } from "vite";
 
@@ -325,7 +326,7 @@ test("NetEase playlists appear in management and navigation, link once, accept t
   const local = { playlistId: "local-1", name: "开车听", bindings: [], ruleRevision: 1, snapshotRevision: 0, hideRevision: 0, stale: true };
   let created = false, linked = false, additions = 0, linkAttempts = 0, referenceAttempts = 0;
   let targetPlaylistId = local.playlistId;
-  const link = () => ({ platform: "netease", instanceId, accountId, externalId: own.externalId, playlistId: targetPlaylistId, pendingCount: additions });
+  const link = () => ({ platform: "netease", instanceId, accountId, externalId: own.externalId, playlistId: targetPlaylistId, pendingCount: additions, jobId: "catalog-import" });
   await page.route("**/api/v1/**", async (route) => {
     const req = route.request(), path = new URL(req.url()).pathname;
     let json: unknown = { items: [], nextAfter: null, nextCursor: null };
@@ -359,6 +360,16 @@ test("NetEase playlists appear in management and navigation, link once, accept t
       json = { items: [{ remoteSourceId: "ref-21" }] };
     }
     if (path.endsWith("/playlist-links")) json = { items: linked ? [link()] : [] };
+    if (path.endsWith("/remote-playlist-sync-jobs/catalog-import")) json = { jobId: "catalog-import", state: "succeeded", resultRevision: 1, error: null };
+    if (path.endsWith("/me/favorites")) {
+      const sourceTrack = { ...track, sourceTrackId: "source-21", providerInstanceId: instanceId, displayName: track.title,
+        availability: "available", assetId: "asset-21", container: null, codec: null, bitrateBps: null,
+        downloaded: true, downloadVersions: [["exhigh", "mp3", "audio/mpeg"], ["lossless", "flac", "audio/flac"]].map(([quality, codec, mime]) => ({
+          versionId: quality, quality, mime, codec, container: codec, sizeBytes: 2097152, downloadedAt: "2026-11-20T12:00:00Z",
+        })) };
+      json = { items: linked && targetPlaylistId === "favorites" ? [{ musicTrack: musicTrack(sourceTrack), track: sourceTrack,
+        recordedAt: "2026-11-20T12:00:00Z", forcedSourceTrackId: null }] : [], nextCursor: null, revision: linked ? "2" : "1" };
+    }
     if (path.endsWith(`/playlists/${own.externalId}/link`)) {
       expect(path).toContain(instanceId);
       expect(req.postDataJSON()).toEqual({ accountId, playlistId: targetPlaylistId });
@@ -447,6 +458,13 @@ test("NetEase playlists appear in management and navigation, link once, accept t
   await dialog.getByRole("button", { name: "关联本地歌单" }).click();
   const favoritesLink = group.getByRole("link", { name: "已关联：我的收藏" });
   await expect(favoritesLink).toHaveAttribute("href", "#/favorites");
+  await expect(group.getByRole("status")).toContainText("已完成");
+  await favoritesLink.click();
+  await expect(page.getByRole("button", { name: "播放 序曲", exact: true })).toBeVisible();
+  await page.getByText("已下载 · 2 个版本").click();
+  await expect(page.locator(".source-downloads li")).toHaveCount(2);
+  await expect(page.locator(".source-downloads").getByText(/无损 · FLAC/)).toBeVisible();
+  await page.goBack();
   await group.getByRole("button", { name: "解除关联" }).click();
   await expect(dialog.getByText(/解除与「我的收藏」的关联/)).toBeVisible();
   await dialog.getByRole("button", { name: "解除关联" }).click();

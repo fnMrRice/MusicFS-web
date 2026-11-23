@@ -1,5 +1,5 @@
 import { tr, useLocale } from "../../i18n";
-import { useState } from "react";
+import { useEffect, useEffectEvent, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useServices } from "../../app/services";
 import { usePages, useResource } from "../../components/query";
@@ -18,6 +18,8 @@ export function PlaylistDetail() {
     s.content.playlist(id, signal),
   );
   const [editing, setEditing] = useState(false);
+  const reload = useEffectEvent(() => detail.reload());
+  useEffect(() => s.activity.subscribe("playlistSync", () => reload()), [s]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const rebuild = async () => {

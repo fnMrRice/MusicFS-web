@@ -15,7 +15,7 @@ export function Favorites() {
   const [params, setParams] = useSearchParams();
   const provider = params.get("source") || "all";
   const providers = useResource("providers", (signal) => s.libraryApi.providers(signal));
-  useEffect(() => { void s.favorites.load(); }, [s]);
+  useEffect(() => s.activity.watch("playlistSync", async () => { await s.favorites.load(true); }).stop, [s]);
   const tracks = favorites.items.filter((track) => provider === "all" || track.selectedSource?.versions?.some((source) => source.providerInstanceId === provider));
   return <section aria-label={tr("我的收藏")}>
     <div className="filters">

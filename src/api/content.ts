@@ -103,6 +103,7 @@ export interface SnapshotPage {
 }
 export interface RemotePlaylist {
   playlistId: string;
+  jobId?: string;
   instanceId: string;
   externalId: string;
   title: string;
@@ -353,7 +354,7 @@ export class ContentApi {
   async importRemote(
     instanceId: string,
     externalId: string,
-  ): Promise<{ playlist: RemotePlaylist; merged: boolean }> {
+  ): Promise<{ playlist: RemotePlaylist; merged: boolean; jobId: string }> {
     const instances = await this.online();
     if (instances.find((instance) => instance.instanceId === instanceId)?.authentication === "anonymous") {
       return this.write("/remote-playlists", { instanceId, externalId, accountId: "" });

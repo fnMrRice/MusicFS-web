@@ -1,4 +1,13 @@
 export default {
+  "已下载": ["Downloaded", "已下載", "ダウンロード済み"],
+  "已下载 · {0} 个版本": ["Downloaded · {0} version(s)", "已下載 · {0} 個版本", "ダウンロード済み · {0} バージョン"],
+  "标准": ["Standard", "標準", "標準"],
+  "极高": ["Very high", "極高", "最高音質"],
+  "无损": ["Lossless", "無損", "ロスレス"],
+  "高解析度无损": ["Hi-Res Lossless", "高解析度無損", "ハイレゾロスレス"],
+  "高清臻音": ["HD Pure Sound", "高清臻音", "HDピュアサウンド"],
+  "超清母带": ["Ultra HD Master", "超清母帶", "ウルトラHDマスター"],
+  "沉浸环绕声": ["Immersive Surround", "沉浸環繞聲", "没入型サラウンド"],
   "此音乐来源暂时离线，请检查来源状态后重试。": ["This music source is offline. Check its status and try again.", "此音樂來源暫時離線，請檢查來源狀態後重試。", "この音楽ソースはオフラインです。状態を確認して再試行してください。"],
   "来源文件已发生变化，请重新扫描曲库。": ["The source file has changed. Scan the library again.", "來源檔案已發生變更，請重新掃描曲庫。", "ソースファイルが変更されました。ライブラリを再スキャンしてください。"],
   "未找到该内容，可能已被移除。": ["This content could not be found. It may have been removed.", "找不到該內容，可能已被移除。", "コンテンツが見つかりません。削除された可能性があります。"],

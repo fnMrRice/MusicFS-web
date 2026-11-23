@@ -1,4 +1,4 @@
-import { tr, useLocale, formatDate, statusText } from "../i18n";
+import { tr, useLocale, formatDate } from "../i18n";
 import { Link, useParams } from "react-router-dom";
 import { useState } from "react";
 import { useServices, useStore } from "../app/services";
@@ -9,6 +9,7 @@ import { Cover, Empty, ErrorNotice, Icon, IconButton } from "../components/ui";
 import { errorMessage } from "../api/client";
 import { useSourceName } from "../components/use-source-name";
 import { OnlinePlaylistTracks } from "./playlists/OnlinePlaylistTracks";
+import { PlaylistSyncStatus } from "./playlists/PlaylistSyncStatus";
 import { usePlaylistObservation } from "./playlists/usePlaylistObservation";
 import { externalLink } from "./scrapers/fields";
 import { useRecommendations } from "./useRecommendations";
@@ -147,18 +148,14 @@ function DiscoveryDetails({ source, external }: { source: OnlineInstance; extern
   const instance = source.instanceId;
   const query = usePlaylistObservation(s.content, source, external);
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState("");
+  const [jobId, setJobId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const importPlaylist = async () => {
     setBusy(true);
     setError(null);
     try {
       const result = await s.content.importRemote(instance, external);
-      setMessage(
-        result.merged
-          ? "此歌单已经导入，可在歌单管理中同步和绑定。"
-          : "已记录导入，可在歌单管理中同步和绑定。",
-      );
+      setJobId(result.jobId);
     } catch (e) {
       setError(errorMessage(e));
     } finally {
@@ -186,7 +183,7 @@ function DiscoveryDetails({ source, external }: { source: OnlineInstance; extern
                   : tr("本次读取不完整")}
               </p>
               <div className="list-actions">
-                <button type="button" className="primary" disabled={busy || !!message} onClick={() => void importPlaylist()}>
+                <button type="button" className="primary" disabled={busy || !!jobId} onClick={() => void importPlaylist()}>
                   {busy ? tr("正在导入…") : tr("导入到歌单管理")}
                 </button>
                 <button type="button" onClick={query.refresh}>{tr("刷新歌单")}</button>
@@ -203,11 +200,8 @@ function DiscoveryDetails({ source, external }: { source: OnlineInstance; extern
           <OnlinePlaylistTracks key={query.data.observedAt} source={source} external={external} />
         </>
       )}
-      {message && (
-        <p role="status" className="notice">
-          {statusText(message)} <Link to="/playlists">{tr("前往管理")}</Link>
-        </p>
-      )}
+      {jobId && <div className="notice"><PlaylistSyncStatus key={jobId} jobId={jobId} />
+        <Link to="/playlists">{tr("前往管理")}</Link></div>}
       <ErrorNotice error={error} />
     </section>
   );

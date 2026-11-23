@@ -13,13 +13,15 @@ export interface PlaylistLink {
   playlistId: string;
   pendingCount: number;
   lastErrorCode?: string;
+  jobId?: string;
 }
 export type PlaylistLinkTarget = Pick<PlaylistLink, "instanceId" | "accountId" | "externalId">;
 
 function validLink(link: PlaylistLink): boolean {
   return !!link && [link.platform, link.instanceId, link.accountId, link.externalId, link.playlistId].every(
     (value) => typeof value === "string" && value.length > 0)
-    && Number.isSafeInteger(link.pendingCount) && link.pendingCount >= 0;
+    && Number.isSafeInteger(link.pendingCount) && link.pendingCount >= 0
+    && (link.jobId === undefined || typeof link.jobId === "string" && link.jobId.length > 0);
 }
 export async function playlistLinks(client: ApiClient, signal: AbortSignal): Promise<PlaylistLink[]> {
   const result = await client.request<{ items: PlaylistLink[] }>("/playlist-links", { signal });

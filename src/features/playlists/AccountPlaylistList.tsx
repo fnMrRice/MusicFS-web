@@ -9,6 +9,7 @@ import { useSourceName } from "../../components/use-source-name";
 import { ErrorNotice, Icon, SectionToggle } from "../../components/ui";
 import { formatDate, tr, useLocale } from "../../i18n";
 import { PlaylistLinkDialog } from "./PlaylistLinkDialog";
+import { PlaylistSyncStatus } from "./PlaylistSyncStatus";
 import { partitionAccountPlaylists, useAccountPlaylistFolders } from "./account-playlist-folders";
 
 export const remotePlaylistPath = (instanceId: string, externalId: string) =>
@@ -80,6 +81,7 @@ function AccountPlaylistList({ source, heading, management, links }: {
           <Icon name="album" /><strong>{title}</strong>
           <small>{tr("{0} 首", { 0: playlist.trackCount ?? tr("未知数量") })}</small>
         </Link>
+        {link?.jobId && <PlaylistSyncStatus key={link.jobId} jobId={link.jobId} />}
         {(syncStatus || (!management && target)) && <p className="muted">
           {!management && target}{!management && syncStatus && " · "}{syncStatus}
         </p>}

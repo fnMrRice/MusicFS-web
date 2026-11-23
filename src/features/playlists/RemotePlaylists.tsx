@@ -1,12 +1,13 @@
 import { tr, useLocale, formatDate } from "../../i18n";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 import { Link } from "react-router-dom";
 import { useServices } from "../../app/services";
 import { usePages, useResource } from "../../components/query";
 import { ErrorNotice, Sentinel } from "../../components/ui";
 import { Modal } from "../../components/Modal";
-import { ApiError, errorMessage } from "../../api/client";
-import type { Observation, RemotePlaylist, SyncJob } from "../../api/content";
+import { errorMessage } from "../../api/client";
+import type { Observation, RemotePlaylist } from "../../api/content";
+import { PlaylistSyncStatus } from "./PlaylistSyncStatus";
 import { useSourceName } from "../../components/use-source-name";
 export function RemotePlaylists() {
   useLocale();
@@ -42,7 +43,7 @@ export function RemotePlaylists() {
       const bilibili = providers.data?.find((p) => p.instanceId === instance)?.platform === "bilibili";
       const canonical = bilibili ? (await s.content.playlistReference(instance, external)).externalId : external.trim();
       const result = await s.content.importRemote(instance, canonical);
-      updated(result.playlist);
+      updated({ ...result.playlist, jobId: result.jobId });
       setOpen(false);
     } catch (e) {
       setError(errorMessage(e));
@@ -73,7 +74,7 @@ export function RemotePlaylists() {
       <ErrorNotice error={page.error} retry={page.retry} />
       {Array.from(playlists.values(), p => (
         <RemoteRow
-          key={p.playlistId}
+          key={`${p.playlistId}:${p.jobId ?? ""}`}
           playlist={p}
           sourceLabel={sourceName(
             providers.data?.find(
@@ -132,7 +133,7 @@ export function RemotePlaylists() {
               />
             </label>
             <p className="muted">
-              {tr("导入仅登记绑定；导入后请点击同步读取曲目。")}
+              {tr("导入后会自动同步歌单，并将曲目及其来源加入曲库。")}
             </p>
             <ErrorNotice error={error || providers.error} />
             {bilibili && <>
@@ -161,44 +162,16 @@ function RemoteRow({
 }) {
   useLocale();
   const s = useServices();
-  const [job, setJob] = useState<SyncJob | null>(null);
-  const [jobId, setJobId] = useState<string | null>(null);
-  const retryStatus = useRef<() => void>(undefined);
+  const [jobId, setJobId] = useState(p.jobId);
+  const [tracking, setTracking] = useState(!!p.jobId);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  useEffect(() => {
-    if (!jobId) return;
-    const watcher = s.activity.watch("playlistSync", async (signal) => {
-      try {
-        const next = await s.content.syncJob(jobId, signal);
-        if (signal.aborted) return;
-        setJob(next);
-        setError(null);
-        if (!["queued", "running"].includes(next.state)) {
-          const playlist = await s.content.remotePlaylist(p.playlistId, signal);
-          if (signal.aborted) return;
-          updated(playlist);
-          watcher.stop();
-          setJobId(null);
-        }
-      } catch (cause) {
-        if (signal.aborted) return;
-        setError(errorMessage(cause));
-        if (cause instanceof ApiError && cause.status === 404) setJobId(null);
-      }
-    });
-    retryStatus.current = () => watcher.refresh();
-    return () => {
-      watcher.stop();
-      retryStatus.current = undefined;
-    };
-  }, [jobId, p.playlistId, s, updated]);
   const sync = async () => {
     setBusy(true);
     setError(null);
     try {
       const receipt = await s.content.sync(p);
-      setJob(null);
+      setTracking(true);
       setJobId(receipt.jobId);
     } catch (e) {
       setError(errorMessage(e));
@@ -220,23 +193,14 @@ function RemoteRow({
             {tr("上次同步失败（{0}），已有内容仍然保留。", { 0: p.error.code })}
           </p>
         )}
-        {job && (
-          <p role="status">
-            {tr("同步状态：")}
-            {{
-              queued: tr("排队中"),
-              running: tr("同步中"),
-              succeeded: tr("已完成"),
-              failed: tr("失败"),
-              cancelled: tr("已取消"),
-            }[job.state] ?? job.state}
-            {job.error && `（${job.error.code}）`}
-          </p>
-        )}
-        <ErrorNotice error={error} retry={jobId ? () => retryStatus.current?.() : undefined} />
+        {jobId && <PlaylistSyncStatus key={jobId} jobId={jobId} finished={async signal => {
+          const playlist = await s.content.remotePlaylist(p.playlistId, signal);
+          if (!signal.aborted) { updated(playlist); setTracking(false); }
+        }} />}
+        <ErrorNotice error={error} />
       </div>
       <button
-        disabled={busy || jobId !== null}
+        disabled={busy || tracking}
         onClick={() => {
           void sync();
         }}
