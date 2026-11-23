@@ -1,39 +1,57 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import { useServices } from "../app/services";
 import { errorMessage } from "../api/client";
 import { resolveOnlineAudio } from "../api/online-audio";
+import { withRateLimitRetry } from "../api/rate-limit";
 import { ErrorNotice } from "../components/ui";
 import { tr } from "../i18n";
 
-export function OnlineAudioActions({ instance, external, title }: { instance: string; external: string; title: string }) {
+export function useOnlineAudioActions(instance: string, external: string | undefined, latestPlay?: RefObject<AbortController | null>) {
   const s = useServices();
   const request = useRef<AbortController | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => () => { request.current?.abort(); }, [instance, external]);
   async function resolve(play: boolean) {
-    if (request.current) return;
+    if (!external || request.current) return;
     const controller = new AbortController();
+    if (play && latestPlay) {
+      latestPlay.current?.abort();
+      latestPlay.current = controller;
+    }
     request.current = controller;
     setBusy(true);
     setError(null);
     try {
-      const track = await resolveOnlineAudio(s.client, instance, external, controller.signal);
+      const track = await withRateLimitRetry(
+        () => resolveOnlineAudio(s.client, instance, external, controller.signal), controller.signal);
       if (controller.signal.aborted) return;
       if (play) s.play(track); else s.enqueue([track]);
     } catch (e) {
       if (!controller.signal.aborted) setError(errorMessage(e));
     } finally {
+      if (latestPlay?.current === controller) latestPlay.current = null;
       if (request.current === controller) {
         request.current = null;
         setBusy(false);
       }
     }
   }
-  return <div>
-    <button disabled={busy} aria-label={tr("播放 {0}", { 0: title })} onClick={() => void resolve(true)}>{tr("播放")}</button>{" "}
-    <button disabled={busy} onClick={() => void resolve(false)}>{tr("加入队列")}</button>
-    {busy && <span role="status"> {tr("正在准备音频…")} <button onClick={() => request.current?.abort()}>{tr("取消")}</button></span>}
+  return { busy, error, play: () => void resolve(true), enqueue: () => void resolve(false), cancel: () => request.current?.abort() };
+}
+
+export function OnlineAudioFeedback({ busy, error, cancel }: ReturnType<typeof useOnlineAudioActions>) {
+  return <>
+    {busy && <span role="status"> {tr("正在准备音频…")} <button type="button" onClick={cancel}>{tr("取消")}</button></span>}
     <ErrorNotice error={error} />
+  </>;
+}
+
+export function OnlineAudioActions({ instance, external, title }: { instance: string; external: string; title: string }) {
+  const actions = useOnlineAudioActions(instance, external);
+  return <div>
+    <button type="button" disabled={actions.busy} aria-label={tr("播放 {0}", { 0: title })} onClick={actions.play}>{tr("播放")}</button>{" "}
+    <button type="button" disabled={actions.busy} onClick={actions.enqueue}>{tr("加入队列")}</button>
+    <OnlineAudioFeedback {...actions} />
   </div>;
 }

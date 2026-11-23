@@ -19,6 +19,7 @@ export interface OnlineInstance {
 export interface OnlineTrack {
   externalId: string;
   title: string;
+  coverUrl?: string | null;
   artists: string[];
   album: string;
   durationMs: number | null;

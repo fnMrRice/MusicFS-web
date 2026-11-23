@@ -187,6 +187,17 @@
   color: var(--accent);
   background: none;
 }
+.online-track-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+}
+.online-track-title > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .track-credits {
   white-space: normal;
   overflow-wrap: anywhere;
