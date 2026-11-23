@@ -236,11 +236,16 @@ export class ContentApi {
         ),
     );
   }
-  async accountPlaylists(instance: string, cursor: string | null, signal?: AbortSignal): Promise<AccountPlaylistPage> {
+  async accountPlaylists(instance: string, cursor: string | null, signal?: AbortSignal, refresh = false): Promise<AccountPlaylistPage> {
     const query = new URLSearchParams({ limit: "30" });
     if (cursor) query.set("cursor", cursor);
+    else if (refresh) query.set("refresh", "true");
     return checked(
-      await this.client.request<AccountPlaylistPage>(`/online-instances/${id(instance)}/playlists?${query}`, { signal }),
+      await this.client.request<AccountPlaylistPage>(`/online-instances/${id(instance)}/playlists?${query}`, {
+        signal,
+        timeoutMs: !cursor && this.onlineInstances.value.some((source) => source.instanceId === instance && source.platform === "netease")
+          ? 300_000 : undefined,
+      }),
       (r) => list(r.items) && r.items.every((p) => object(p) && string(p.externalId) && string(p.title)) &&
         (r.nextCursor === null || string(r.nextCursor)) && r.consistency === "unversioned" && string(r.observedAt),
     );
@@ -249,10 +254,11 @@ export class ContentApi {
     instance: string,
     external: string,
     signal?: AbortSignal,
+    refresh = false,
   ): Promise<Observation> {
     return checked(
       await withRateLimitRetry(() => this.client.request<Observation>(
-        `/online-instances/${id(instance)}/playlists/${id(external)}`,
+        `/online-instances/${id(instance)}/playlists/${id(external)}${refresh ? "?refresh=true" : ""}`,
         { signal },
       ), signal),
       (r) => object(r.playlist) && string(r.playlist.title) && list(r.entries),

@@ -102,7 +102,7 @@ test("one music-source settings section uses arbitrary plugin translations and k
   await expect(page.getByText("Hidden recommendation alias")).toHaveCount(0);
 });
 
-test("recommendations show playlist artwork, keep cover fallbacks, and open the illustrated preview", async ({ page }) => {
+test("recommendations show cover fallbacks and the playlist preview refreshes details and track pages", async ({ page }) => {
   await mock(page);
   const coverUrl = "https://p1.music.126.net/playlist-cover.png";
   const available = { ...playlist("p1", "Morning mix"), coverUrl };
@@ -115,9 +115,22 @@ test("recommendations show playlist artwork, keep cover fallbacks, and open the 
     instanceId: custom.instanceId, name: custom.name, stale: false, expiresAt: null, lastSuccessAt: null, error: null,
     items: [available, unavailable, empty].map((playlist, position) => ({ playlist, position, reason: "" })),
   }] } }));
-  await page.route(`**/api/v1/online-instances/${custom.instanceId}/playlists/p1`, (route) => route.fulfill({ json: {
-    playlist: available, entries: [], complete: true, observedAt: "2026-10-10T08:00:00Z",
+  let observations = 0;
+  const reads: (string | null)[] = [];
+  const path = `**/api/v1/online-instances/${custom.instanceId}/playlists/p1`;
+  await page.route(path, (route) => route.fulfill({ json: {
+    playlist: { ...available, title: ++observations === 1 ? available.title : "Updated mix" },
+    entries: [], complete: true, observedAt: "2026-10-10T08:00:00Z",
   } }));
+  await page.route(`${path}/tracks?*`, (route) => {
+    const cursor = new URL(route.request().url()).searchParams.get("cursor");
+    reads.push(cursor);
+    if (reads.length === 3) return route.fulfill({ status: 503, json: { error: { code: "TEMPORARY_FAILURE" } } });
+    const position = cursor === null ? 0 : 1;
+    const track = { externalId: String(position), artists: [], title: observations === 1 ? `Previous track ${position}` : "New track" };
+    return route.fulfill({ json: { playlist: available, items: [{ position, externalId: track.externalId, track }],
+      nextCursor: observations === 1 && cursor === null ? "previous-page" : null } });
+  });
 
   await page.goto(`${origin}/#/recommendations`);
   const morning = page.locator("#page-scroll").getByRole("link", { name: /Morning mix/ });
@@ -128,6 +141,15 @@ test("recommendations show playlist artwork, keep cover fallbacks, and open the 
   await morning.click();
   await expect(page.getByRole("heading", { name: "Morning mix" })).toBeVisible();
   await expect.poll(() => page.locator(".detail-heading .cover img").evaluate((img: HTMLImageElement) => img.naturalWidth)).toBe(1);
+  await expect(page.getByText("打开歌单不会自动导入；播放能力由各来源提供。")).toHaveCount(0);
+  await expect(page.getByRole("cell", { name: "Previous track 1" })).toBeVisible();
+  await page.getByRole("button", { name: "刷新歌单", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Updated mix" })).toBeVisible();
+  await page.getByRole("alert").getByRole("button", { name: "重试" }).click();
+  await expect(page.getByRole("cell", { name: "New track" })).toBeVisible();
+  await expect(page.getByRole("cell", { name: /Previous track/ })).toHaveCount(0);
+  expect(observations).toBe(2);
+  expect(reads).toEqual([null, "previous-page", null, null]);
 });
 
 test("recommendations request daily results on open, refresh explicitly, and rewind up to five times", async ({ page }) => {
@@ -283,7 +305,8 @@ test("NetEase playlists appear in management and navigation, link once, accept t
   const track = { externalId: "21", title: "序曲", artists: ["音乐人"], album: "", durationMs: 60000, sourceUrl: "" };
   const local = { playlistId: "local-1", name: "开车听", bindings: [], ruleRevision: 1, snapshotRevision: 0, hideRevision: 0, stale: true };
   let created = false, linked = false, additions = 0, linkAttempts = 0, referenceAttempts = 0;
-  const link = () => ({ platform: "netease", instanceId, accountId, externalId: own.externalId, playlistId: local.playlistId, pendingCount: additions });
+  let targetPlaylistId = local.playlistId;
+  const link = () => ({ platform: "netease", instanceId, accountId, externalId: own.externalId, playlistId: targetPlaylistId, pendingCount: additions });
   await page.route("**/api/v1/**", async (route) => {
     const req = route.request(), path = new URL(req.url()).pathname;
     let json: unknown = { items: [], nextAfter: null, nextCursor: null };
@@ -319,7 +342,7 @@ test("NetEase playlists appear in management and navigation, link once, accept t
     if (path.endsWith("/playlist-links")) json = { items: linked ? [link()] : [] };
     if (path.endsWith(`/playlists/${own.externalId}/link`)) {
       expect(path).toContain(instanceId);
-      expect(req.postDataJSON()).toEqual({ accountId, playlistId: local.playlistId });
+      expect(req.postDataJSON()).toEqual({ accountId, playlistId: targetPlaylistId });
       if (++linkAttempts === 1) return route.fulfill({ status: 429, json: { error: { code: "RATE_LIMITED", retryAfter: 1 } } });
       linked = req.method() === "PUT";
       if (!linked) return route.fulfill({ status: 204 });
@@ -360,5 +383,16 @@ test("NetEase playlists appear in management and navigation, link once, accept t
   await mirror.getByRole("button", { name: "解除关联" }).click();
   await dialog.getByRole("button", { name: "解除关联" }).click();
   await expect(group.getByRole("button", { name: "关联本地歌单" })).toBeEnabled();
+  expect(linked).toBe(false);
+  targetPlaylistId = "favorites";
+  await group.getByRole("button", { name: "关联本地歌单" }).click();
+  await dialog.getByLabel("本地歌单").selectOption({ label: "我的收藏" });
+  await dialog.getByRole("button", { name: "关联本地歌单" }).click();
+  const favoritesLink = group.getByRole("link", { name: "已关联：我的收藏" });
+  await expect(favoritesLink).toHaveAttribute("href", "#/favorites");
+  await group.getByRole("button", { name: "解除关联" }).click();
+  await expect(dialog.getByText(/解除与「我的收藏」的关联/)).toBeVisible();
+  await dialog.getByRole("button", { name: "解除关联" }).click();
+  await expect(favoritesLink).toHaveCount(0);
   expect(linked).toBe(false);
 });

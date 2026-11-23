@@ -2,6 +2,9 @@ import { ApiClient, ApiError } from "./client";
 import { withRateLimitRetry } from "./rate-limit";
 import type { OnlineTrack } from "./content";
 
+// 歌单关联接口使用此标识表示当前用户的系统收藏。
+export const favoritesPlaylistId = "favorites";
+
 export interface PlaylistLink {
   platform: string;
   instanceId: string;

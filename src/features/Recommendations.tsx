@@ -8,6 +8,7 @@ import { Cover, Empty, ErrorNotice, Icon, IconButton } from "../components/ui";
 import { errorMessage } from "../api/client";
 import { useSourceName } from "../components/use-source-name";
 import { OnlinePlaylistTracks } from "./playlists/OnlinePlaylistTracks";
+import { usePlaylistObservation } from "./playlists/usePlaylistObservation";
 import { externalLink } from "./scrapers/fields";
 import { useRecommendations } from "./useRecommendations";
 import { DailySongs } from "./DailySongs";
@@ -127,9 +128,7 @@ export function DiscoveryPlaylist() {
 function DiscoveryDetails({ source, external }: { source: OnlineInstance; external: string }) {
   const s = useServices();
   const instance = source.instanceId;
-  const query = useResource(`${instance}:${external}`, (signal) =>
-    s.content.observation(instance, external, signal),
-  );
+  const query = usePlaylistObservation(s.content, source, external);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -151,7 +150,7 @@ function DiscoveryDetails({ source, external }: { source: OnlineInstance; extern
   };
   return (
     <section>
-      <ErrorNotice error={query.error} retry={query.reload} />
+      <ErrorNotice error={query.error} retry={query.retry} />
       {query.loading && <p className="loading">{tr("正在读取歌单…")}</p>}
       {query.data && (
         <>
@@ -169,22 +168,14 @@ function DiscoveryDetails({ source, external }: { source: OnlineInstance; extern
                   ? tr("本次读取完整")
                   : tr("本次读取不完整")}
               </p>
-              <button
-                className="primary"
-                disabled={busy || !!message}
-                onClick={() => {
-                  void importPlaylist();
-                }}
-              >
-                {busy ? tr("正在导入…") : tr("导入到歌单管理")}
-              </button>
+              <div className="list-actions">
+                <button type="button" className="primary" disabled={busy || !!message} onClick={() => void importPlaylist()}>
+                  {busy ? tr("正在导入…") : tr("导入到歌单管理")}
+                </button>
+                <button type="button" onClick={query.refresh}>{tr("刷新歌单")}</button>
+              </div>
             </div>
           </div>
-          <p className="notice">
-            {tr(
-              "打开歌单不会自动导入；播放能力由各来源提供。",
-            )}
-          </p>
           <p className="muted">
             {tr("本次观测到 {0} 个曲目引用。", {
               0: query.data.entries.length,
@@ -192,7 +183,7 @@ function DiscoveryDetails({ source, external }: { source: OnlineInstance; extern
             {query.data.observedAt &&
               tr("观测时间：{0}", { "0": formatDate(query.data.observedAt) })}
           </p>
-          <OnlinePlaylistTracks source={source} external={external} />
+          <OnlinePlaylistTracks key={query.data.observedAt} source={source} external={external} />
         </>
       )}
       {message && (

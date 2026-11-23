@@ -9,7 +9,6 @@ export default {
   "完整观测": ["Complete observation", "完整觀測", "取得完了"],
   "观测不完整，已有快照不会被替换": ["Incomplete observation; existing snapshots will be retained", "觀測不完整，已有快照不會被替換", "取得が未完了のため、既存のスナップショットを保持します"],
   "公开收藏夹或音频歌单": ["Public favorites or audio playlist", "公開收藏夾或音訊歌單", "公開のお気に入りまたは音声プレイリスト"],
-  "打开歌单不会自动导入；播放能力由各来源提供。": ["Opening a playlist does not import it. Playback support depends on the source.", "開啟歌單不會自動匯入；播放能力由各來源提供。", "プレイリストを開いてもインポートされません。再生機能はソースによって異なります。"],
   "内容已失效或不可用": ["Content is missing or unavailable", "內容已失效或不可用", "コンテンツが無効か利用できません"],
   "正在准备音频…": ["Preparing audio…", "正在準備音訊…", "音声を準備中…"],
 };

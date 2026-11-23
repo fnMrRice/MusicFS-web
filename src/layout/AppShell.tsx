@@ -13,6 +13,7 @@ import { TaskQueue } from "./TaskQueue";
 import { LibraryNavigation } from "./LibraryNavigation";
 import { useWorkTypes, workSectionTitle } from "../features/works/navigation";
 import { remotePlaylistLabel, remotePlaylistPath } from "../features/playlists/AccountPlaylistList";
+import { useForeground } from "../components/use-foreground";
 
 const links = [
   ["/search", "search", "搜索"],
@@ -27,6 +28,9 @@ export function AppShell() {
   const prefs = useStore(s.preferences);
   const playlists = useStore(s.playlists);
   const sources = useMusicSources();
+  useForeground(true, () => {
+    for (const { online } of sources) if (online?.platform === "netease") s.sourcePlaylists.revalidate(online.instanceId);
+  });
   const sourcePlaylists = useStore(s.sourcePlaylists.pages);
   const playlistStatus = useStore(s.sourcePlaylists.status);
   const accountSources = sources.flatMap(({ online }) => online && sourcePlaylists[online.instanceId]?.items.length ? [online] : []);

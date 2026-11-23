@@ -16,9 +16,10 @@ export class SourcePlaylistCatalog {
   private sources = new Map<string, string>();
   private epoch = 0;
   private blocked = new Set<string>();
-  private requests = new Map<string, { controller: AbortController; promise: Promise<AccountPlaylistPage> }>();
+  private requests = new Map<string, { controller: AbortController; cursor: string | null; promise: Promise<AccountPlaylistPage> }>();
   private cursors = new Map<string, Set<string>>();
-  constructor(private load: (instance: string, signal: AbortSignal, cursor: string | null) => Promise<AccountPlaylistPage>) {}
+  private firstPages = new Map<string, AccountPlaylistPage>();
+  constructor(private load: (instance: string, signal: AbortSignal, cursor: string | null, refresh: boolean) => Promise<AccountPlaylistPage>) {}
 
   update(instances: readonly OnlineInstance[]): void {
     const eligible = new Map(instances.filter(supportsAccountPlaylists)
@@ -44,6 +45,7 @@ export class SourcePlaylistCatalog {
     this.requests.get(instance)?.controller.abort();
     this.requests.delete(instance);
     this.cursors.delete(instance);
+    this.firstPages.delete(instance);
     this.blocked.add(instance);
     const pages = { ...this.pages.value };
     delete pages[instance];
@@ -54,11 +56,23 @@ export class SourcePlaylistCatalog {
     this.revisions.set({ ...this.revisions.value, [instance]: (this.revisions.value[instance] ?? 0) + 1 });
   }
 
-  refresh(instance: string): void {
+  refresh(instance: string, force = false): void {
     this.invalidate(instance);
     this.blocked.delete(instance);
     if (!this.sources.has(instance)) return;
-    this.fetch(instance, null);
+    this.fetch(instance, null, force);
+  }
+
+  revalidate(instance: string): void {
+    if (!this.sources.has(instance) || this.blocked.has(instance)) return;
+    const pending = this.requests.get(instance);
+    if (!pending) this.fetch(instance, null);
+    else if (pending.cursor) {
+      // 保留进行中的翻页，结束后再向 Server 确认当前首屏。
+      void pending.promise.finally(() => {
+        if (!pending.controller.signal.aborted) this.revalidate(instance);
+      }).catch(() => {});
+    }
   }
 
   more(instance: string): void {
@@ -66,13 +80,23 @@ export class SourcePlaylistCatalog {
     if (cursor && !this.requests.has(instance)) this.fetch(instance, cursor);
   }
 
-  private fetch(instance: string, cursor: string | null): void {
+  private fetch(instance: string, cursor: string | null, force = false): void {
     const controller = new AbortController();
     const generation = this.generation(instance);
     this.status.set({ ...this.status.value, [instance]: { loading: true, error: null } });
-    const promise = withRateLimitRetry(() => this.load(instance, controller.signal, cursor), controller.signal).then((page) => {
+    const promise = withRateLimitRetry(() => this.load(instance, controller.signal, cursor, force), controller.signal).then((page) => {
       if (controller.signal.aborted || generation !== this.generation(instance))
         throw new ApiError("CANCELLED", "Account changed");
+      if (!cursor) {
+        const current = this.pages.value[instance];
+        // Server 返回相同首屏时继续使用已经加载的后续页。
+        if (current && JSON.stringify(this.firstPages.get(instance)) === JSON.stringify(page)) {
+          this.status.set({ ...this.status.value, [instance]: { loading: false, error: null } });
+          return current;
+        }
+        this.firstPages.set(instance, page);
+        this.cursors.delete(instance);
+      }
       const seen = this.cursors.get(instance) ?? new Set<string>();
       if (cursor) seen.add(cursor);
       if (page.nextCursor && seen.has(page.nextCursor))
@@ -86,13 +110,15 @@ export class SourcePlaylistCatalog {
       this.status.set({ ...this.status.value, [instance]: { loading: false, error: null } });
       return combined;
     }).catch((error) => {
-      if (!controller.signal.aborted && generation === this.generation(instance))
+      if (!controller.signal.aborted && generation === this.generation(instance)) {
+        if (!cursor) this.failed(instance, generation);
         this.status.set({ ...this.status.value, [instance]: { loading: false, error: errorMessage(error) } });
+      }
       throw error;
     }).finally(() => {
       if (this.requests.get(instance)?.controller === controller) this.requests.delete(instance);
     });
-    const request = { controller, promise };
+    const request = { controller, cursor, promise };
     this.requests.set(instance, request);
     void promise.catch(() => {});
   }
@@ -123,6 +149,7 @@ export class SourcePlaylistCatalog {
     this.requests.clear();
     this.sources.clear();
     this.cursors.clear();
+    this.firstPages.clear();
     this.blocked.clear();
     this.pages.set({});
     this.status.set({});

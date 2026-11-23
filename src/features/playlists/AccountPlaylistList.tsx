@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import type { OnlineInstance, OnlinePlaylist } from "../../api/content";
-import { playlistLinks, type PlaylistLink } from "../../api/playlist-links";
+import { favoritesPlaylistId, playlistLinks, type PlaylistLink } from "../../api/playlist-links";
 import { useServices, useStore } from "../../app/services";
 import { useResource } from "../../components/query";
 import { pluginName } from "../../components/source-name";
@@ -42,8 +42,11 @@ function AccountPlaylistList({ source, heading, prefix, links }: {
   const local = useStore(s.playlists);
   const canLink = supportsLinks(source);
   const [editing, setEditing] = useState<{ playlist: OnlinePlaylist; link?: PlaylistLink } | null>(null);
+  useEffect(() => {
+    if (source.platform === "netease") s.sourcePlaylists.revalidate(instanceId);
+  }, [s, instanceId, source.platform]);
   function refresh() {
-    s.sourcePlaylists.refresh(instanceId);
+    s.sourcePlaylists.refresh(instanceId, source.platform === "netease");
     links.reload();
   }
   return <section className="source-section" aria-label={heading}>
@@ -55,7 +58,8 @@ function AccountPlaylistList({ source, heading, prefix, links }: {
     {page?.items.map((playlist) => {
       const link = links.data?.find((item) => item.platform === source.platform && item.accountId === accountId
         && item.externalId === playlist.externalId);
-      const linkedName = local.find((item) => item.playlistId === link?.playlistId)?.name;
+      const linkedToFavorites = link?.playlistId === favoritesPlaylistId;
+      const linkedName = linkedToFavorites ? tr("我的收藏") : local.find((item) => item.playlistId === link?.playlistId)?.name;
       return <div className="remote-row account-playlist" key={playlist.externalId}>
         <div>
           <Link to={remotePlaylistPath(instanceId, playlist.externalId)} className="account-playlist-link">
@@ -63,7 +67,7 @@ function AccountPlaylistList({ source, heading, prefix, links }: {
             <small>{tr("{0} 首", { 0: playlist.trackCount ?? tr("未知数量") })}</small>
           </Link>
           {link && <p className="muted">
-            <Link to={`/playlists/${encodeURIComponent(link.playlistId)}`}>{tr("已关联：{0}", { 0: linkedName ?? link.playlistId })}</Link>
+            <Link to={linkedToFavorites ? "/favorites" : `/playlists/${encodeURIComponent(link.playlistId)}`}>{tr("已关联：{0}", { 0: linkedName ?? link.playlistId })}</Link>
             {link.pendingCount > 0 && ` · ${tr("{0} 首待同步", { 0: link.pendingCount })}`}
             {link.lastErrorCode && ` · ${tr("同步失败（{0}）", { 0: link.lastErrorCode })}`}
           </p>}

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ApiError, errorMessage } from "../../api/client";
-import { changePlaylistLink, type PlaylistLinkTarget } from "../../api/playlist-links";
+import { changePlaylistLink, favoritesPlaylistId, type PlaylistLinkTarget } from "../../api/playlist-links";
 import { useServices, useStore } from "../../app/services";
 import { Modal } from "../../components/Modal";
 import { ErrorNotice } from "../../components/ui";
@@ -45,11 +45,12 @@ export function PlaylistLinkDialog({ target, title, linkedId, close, changed }: 
       <p>{title}</p>
       {linkedId
         ? <p>{tr("解除与「{0}」的关联后，新添加的曲目将停止同步到这张远程歌单。", {
-          0: local.find((item) => item.playlistId === linkedId)?.name ?? linkedId,
+          0: linkedId === favoritesPlaylistId ? tr("我的收藏") : local.find((item) => item.playlistId === linkedId)?.name ?? linkedId,
         })}</p>
         : <>
           <label>{tr("本地歌单")}
             <select value={choice} onChange={(event) => setChoice(event.target.value)} disabled={busy}>
+              <option value={favoritesPlaylistId}>{tr("我的收藏")}</option>
               {local.map((item) => <option key={item.playlistId} value={item.playlistId}>{item.name}</option>)}
               <option value="">{tr("新建歌单")}</option>
             </select>

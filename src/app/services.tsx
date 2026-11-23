@@ -86,7 +86,7 @@ export class Services {
   favorites = new FavoritesState(new FavoritesApi(this.client));
   matchingDecisions = new MatchingDecisions(new MatchingApi(this.client), () => this.matchingChanged());
   content = new ContentApi(this.client);
-  sourcePlaylists = new SourcePlaylistCatalog((instance, signal, cursor) => this.content.accountPlaylists(instance, cursor, signal));
+  sourcePlaylists = new SourcePlaylistCatalog((instance, signal, cursor, refresh) => this.content.accountPlaylists(instance, cursor, signal, refresh));
   private capabilityEvents = new CapabilityEvents(
     () => {
       capabilityResources.invalidate();
