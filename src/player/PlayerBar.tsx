@@ -99,7 +99,6 @@ export function PlayerBar() {
         <IconButton
           icon={mode.icon}
           label={tr("播放模式：{0}", { 0: tr(mode.label) })}
-          className={q.mode === "sequence" ? "" : "playback-mode-active"}
           onClick={() => s.setPlaybackMode(playbackModes[(modeIndex + 1) % playbackModes.length].mode)}
         />
         <IconButton

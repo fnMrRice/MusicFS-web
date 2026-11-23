@@ -109,9 +109,16 @@ test('track rows show bouncing dots while waiting, moving bars while playing, an
 test('playback mode cycles through all modes and empty or single queues cannot shuffle', async ({ page }) => {
   const { creates, errors } = await setup(page, 1);
   await expect(page.getByRole('button', { name: /^(停止|停止播放)$/ })).toHaveCount(0);
-  for (const name of ['顺序播放', '列表循环', '单曲循环', '随机播放']) {
-    await expect(mode(page, name)).toBeVisible();
-    await mode(page, name).click();
+  for (const colorScheme of ['light', 'dark'] as const) {
+    await page.emulateMedia({ colorScheme });
+    await expect(page.locator('html')).toHaveAttribute('data-theme', colorScheme);
+    const queueIcon = page.getByRole('button', { name: '播放队列', exact: true }).locator('svg');
+    const foreground = await queueIcon.evaluate(svg => getComputedStyle(svg).stroke);
+    for (const name of ['顺序播放', '列表循环', '单曲循环', '随机播放']) {
+      const button = mode(page, name);
+      await expect(button.locator('svg')).toHaveCSS('stroke', foreground);
+      await button.click();
+    }
   }
   await expect(mode(page, '顺序播放')).toBeVisible();
   await page.getByRole('button', { name: '播放队列', exact: true }).click();

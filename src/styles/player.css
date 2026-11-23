@@ -122,9 +122,6 @@
   width: 52px;
   height: 52px;
 }
-.transport .playback-mode-active {
-  color: var(--accent);
-}
 .play-main svg {
   fill: currentColor;
 }
