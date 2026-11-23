@@ -15,6 +15,7 @@ function isTrack(value: SourceTrack): boolean {
 }
 export class LibraryApi {
   readonly providerInstances = new Store<Provider[]>([]);
+  readonly downloadChanges = new Store<ReadonlyMap<string, number>>(new Map());
   private providerEpoch = 0;
   private providerRequest = 0;
   private providerApplied = 0;
@@ -25,9 +26,24 @@ export class LibraryApi {
       throw new ApiError("INVALID_RESPONSE", "Invalid source track response");
     return response;
   }
+  async deleteDownload(sourceTrackId: string, versionId: string): Promise<void> {
+    const session = this.providerEpoch;
+    try {
+      await this.client.request<void>(`/source-tracks/${encodeURIComponent(sourceTrackId)}/downloads/${encodeURIComponent(versionId)}`, { method: "DELETE" });
+    } catch (error) {
+      // 定时清理或另一页面可能已删除同一版本，重新读取该来源即可确认现状。
+      if (!(error instanceof ApiError) || error.code !== "NOT_FOUND") throw error;
+    }
+    if (session === this.providerEpoch) {
+      const changes = new Map(this.downloadChanges.value);
+      changes.set(sourceTrackId, (changes.get(sourceTrackId) ?? 0) + 1);
+      this.downloadChanges.set(changes);
+    }
+  }
   clearProviderInstances(): void {
     ++this.providerEpoch;
     this.providerInstances.set([]);
+    this.downloadChanges.set(new Map());
   }
   async providers(signal?: AbortSignal): Promise<Provider[]> {
     const epoch = this.providerEpoch;

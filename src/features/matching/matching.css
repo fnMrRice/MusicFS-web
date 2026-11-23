@@ -11,6 +11,7 @@
 .source-downloads { color: var(--muted); font-size: .82rem; white-space: normal; }
 .source-downloads summary { cursor: pointer; }
 .source-downloads ul { margin: .3rem 0; padding-inline-start: 1.2rem; }
+.source-downloads li button { margin-inline-start: .6em; }
 .track-version-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .track-version-default { font-size: 12px; color: var(--accent); border: 1px solid currentColor; border-radius: 4px; padding: 2px 6px; white-space: nowrap; }
 .track-version-quality { font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--muted); }

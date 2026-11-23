@@ -95,7 +95,7 @@ export function TrackRow({
               <span>{t.title || t.displayName}</span>
             </button>
             <OtherTrackTitles title={title} names={localizedTitles} />
-            {versions.length === 1 && <SourceDownloads track={versions[0]} />}
+            {versions.length === 1 && <SourceDownloads key={versions[0].sourceTrackId} track={versions[0]} />}
             {versions.length > 1 && <button className="text-button track-expand" aria-expanded={expanded}
               aria-label={tr("展开 {0} 的来源版本", { 0: t.title || t.displayName })}
               onClick={() => setExpanded(!expanded)}>
