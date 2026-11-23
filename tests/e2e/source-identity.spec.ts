@@ -231,7 +231,7 @@ test("non-NetEase account playlists in management collapse together and keep the
   await page.goto(`${origin}/#/playlists`);
   const group = page.getByRole("region", { name: "自定义节拍 · Actual account listener 的歌单", exact: true });
   const toggle = group.getByRole("heading").getByRole("button");
-  const mix = group.getByRole("link", { name: /Morning mix/ });
+  const mix = group.getByRole("link", { name: "自定义节拍-Morning mix 2 首", exact: true });
   await expect(toggle).toHaveAttribute("aria-expanded", "true");
   await expect(mix).toBeVisible();
   await group.getByRole("button", { name: "加载更多歌单" }).click();
@@ -375,19 +375,29 @@ test("NetEase playlists appear in management and navigation, link once, accept t
   const sidebar = page.getByRole("complementary", { name: "侧栏" });
   const sidebarLink = sidebar.locator(`a[href="#/discover/${instanceId}/100"]`);
   await expect(sidebarLink).toHaveAccessibleName("网易云音乐-通勤");
-  await expect(sidebar.getByRole("link", { name: "网易云音乐-睡前" })).toHaveCount(0);
-  await expect(sidebar.getByRole("button", { name: /收藏的歌单/ })).toHaveCount(2);
+  await expect(sidebarLink).toHaveText(own.title);
+  const sidebarSaved = sidebar.getByRole("button", { name: /收藏的歌单/ });
+  const sidebarCollected = sidebar.getByRole("link", { name: "网易云音乐-睡前", exact: true });
+  await expect(sidebarCollected).toHaveCount(0);
+  await expect(sidebarSaved).toHaveCount(2);
+  await sidebarSaved.first().click();
+  await expect(sidebarCollected).toHaveText(collected.title);
   const saved = group.getByRole("button", { name: /收藏的歌单/ });
   await expect(saved).toHaveAttribute("aria-expanded", "false");
   await saved.click();
-  await expect(group.getByRole("link", { name: /睡前/ })).toBeVisible();
+  for (const playlist of [own, collected]) {
+    const entry = group.getByRole("link", { name: playlist.title + " 2 首", exact: true });
+    await expect(entry).toBeVisible();
+    await expect(entry).toHaveAttribute("href", `#/discover/${instanceId}/${playlist.externalId}`);
+  }
   await expect(group.getByText("只读", { exact: true })).toHaveCount(0);
   await expect(group.getByRole("button", { name: "关联本地歌单" })).toHaveCount(1);
   await group.getByRole("button", { name: "关联本地歌单" }).click();
   const dialog = page.getByRole("dialog");
   await dialog.getByLabel("歌单名称").fill(local.name);
   await dialog.getByRole("button", { name: "关联本地歌单" }).click();
-  await expect(group.getByRole("link", { name: "已关联：开车听" })).toBeVisible();
+  const localTarget = group.getByRole("link", { name: "已关联：开车听", exact: true });
+  await expect(localTarget).toHaveAttribute("href", `#/playlists/${local.playlistId}`);
   await expect(mirror.getByRole("link", { name: "已关联：开车听" })).toBeVisible();
   await expect(group.getByRole("button", { name: "关联本地歌单", exact: true })).toHaveCount(0);
   await sidebarLink.click();
@@ -404,6 +414,29 @@ test("NetEase playlists appear in management and navigation, link once, accept t
   await saveTrack();
   await page.goto(`${origin}/#/playlists`);
   await expect(group.getByText("2 首待同步", { exact: false })).toBeVisible();
+  const unlink = group.getByRole("button", { name: "解除关联", exact: true });
+  for (const width of [1280, 375]) {
+    await page.setViewportSize({ width, height: 900 });
+    await localTarget.scrollIntoViewIfNeeded();
+    const text = await localTarget.evaluate(node => {
+      const range = document.createRange();
+      range.selectNodeContents(node);
+      return range.getBoundingClientRect().toJSON() as { x: number; right: number; top: number; bottom: number };
+    });
+    const button = await unlink.boundingBox();
+    if (!button) throw new Error("Unlink button has no visible bounds");
+    expect(text.x).toBeGreaterThanOrEqual(0);
+    expect(button.x + button.width).toBeLessThanOrEqual(width + 1);
+    const gap = button.x - text.right;
+    expect(gap).toBeGreaterThanOrEqual(-1);
+    expect(gap).toBeLessThanOrEqual(20);
+    const overlap = Math.min(text.bottom, button.y + button.height) - Math.max(text.top, button.y);
+    expect(overlap).toBeGreaterThan(Math.min(text.bottom - text.top, button.height) / 2);
+  }
+  await localTarget.click();
+  await expect(page).toHaveURL(`${origin}/#/playlists/${local.playlistId}`);
+  await page.goBack();
+  await expect(unlink).toBeVisible();
   await mirror.getByRole("button", { name: "解除关联" }).click();
   await dialog.getByRole("button", { name: "解除关联" }).click();
   await expect(group.getByRole("button", { name: "关联本地歌单" })).toBeEnabled();

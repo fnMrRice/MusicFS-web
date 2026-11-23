@@ -61,23 +61,32 @@ function AccountPlaylistList({ source, heading, management, links }: {
       && item.externalId === playlist.externalId);
     const linkedToFavorites = link?.playlistId === favoritesPlaylistId;
     const linkedName = linkedToFavorites ? tr("我的收藏") : local.find((item) => item.playlistId === link?.playlistId)?.name;
+    const title = management && source.platform !== "netease" ? remotePlaylistLabel(source, playlist, locale) : playlist.title;
+    const target = link && <Link to={linkedToFavorites ? "/favorites" : `/playlists/${encodeURIComponent(link.playlistId)}`}>
+      {tr("已关联：{0}", { 0: linkedName ?? link.playlistId })}
+    </Link>;
+    const syncStatus = link && [
+      link.pendingCount > 0 && tr("{0} 首待同步", { 0: link.pendingCount }),
+      link.lastErrorCode && tr("同步失败（{0}）", { 0: link.lastErrorCode }),
+    ].filter(Boolean).join(" · ");
+    const linkAction = canLink && (link || playlist.writable === true)
+      ? <button disabled={!links.data} onClick={() => setEditing({ playlist, link })}>
+        {tr(link ? "解除关联" : "关联本地歌单")}
+      </button>
+      : canLink && !groupSaved && <small className="muted">{tr("只读")}</small>;
     return <div className="remote-row account-playlist" key={playlist.externalId}>
       <div>
         <Link to={remotePlaylistPath(instanceId, playlist.externalId)} className="account-playlist-link">
-          <Icon name="album" /><strong>{management ? remotePlaylistLabel(source, playlist, locale) : playlist.title}</strong>
+          <Icon name="album" /><strong>{title}</strong>
           <small>{tr("{0} 首", { 0: playlist.trackCount ?? tr("未知数量") })}</small>
         </Link>
-        {link && <p className="muted">
-          <Link to={linkedToFavorites ? "/favorites" : `/playlists/${encodeURIComponent(link.playlistId)}`}>{tr("已关联：{0}", { 0: linkedName ?? link.playlistId })}</Link>
-          {link.pendingCount > 0 && ` · ${tr("{0} 首待同步", { 0: link.pendingCount })}`}
-          {link.lastErrorCode && ` · ${tr("同步失败（{0}）", { 0: link.lastErrorCode })}`}
+        {(syncStatus || (!management && target)) && <p className="muted">
+          {!management && target}{!management && syncStatus && " · "}{syncStatus}
         </p>}
       </div>
-      {canLink && (link || playlist.writable === true)
-        ? <button disabled={!links.data} onClick={() => setEditing({ playlist, link })}>
-          {tr(link ? "解除关联" : "关联本地歌单")}
-        </button>
-        : canLink && !groupSaved && <small className="muted">{tr("只读")}</small>}
+      {management && target
+        ? <div className="account-playlist-actions muted">{target}{linkAction}</div>
+        : linkAction}
     </div>;
   }
   return <section className="source-section" aria-label={heading}>
