@@ -3,7 +3,7 @@ import type { OnlineInstance } from "../../api/content";
 import { Modal } from "../../components/Modal";
 import { Icon } from "../../components/ui";
 import { pluginName } from "../../components/source-name";
-import { tr, useLocale } from "../../i18n";
+import { statusText, tr, useLocale } from "../../i18n";
 import { usePlatformAccount, type Account } from "./usePlatformAccount";
 import "./accounts.css";
 
@@ -25,6 +25,8 @@ export function PlatformAccount({ instance }: { instance: OnlineInstance }) {
   const status = !account ? "正在读取账号状态…"
     : account.state === "signedOut" || account.state === "canceled"
       ? null
+      : account.state === "unverified" && instance.platform === "netease"
+      ? tr("账号已保存，下次使用此来源时会自动校验。")
       : states[account.state] ?? account.state;
 
   const loginActions = <div className="platform-account-actions">
@@ -41,7 +43,7 @@ export function PlatformAccount({ instance }: { instance: OnlineInstance }) {
     </div>
     {signedIn && account ? <AccountProfile key={`${account.accountId}:${account.avatarUrl}`} account={account} />
       : status && <p className="muted" aria-live="polite">{status}</p>}
-    {error && !dialogOpen && <p role="alert">{error}</p>}
+    {error && !dialogOpen && <p role="alert">{statusText(error)}</p>}
     {instance.availability === "offline" && <p className="muted">此音乐来源暂时离线，请稍后重试。</p>}
     {options && !options.configured && <p className="muted">请先在服务端配置 Apple Music 开发者授权。</p>}
     {!modalLogin && pending && <>
@@ -61,7 +63,7 @@ export function PlatformAccount({ instance }: { instance: OnlineInstance }) {
         <p className="muted">请使用{name} App 扫码，二维码过期后请重新获取。</p>
         {account && pending && <p aria-live="polite">{states[account.state] ?? account.state}</p>}
         {account?.state === "expired" && <p role="status">二维码已过期，请重新获取。</p>}
-        {error && <p role="alert">{error}</p>}
+        {error && <p role="alert">{statusText(error)}</p>}
         {(!pending || error) && !busy && <button onClick={() => { void startLogin(); }}>重新获取二维码</button>}
         {loginActions}
       </div>

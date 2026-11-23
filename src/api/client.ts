@@ -147,7 +147,7 @@ export function errorMessage(error: unknown): string {
     PAGINATION_STALLED: "列表未能继续加载，请刷新后重试。",
     UNSUPPORTED: "当前来源尚不支持此功能。",
     AUTH_REQUIRED: "登录已失效，请重新登录。",
-    PLATFORM_AUTH_REQUIRED: "请先在设置中登录此音乐平台；已保存的账号需要校验登录状态。",
+    PLATFORM_AUTH_REQUIRED: "请在设置中查看此音乐平台的登录状态。",
     RISK_CONTROL: "平台暂时限制了请求，请稍后重试。无需退出 MusicFS。",
     REVISION_CONFLICT: "内容已发生变化，请刷新后重新编辑。",
     MATCHING_PENDING: "请先确认上次歌曲关联操作的结果。",

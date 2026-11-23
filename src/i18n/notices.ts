@@ -69,6 +69,8 @@ export default {
   "无法确认上次操作结果，请重新播放。": ["The previous action could not be confirmed. Start playback again.", "無法確認上次操作結果，請重新播放。", "前の操作の結果を確認できません。もう一度再生してください。"],
   "来源暂不可用，请检查音乐目录。": ["This source is unavailable. Check the music folder.", "來源暫不可用，請檢查音樂目錄。", "ソースを利用できません。音楽フォルダーを確認してください。"],
   "登录已失效，请重新登录。": ["Your session has expired. Please sign in again.", "登入已失效，請重新登入。", "セッションの有効期限が切れました。再度ログインしてください。"],
+  "账号已保存，下次使用此来源时会自动校验。": ["Your account is saved. We’ll check your sign-in status the next time you use this source.", "帳號已儲存，下次使用此來源時會自動確認登入狀態。", "アカウントは保存されています。次回このソースを使用する際にログイン状態を自動で確認します。"],
+  "请在设置中查看此音乐平台的登录状态。": ["Check your sign-in status for this music service in Settings.", "請在設定中查看此音樂平台的登入狀態。", "設定でこの音楽サービスのログイン状態を確認してください。"],
   "无权执行此操作。": ["You do not have permission for this action.", "無權執行此操作。", "この操作を行う権限がありません。"],
   "操作失败，请重试或检查 Server 状态。": ["The action failed. Retry or check the server status.", "操作失敗，請重試或檢查伺服器狀態。", "操作に失敗しました。再試行するか、サーバーの状態を確認してください。"],
   "{0} 请求编号：{1}": ["{0} Request ID: {1}", "{0} 請求編號：{1}", "{0} リクエスト ID：{1}"],
