@@ -1,6 +1,10 @@
 import { expect, test } from "@playwright/test";
 import { preview, type PreviewServer } from "vite";
 import { instanceIds, neteasePlugin } from "../fixtures/plugins";
+import { audioFixture } from "../fixtures/audio";
+import { routeApi } from "../fixtures/control-mock";
+import { deferred, playback, track } from "../fixtures/dto";
+import { waitPlaying } from "./helpers";
 
 const origin = "http://127.0.0.1:18289";
 let server: PreviewServer;
@@ -30,7 +34,8 @@ test("NetEase playlist pages recheck the server day and only force a snapshot on
     }
     if (url.pathname === path + "/mix") {
       details.push(url.search);
-      json = { playlist, entries: [], complete: true, observedAt };
+      const entries = ["0", "1"].map((externalTrackId, position) => ({ externalTrackId, position }));
+      json = { playlist, entries, complete: true, observedAt };
     }
     if (url.pathname === path + "/mix/tracks") {
       trackReads.push(url.search);
@@ -73,11 +78,73 @@ test("NetEase playlist pages recheck the server day and only force a snapshot on
   day = 3;
   await page.evaluate(() => window.dispatchEvent(new Event("focus")));
   await expect(page.getByRole("heading", { name: "Mix 3" })).toBeVisible();
+  const refreshed = await page.evaluate(() => new Date("2026-11-03T09:00:00Z").toLocaleString("zh-CN"));
+  await expect(page.locator(".detail-heading").getByText(`2 首 · 刷新时间：${refreshed}`, { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "播放全部", exact: true })).toBeDisabled();
+  await expect(page.locator("#page-scroll")).not.toContainText(/本次读取|本次观测到|观测时间/);
   await expect(page.getByRole("cell", { name: "Track 3.1", exact: true })).toBeVisible();
   expect(details.every((query) => query === "")).toBe(true);
+  day = 4;
   await page.getByRole("button", { name: "刷新歌单", exact: true }).click();
-  await expect(page.getByRole("cell", { name: "Track 3.1", exact: true })).toBeVisible();
+  await expect(page.locator(".detail-heading time")).toHaveAttribute("datetime", "2026-11-04T09:00:00Z");
+  await expect(page.getByRole("cell", { name: "Track 4.1", exact: true })).toBeVisible();
   expect(details.at(-1)).toBe("?refresh=true");
   expect(trackReads).toHaveLength(6);
   expect(trackReads.every((query) => !query.includes("refresh"))).toBe(true);
+});
+
+test("play all starts the first available track and queues the whole online playlist in order", async ({ page }) => {
+  const source = instanceIds.netease;
+  const sourcePath = `/api/v1/online-instances/${source}`;
+  const playlistPath = sourcePath + "/playlists/mix";
+  const playlist = { externalId: "mix", title: "Night mix", trackCount: 4, coverUrl: null, sourceUrl: "" };
+  const entries = ["missing", "A", "B", "A"].map((externalTrackId, position) => ({ externalTrackId, position }));
+  const laterPage = deferred<void>();
+  const starts: string[] = [];
+  const sound = audioFixture();
+  await routeApi(page, async (route) => {
+    const request = route.request(), { pathname, searchParams } = new URL(request.url());
+    let json: unknown = { items: [], nextAfter: null };
+    if (pathname.endsWith("/health/ready")) json = { product: "MusicFS", ready: true, apiVersion: "1", instanceId: "fixture" };
+    if (pathname.endsWith("/auth/session")) json = { csrfToken: "fixture", user: { id: "listener", role: "user" } };
+    if (pathname.endsWith("/online-instances")) json = { items: [{
+      instanceId: source, accountId: "listener", accountRevision: "1", name: "Listener", plugin: neteasePlugin,
+      platform: "netease", availability: "available", capabilities: [{ name: "stream.resolve", supported: true, reason: "" }],
+    }] };
+    if (pathname === playlistPath) json = { playlist, entries, complete: true, observedAt: "2026-11-23T00:00:00Z" };
+    if (pathname === playlistPath + "/tracks") {
+      const next = searchParams.has("cursor");
+      if (next) await laterPage.promise;
+      const items = (next ? entries.slice(2) : entries.slice(0, 2)).map(({ externalTrackId: externalId, position }) => ({
+        position, externalId, track: externalId === "missing" ? null : { externalId, title: externalId, artists: [], durationMs: 30_000 },
+        errorCode: externalId === "missing" ? "NOT_FOUND" : null,
+      }));
+      json = { playlist, items, nextCursor: next ? null : "next", complete: true };
+    }
+    if (pathname.startsWith(sourcePath + "/tracks/") && pathname.endsWith("/resolve")) {
+      const external = pathname.split("/").at(-2)!;
+      if (external === "missing") return route.fulfill({ status: 404, json: { error: { code: "NOT_FOUND" } } });
+      json = { ...track, sourceTrackId: external, assetId: "asset-" + external, providerInstanceId: source, title: external };
+    }
+    if (pathname.endsWith("/playback/sessions") && request.method() === "POST") {
+      const { sourceTrackId } = request.postDataJSON();
+      starts.push(sourceTrackId);
+      json = { ...playback(), sourceTrackId, assetId: "asset-" + sourceTrackId };
+    }
+    if (pathname.endsWith("/stream")) return route.fulfill({ contentType: "audio/wav", body: sound });
+    return route.fulfill({ json });
+  });
+  try {
+    await page.goto(`${origin}/#/discover/${source}/mix`);
+    await expect(page.getByRole("cell", { name: "A", exact: true })).toBeVisible();
+    await page.locator(".detail-heading").getByRole("button", { name: "播放全部", exact: true }).click();
+    await waitPlaying(page);
+    await page.getByRole("button", { name: "播放队列", exact: true }).click();
+    const queued = page.locator(".queue-list button");
+    await expect(queued).toHaveText(["A", "B", "A"]);
+    await expect(queued.first()).toHaveAttribute("aria-current", "true");
+    expect(starts).toEqual(["A"]);
+  } finally {
+    laterPage.resolve();
+  }
 });

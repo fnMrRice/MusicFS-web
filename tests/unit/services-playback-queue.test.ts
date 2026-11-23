@@ -9,6 +9,8 @@ const second = { ...track, sourceTrackId: "second" };
 const third = { ...track, sourceTrackId: "third" };
 const other = { ...track, sourceTrackId: "other" };
 const settle = async () => { await Promise.resolve(); await Promise.resolve(); };
+const onlineSource = { instanceId: "network", name: "Music", platform: "netease", availability: "available",
+  capabilities: [{ name: "stream.resolve", supported: true, reason: "" }] };
 
 beforeEach(() => {
   vi.stubGlobal("document", { createElement: () => ({ canPlayType: () => "probably" }) });
@@ -43,6 +45,42 @@ function setup() {
     ended: () => observe({ type: "ended", seconds: 30, paused: true }),
   };
 }
+
+describe("online playlist preparation", () => {
+  async function prepare() {
+    const s = setup();
+    const pending = deferred<typeof second>();
+    vi.spyOn(s.services.client, "request").mockResolvedValueOnce(first).mockReturnValueOnce(pending.promise);
+    const preparation = s.services.onlinePlaylistPlayback.start("mix", onlineSource, [
+      { position: 0, externalTrackId: "first" }, { position: 1, externalTrackId: "second" },
+    ]);
+    await vi.waitFor(() => expect(s.player.state.phase).toBe("loading"));
+    s.playing();
+    return { ...s, finish: async () => { pending.resolve(second); await preparation; } };
+  }
+
+  it.each(["ended", "paused"] as const)("appends late tracks when the current track has %s", async (phase) => {
+    const s = await prepare();
+    if (phase === "ended") s.ended();
+    else s.player.toggle();
+    await settle();
+    expect(s.player.state.phase).toBe(phase);
+    await s.finish();
+    expect(s.services.queue.value.items).toEqual([first, second]);
+    expect(s.services.queue.value.index).toBe(phase === "ended" ? 1 : 0);
+    expect(s.api.create).toHaveBeenCalledTimes(phase === "ended" ? 2 : 1);
+    s.player.stop();
+  });
+
+  it.each(["enqueue", "replace"] as const)("respects a concurrent %s operation", async (action) => {
+    const s = await prepare();
+    if (action === "enqueue") s.services.enqueue([other]);
+    else s.services.play(other, [other]);
+    await s.finish();
+    expect(s.services.queue.value.items).toEqual(action === "enqueue" ? [first, other, second] : [other]);
+    s.player.stop();
+  });
+});
 
 describe("queue rollback when seeking during a track transition", () => {
   it("restores the actual playing queue after repeated next requests", async () => {

@@ -262,7 +262,10 @@ export class ContentApi {
         `/online-instances/${id(instance)}/playlists/${id(external)}${refresh ? "?refresh=true" : ""}`,
         { signal },
       ), signal),
-      (r) => object(r.playlist) && string(r.playlist.title) && list(r.entries),
+      (r) => object(r.playlist) && r.playlist.externalId === external && string(r.playlist.title) &&
+        typeof r.complete === "boolean" && list(r.entries) && r.entries.every(entry =>
+          object(entry) && Number.isInteger(entry.position) && entry.position >= 0 &&
+          string(entry.externalTrackId) && entry.externalTrackId.length > 0),
     );
   }
   async playlistReference(instance: string, reference: string, signal?: AbortSignal): Promise<OnlinePlaylist> {

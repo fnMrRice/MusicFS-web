@@ -15,6 +15,7 @@ import { defaultFadeSettings, type FadeSettings } from "../player/playback-trans
 import { loadFadePreferences } from "./fade-preferences";
 import { PlaybackQueue, type PlaybackMode } from "../player/playback-queue";
 import { QueuePersistence } from "../player/queue-persistence";
+import { OnlinePlaylistPlayback } from "../player/online-playlist-playback";
 import { audioFactory } from "../player/audio-adapter";
 import { capabilities } from "../player/capabilities";
 import { Store } from "./store";
@@ -118,6 +119,13 @@ export class Services {
     (status) => this.audioOutput.reportStatus(status));
   playlists = new Store<Playlist[]>([]);
   queue = new PlaybackQueue();
+  onlinePlaylistPlayback = new OnlinePlaylistPlayback(this.client, this.queue, (items, start) => {
+    if (start) this.play(items[0], items);
+    else {
+      this.enqueue(items);
+      if (this.player.state.phase === "ended") this.advanceQueue(1, true);
+    }
+  });
   private queuePersistence = new QueuePersistence(this.queue);
   recordingCovers = new RecordingCovers();
   player: PlayerController;
@@ -193,7 +201,11 @@ export class Services {
       output = this.audioOutput.value.config;
       this.dsp.setOutput(output);
     });
-    this.content.onlineInstances.subscribe(() => this.sourcePlaylists.update(this.content.onlineInstances.value));
+    this.content.onlineInstances.subscribe(() => {
+      const sources = this.content.onlineInstances.value;
+      this.sourcePlaylists.update(sources);
+      this.onlinePlaylistPlayback.updateSources(sources);
+    });
     this.player = new PlayerController(
       new PlaybackApi(this.client),
       audioFactory(root, this.dsp),
@@ -244,6 +256,7 @@ export class Services {
   }
   inspectAudioOutput(): void { this.dsp.inspectOutput(); }
   private accept(session: AuthSession): void {
+    this.onlinePlaylistPlayback.cancel();
     this.recordingCovers.clear();
     this.player.stop();
     this.dsp.dispose();
@@ -344,6 +357,7 @@ export class Services {
     }
   }
   async logout(): Promise<void> {
+    this.onlinePlaylistPlayback.cancel();
     const generation = ++this.generation;
     this.player.stop();
     this.capabilityEvents.stop();
@@ -364,6 +378,7 @@ export class Services {
     }
   }
   clear(options: { preserveQueue?: boolean } = {}): void {
+    this.onlinePlaylistPlayback.cancel();
     if (options.preserveQueue) this.queuePersistence.detach();
     else this.queuePersistence.clear();
     this.tasks.clear();
