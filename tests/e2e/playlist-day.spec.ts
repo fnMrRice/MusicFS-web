@@ -15,7 +15,7 @@ test("NetEase playlist pages recheck the server day and only force a snapshot on
   await page.route("**/api/v1/**", (route) => {
     const url = new URL(route.request().url());
     const cursor = url.searchParams.get("cursor");
-    const playlist = { externalId: "mix", title: `Mix ${day}`, trackCount: 2, coverUrl: null, sourceUrl: "" };
+    const playlist = { externalId: "mix", title: `Mix ${day}`, writable: true, trackCount: 2, coverUrl: null, sourceUrl: "" };
     const observedAt = `2026-11-0${day}T09:00:00Z`;
     let json: unknown = { items: [], nextAfter: null };
     if (url.pathname.endsWith("/health/ready")) json = { product: "MusicFS", ready: true, apiVersion: "1", instanceId: "fixture" };
@@ -25,7 +25,7 @@ test("NetEase playlist pages recheck the server day and only force a snapshot on
       capabilities: [{ name: "playlist.list", supported: true, reason: "" }] }] };
     if (url.pathname === path) {
       listReads.push(url.search);
-      json = { items: [cursor ? { ...playlist, externalId: "saved", title: `Saved ${day}` } : playlist],
+      json = { items: [cursor ? { ...playlist, externalId: "saved", title: `Saved ${day}`, writable: false } : playlist],
         consistency: "unversioned", observedAt, nextCursor: cursor ? null : "next" };
     }
     if (url.pathname === path + "/mix") {
@@ -46,6 +46,7 @@ test("NetEase playlist pages recheck the server day and only force a snapshot on
   const more = group.getByRole("button", { name: "加载更多歌单" });
   await expect(mix).toContainText("Mix 1");
   await more.click();
+  await group.getByRole("button", { name: /收藏的歌单/ }).click();
   await expect(group.getByRole("link", { name: /Saved 1/ })).toBeVisible();
   await page.goto(`${origin}/#/search`);
   await expect(page.getByRole("combobox", { name: "搜索来源" })).toBeVisible();

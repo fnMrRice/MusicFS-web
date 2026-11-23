@@ -226,6 +226,23 @@ test("sidebar source playlists page reads and paginates the signed-in account wi
   expect(requests.some((r) => r.path.includes(`online-instances/${instanceIds.customFolder}`))).toBe(false);
 });
 
+test("non-NetEase account playlists in management collapse together and keep their original list", async ({ page }) => {
+  await mock(page);
+  await page.goto(`${origin}/#/playlists`);
+  const group = page.getByRole("region", { name: "自定义节拍 · Actual account listener 的歌单", exact: true });
+  const toggle = group.getByRole("heading").getByRole("button");
+  const mix = group.getByRole("link", { name: /Morning mix/ });
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
+  await expect(mix).toBeVisible();
+  await group.getByRole("button", { name: "加载更多歌单" }).click();
+  await expect(group.getByRole("link", { name: /Evening mix/ })).toBeVisible();
+  await expect(group.getByRole("button", { name: /收藏的歌单/ })).toHaveCount(0);
+  await toggle.click();
+  await expect(mix).toBeHidden();
+  await toggle.press("Enter");
+  await expect(mix).toBeVisible();
+});
+
 test("multiple accounts on one plugin use usernames and keep UUID account actions isolated", async ({ page }) => {
   const accounts = new Map<string, { state: string; accountId?: string; displayName?: string }>([
     [instanceIds.netease, { state: "signedIn", accountId: "a", displayName: "Alice" }],
@@ -360,7 +377,11 @@ test("NetEase playlists appear in management and navigation, link once, accept t
   await expect(sidebarLink).toHaveAccessibleName("网易云音乐-通勤");
   await expect(sidebar.getByRole("link", { name: "网易云音乐-睡前" })).toHaveCount(0);
   await expect(sidebar.getByRole("button", { name: /收藏的歌单/ })).toHaveCount(2);
-  await expect(group.getByText("只读")).toHaveCount(1);
+  const saved = group.getByRole("button", { name: /收藏的歌单/ });
+  await expect(saved).toHaveAttribute("aria-expanded", "false");
+  await saved.click();
+  await expect(group.getByRole("link", { name: /睡前/ })).toBeVisible();
+  await expect(group.getByText("只读", { exact: true })).toHaveCount(0);
   await expect(group.getByRole("button", { name: "关联本地歌单" })).toHaveCount(1);
   await group.getByRole("button", { name: "关联本地歌单" }).click();
   const dialog = page.getByRole("dialog");

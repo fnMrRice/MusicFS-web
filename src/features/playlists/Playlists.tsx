@@ -82,7 +82,7 @@ export function Playlists() {
         active={!!page.cursor && !page.loading && !page.error}
         load={page.more}
       />
-      <AccountPlaylistLists sources={sources} prefix />
+      <AccountPlaylistLists sources={sources} management />
       <RemotePlaylists />
       {params.get("new") && (
         <Modal title={tr("新建歌单")} close={close}>

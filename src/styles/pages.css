@@ -31,7 +31,7 @@
 }
 .section-title.recommendation-heading { gap: 8px; }
 .recommendation-heading h2 { min-width: 0; overflow-wrap: anywhere; }
-.recommendation-toggle {
+.section-toggle {
   max-width: 100%;
   gap: 5px;
   padding: 4px 0;
@@ -42,9 +42,10 @@
   text-align: start;
   overflow-wrap: anywhere;
 }
-.recommendation-toggle:hover { background: transparent; color: var(--accent); }
-.recommendation-toggle svg { flex-shrink: 0; }
-.recommendation-toggle[aria-expanded="false"] svg { transform: rotate(-90deg); }
+.section-toggle:hover { background: transparent; color: var(--accent); }
+.section-toggle svg { flex-shrink: 0; }
+.section-toggle[aria-expanded="false"] svg { transform: rotate(-90deg); }
+.saved-account-playlists { margin-inline-start: 18px; }
 .recommendation-actions { display: flex; align-items: center; flex-shrink: 0; gap: 8px; }
 .recommendation-history { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
 @media (max-width: 480px) {

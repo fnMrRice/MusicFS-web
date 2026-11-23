@@ -1,6 +1,6 @@
 import { useId, type ReactNode } from "react";
 import { useServices, useStore } from "../app/services";
-import { Icon } from "../components/ui";
+import { SectionToggle } from "../components/ui";
 
 interface Props {
   sourceId?: string;
@@ -27,9 +27,7 @@ export function RecommendationSection({ sourceId, title, actions, children }: Pr
   return <section className={isSource ? "source-section" : undefined}>
     <div className={isSource ? "section-title" : "section-title recommendation-heading"}>
       <Heading>
-        <button type="button" className="recommendation-toggle" aria-expanded={expanded} aria-controls={bodyId} onClick={toggle}>
-          <Icon name="chevron" size={14} /><span>{title}</span>
-        </button>
+        <SectionToggle title={title} expanded={expanded} controls={bodyId} onClick={toggle} />
       </Heading>
       {actions}
     </div>

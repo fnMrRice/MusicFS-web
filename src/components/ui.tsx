@@ -164,6 +164,14 @@ export function Icon({ name, size = 20 }: { name: string; size?: number }) {
     </svg>
   );
 }
+export function SectionToggle({ title, expanded, controls, onClick }: {
+  title: string; expanded: boolean; controls: string; onClick: () => void;
+}) {
+  return <button type="button" className="section-toggle" aria-expanded={expanded} aria-controls={controls} onClick={onClick}>
+    <Icon name="chevron" size={14} /><span>{title}</span>
+  </button>;
+}
+
 export function IconButton({
   icon,
   label,
