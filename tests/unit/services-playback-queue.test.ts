@@ -35,7 +35,7 @@ function setup() {
   player.onChange = services.player.onChange;
   player.onSelectionCancelled = services.player.onSelectionCancelled;
   services.player = player;
-  player.setTransitions(true, 300);
+  player.setTransitions(true, false, 300);
   return {
     services, player, api, fades,
     playing: () => observe({ type: "playing", seconds: 0, paused: false }),
@@ -146,7 +146,7 @@ describe("queue rollback when seeking during a track transition", () => {
 describe("playback modes and queue order", () => {
   it("replays a finished track in repeat-one while manual next still selects its neighbour", async () => {
     const s = setup();
-    s.player.setTransitions(false, 300);
+    s.player.setTransitions(false, false, 300);
     s.services.setPlaybackMode("repeat-one");
     s.services.play(first, [first, second]); await settle(); s.playing();
     s.ended(); await settle();
@@ -206,7 +206,7 @@ describe("playback modes and queue order", () => {
 describe("track queue actions", () => {
   it("appends and plays a requested track while preserving the existing queue", async () => {
     const s = setup();
-    s.player.setTransitions(false, 300);
+    s.player.setTransitions(false, false, 300);
     s.services.play(first, [first, second]); await settle(); s.playing();
     s.services.play(first); await settle();
     expect(s.services.queue.value.items).toEqual([first, second, first]);
@@ -237,7 +237,7 @@ describe("track queue actions", () => {
   it("adds next tracks without interrupting playback and prioritizes them in shuffle mode", async () => {
     vi.spyOn(Math, "random").mockReturnValue(0.99);
     const s = setup();
-    s.player.setTransitions(false, 300);
+    s.player.setTransitions(false, false, 300);
     s.services.setPlaybackMode("shuffle");
     s.services.play(first, [first, second]); await settle(); s.playing(); s.progress();
     s.services.playNext([third, other]);

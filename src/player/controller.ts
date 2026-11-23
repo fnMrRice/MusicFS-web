@@ -1,4 +1,3 @@
-import { ApiError } from "../api/client";
 import type { PlaybackApi } from "../api/playback";
 import type {
   Capabilities,
@@ -16,6 +15,7 @@ import { ControlQueue, isUncertain } from "./control-queue";
 import { RecoveryBudget } from "./recovery";
 import { trackPosition, seekAllowed } from "./timeline";
 import { playbackErrorMessage } from "./errors";
+import { PlaybackTransitions } from "./playback-transitions";
 
 export class PlayerController {
   state = initialState();
@@ -32,14 +32,10 @@ export class PlayerController {
   private volume = 0.8;
   private selection = 0;
   private pendingSelection: number | null = null;
-  private fadeEnabled = false;
-  private fadeDurationMs = 300;
-  private pendingFadeIn = 0;
-  private fadingAttempt: string | null = null;
-  setTransitions(enabled: boolean, durationMs: number): void {
-    this.fadeEnabled = enabled;
-    this.fadeDurationMs = Number.isFinite(durationMs) ? Math.max(100, Math.min(2000, durationMs)) : 300;
-    if (!enabled) { this.audio?.cancelFade?.(); this.pendingFadeIn = 0; this.fadingAttempt = null; }
+  private seekingOut = false;
+  private transitions = new PlaybackTransitions();
+  setTransitions(trackFadeEnabled: boolean, seekFadeEnabled: boolean, durationMs: number): void {
+    this.transitions.configure(trackFadeEnabled, seekFadeEnabled, durationMs, this.audio);
   }
   setVolume(value: number): void {
     this.volume = Math.max(0, Math.min(1, value));
@@ -81,16 +77,20 @@ export class PlayerController {
   ): Promise<void> {
     this.unlockAudio();
     const selection = ++this.selection;
+    this.seekingOut = false;
     let wantsPlay = true;
-    if (this.fadeEnabled && this.audio && this.state.wantsPlay && this.state.phase === "playing") {
-      this.pendingSelection = selection;
-      await this.audio.fadeOut?.(this.fadeDurationMs);
-      if (selection !== this.selection) return;
-      this.pendingSelection = null;
-      wantsPlay = this.state.wantsPlay || ["ended"].includes(this.state.phase);
+    if (this.state.wantsPlay && this.state.phase === "playing") {
+      const outgoing = this.transitions.fadeOut("track", this.audio);
+      if (outgoing) {
+        this.pendingSelection = selection;
+        await outgoing;
+        if (selection !== this.selection) return;
+        this.pendingSelection = null;
+        wantsPlay = this.state.wantsPlay || ["ended"].includes(this.state.phase);
+      }
     }
     this.stop();
-    this.pendingFadeIn = this.fadeEnabled ? this.fadeDurationMs : 0;
+    this.transitions.prepareIncoming("track");
     // 浏览器音效始终由本地执行；旧服务端配置不得叠加到新会话。
     preferences = { ...preferences, gainDb: 0, dspExecution: "client" };
     const generation = this.generation;
@@ -165,8 +165,8 @@ export class PlayerController {
   stop(): void {
     ++this.selection;
     this.pendingSelection = null;
-    this.pendingFadeIn = 0;
-    this.fadingAttempt = null;
+    this.seekingOut = false;
+    this.transitions.reset();
     ++this.generation;
     this.controller?.abort();
     this.queue?.dispose();
@@ -210,29 +210,25 @@ export class PlayerController {
       this.observe(event);
     }, playback.outputProfile.channels);
     this.audio.setVolume?.(this.volume);
-    if (this.pendingFadeIn) this.audio.fadeIn?.(this.pendingFadeIn);
-    this.pendingFadeIn = 0;
+    this.transitions.fadeIn(this.audio);
     this.emit();
-    if (this.state.wantsPlay)
-      void this.audio.play().catch((error: unknown) => {
-        if (
-          generation !== this.generation ||
-          this.state.playback?.attemptId !== playback.attemptId
-        )
-          return;
-        if (error instanceof DOMException && error.name === "AbortError")
-          return;
-        if (error instanceof DOMException && error.name === "NotAllowedError") {
-          this.state.phase = "paused";
-          this.state.wantsPlay = false;
-          this.state.message = "请点击播放按钮。";
-          this.emit();
-        } else this.recover("PLAY_REJECTED");
-      });
+    if (this.state.wantsPlay) this.playAttached(playback, generation);
     else {
       this.state.phase = "paused";
       this.emit();
     }
+  }
+  private playAttached(playback: Playback, generation: number): void {
+    void this.audio?.play().catch((error: unknown) => {
+      if (generation !== this.generation || this.state.playback?.attemptId !== playback.attemptId) return;
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      if (error instanceof DOMException && error.name === "NotAllowedError") {
+        this.state.phase = "paused";
+        this.state.wantsPlay = false;
+        this.state.message = "请点击播放按钮。";
+        this.emit();
+      } else this.recover("PLAY_REJECTED");
+    });
   }
   private reportStarted(): void {
     const playback = this.state.playback;
@@ -244,6 +240,8 @@ export class PlayerController {
     });
   }
   private observe(event: MediaObservation): void {
+    // 淡出定位期间若旧位置自然播完，仍以用户刚选择的位置继续。
+    if (this.seekingOut && (event.type === "ended" || (event.type === "pause" && this.audio?.ended))) return;
     if (this.state.playback)
       this.state.positionMs = trackPosition(this.state.playback, event.seconds);
     switch (event.type) {
@@ -251,11 +249,8 @@ export class PlayerController {
         const playback = this.state.playback;
         const end = playback?.seekableRange?.endMs ?? this.state.track?.durationMs;
         const remaining = end == null ? Infinity : end - this.state.positionMs;
-        if (this.fadeEnabled && playback && this.state.wantsPlay && this.state.phase === "playing" &&
-          remaining > 0 && remaining <= this.fadeDurationMs && this.fadingAttempt !== playback.attemptId) {
-          this.fadingAttempt = playback.attemptId;
-          void this.audio?.fadeOut?.(remaining);
-        }
+        if (playback && this.state.wantsPlay && this.state.phase === "playing" && !this.seekingOut && this.pendingSelection === null)
+          this.transitions.fadeEnding(this.audio, remaining, playback.attemptId);
         break;
       }
       case "playing":
@@ -287,7 +282,8 @@ export class PlayerController {
         this.state.phase = "seeking";
         break;
       case "seeked":
-        this.state.phase = event.paused ? "paused" : "loading";
+        this.state.phase = event.paused ? "paused" : event.readyToPlay ? "playing" : "loading";
+        if (this.state.phase === "playing") this.clearBufferingTimer();
         break;
       case "ended":
         this.clearBufferingTimer();
@@ -327,57 +323,53 @@ export class PlayerController {
     if (this.bufferingTimer) clearTimeout(this.bufferingTimer);
     this.bufferingTimer = null;
   }
-  seek(positionMs: number): void {
+  async seek(positionMs: number): Promise<void> {
     const playback = this.state.playback;
     if (!playback || !seekAllowed(playback, positionMs)) {
       this.state.message = "请输入当前曲目可定位范围内的有效位置。";
       this.emit();
       return;
     }
-    if (playback.seekMode === "timeRestart" && this.queue) {
-      this.cancelSelectionForSeek();
-      this.clearBufferingTimer();
-      this.audio?.destroy();
-      this.audio = null;
-      this.state.phase = "seeking";
-      this.state.message = null;
-      this.emit();
-      this.queue.seek(positionMs);
-      return;
-    }
-    if (!this.audio) return;
-    if (playback?.seekMode !== "byteRange") {
-      this.fail(
-        playbackErrorMessage(new ApiError("SEEK_UNSUPPORTED", "Seek not available")),
-      );
-      return;
-    }
-    const range = playback.seekableRange;
+    const serverSeek = playback.seekMode === "timeRestart";
+    const audio = this.audio;
+    if (serverSeek ? !this.queue : !audio) return;
     const seconds = (positionMs - playback.positionOriginMs) / 1000;
-    if (
-      !range ||
-      positionMs < range.startMs ||
-      positionMs > range.endMs ||
-      !this.audio.seekable.some((r) => seconds >= r.start && seconds <= r.end)
-    ) {
+    if (!serverSeek && !audio?.seekable.some((r) => seconds >= r.start && seconds <= r.end)) {
       this.state.message =
         "目标尚不在当前可定位范围内，请等待加载或选择其他位置。";
       this.emit();
       return;
     }
-    this.cancelSelectionForSeek();
-    this.audio.seek(seconds);
-  }
-  private cancelSelectionForSeek(): void {
-    // 先失效待切歌请求，再取消包络；取消包络可能立即唤醒 select 的等待。
+    // 先使上次定位或选曲失效，再接管同一个输出包络。
+    const selection = ++this.selection;
     if (this.pendingSelection !== null) {
-      ++this.selection;
       this.pendingSelection = null;
       this.onSelectionCancelled?.();
     }
-    this.pendingFadeIn = 0;
-    this.fadingAttempt = null;
-    this.audio?.cancelFade?.();
+    const outgoing = this.state.wantsPlay && this.state.phase === "playing"
+      ? this.transitions.fadeOut("seek", audio) : undefined;
+    this.seekingOut = !!outgoing;
+    if (outgoing) {
+      await outgoing;
+      if (selection !== this.selection) return;
+      this.seekingOut = false;
+      if (this.audio !== audio) return;
+    } else this.transitions.reset(audio);
+    if (this.state.wantsPlay) this.transitions.prepareIncoming("seek");
+    if (serverSeek) {
+      this.clearBufferingTimer();
+      audio?.destroy();
+      this.audio = null;
+      this.state.phase = "seeking";
+      this.state.message = null;
+      this.emit();
+      this.queue?.seek(positionMs);
+    } else if (audio) {
+      const resumeEnded = audio.ended && this.state.wantsPlay;
+      this.transitions.fadeIn(audio);
+      audio.seek(seconds);
+      if (resumeEnded) this.playAttached(playback, this.generation);
+    }
   }
   private fail(message: string): void {
     this.clearBufferingTimer();

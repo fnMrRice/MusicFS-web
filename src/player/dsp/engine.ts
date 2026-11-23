@@ -7,7 +7,7 @@ import type { AudioOutputConfig, AudioOutputStatus } from './output';
 export interface LocalDSPAttachment {
   resume(): Promise<void>;
   pause(): void;
-  reset(): void;
+  reset(holdSilence?: boolean): void;
   fadeOut(durationMs: number): Promise<void>;
   prepareFadeIn(): void;
   fadeIn(durationMs: number): void;
@@ -181,12 +181,13 @@ export class LocalDSPEngine {
           pause: () => {
             if (!detached) { playIntent++; paused = true; started = false; attachedGraph.setPaused(true); cancelFade(); }
           },
-          reset: () => {
+          reset: (holdSilence = false) => {
             if (detached) return;
-            cancelFade();
+            cancelFade(!holdSilence);
             let replacement: LocalDSPGraph | undefined;
             try {
               replacement = new LocalDSPGraph(attachedContext, this.config, count);
+              if (holdSilence) replacement.fadeTo(0, 0);
               replacement.setAutoVolume(this.autoVolume);
               this.output.add(replacement);
               replacement.setVolume(volume);
@@ -208,7 +209,7 @@ export class LocalDSPEngine {
           },
           fadeOut: (durationMs) => {
             if (detached) return Promise.resolve();
-            // 连续切歌从当前包络继续，不能先恢复满音量。
+            // 连续切歌或定位从当前增益继续，避免音量跳变。
             cancelFade(false);
             if (paused || attachedContext.state !== 'running') return Promise.resolve();
             const duration = attachedGraph.fadeTo(0, durationMs);

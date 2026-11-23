@@ -110,7 +110,7 @@ export class LocalDSPGraph {
     this.routing.dispose(); this.routing = routing; this.outputConfig = { ...config, expandStereo };
   }
 
-  // 切歌包络使用独立增益，不改用户音量，也不会绕过暂停或静音状态。
+  // 播放过渡使用独立增益，不改用户音量，也不会绕过暂停或静音状态。
   fadeTo(target: 0 | 1, durationMs: number): number {
     const duration = Number.isFinite(durationMs) ? Math.max(0, Math.min(2000, durationMs)) : 300;
     const param = this.transition.gain;

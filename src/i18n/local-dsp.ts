@@ -61,6 +61,7 @@ export default {
   "本地音频路由失败，请重新播放。": ["Local audio routing failed. Restart playback.", "本機音訊路由失敗，請重新播放。", "ローカル音声の接続に失敗しました。再生し直してください。"],
   "本地音效暂不可用，请查看上方提示。": ["Local effects are currently unavailable. Check the message above.", "本機音效暫不可用，請查看上方提示。", "ローカルエフェクトは現在利用できません。上のメッセージを確認してください。"],
   "切歌淡出淡入": ["Fade out and in between tracks", "切歌淡出淡入", "曲切替時のフェードアウトとフェードイン"],
+  "进度跳转淡出淡入": ["Fade out and in when seeking", "進度跳轉淡出淡入", "シーク時のフェードアウトとフェードイン"],
   "淡出淡入时长（毫秒）": ["Fade duration (milliseconds)", "淡出淡入時長（毫秒）", "フェード時間（ミリ秒）"],
   "100–2000 毫秒，默认 300 毫秒。此时长分别用于淡出和淡入。": ["100–2000 milliseconds; the default is 300. This duration applies to each fade out and fade in.", "100–2000 毫秒，預設 300 毫秒。此時長分別用於淡出和淡入。", "100～2000 ミリ秒、既定値は 300 です。フェードアウトとフェードインにそれぞれ適用されます。"],
   "自动音量平衡": ["Automatic volume leveling", "自動音量平衡", "自動音量調整"],

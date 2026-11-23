@@ -4,7 +4,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { preview, type PreviewServer } from 'vite';
 import { playback, track } from '../fixtures/dto';
 import { installAudioProbe, outputSignal } from '../fixtures/audio-probe';
-import { logout, waitPlaying } from './helpers';
+import { logout, seekTo, waitPlaying } from './helpers';
 
 let server: PreviewServer;
 const origin = 'http://127.0.0.1:18163';
@@ -46,8 +46,14 @@ async function recordOutput(page: Page): Promise<void> {
       const rms = Math.sqrt(buffer.reduce((sum, value) => sum + value * value, 0) / buffer.length);
       recording.samples.push({ at: performance.now(), rms, src: document.querySelector('audio')?.currentSrc ?? '' });
     }, 20);
-    document.addEventListener('playing', (event) => {
-      if (event.target instanceof HTMLMediaElement) recording.events.push({ type: 'playing', at: performance.now(), src: event.target.currentSrc });
+    for (const type of ['playing', 'seeking', 'seeked']) {
+      document.addEventListener(type, (event) => {
+        if (event.target instanceof HTMLMediaElement) recording.events.push({ type, at: performance.now(), src: event.target.currentSrc });
+      }, true);
+    }
+    document.addEventListener('pointerup', (event) => {
+      if (event.target instanceof HTMLInputElement && event.target.getAttribute('aria-label') === '曲目进度')
+        recording.events.push({ type: 'seek-request', at: performance.now() });
     }, true);
     document.addEventListener('click', (event) => {
       const button = (event.target as Element).closest('button');
@@ -62,23 +68,36 @@ function meanRms(samples: Sample[], at: number, from: number, to: number, attemp
   return selected.reduce((sum, sample) => sum + sample.rms, 0) / selected.length;
 }
 
-test('switching waits for audible fade-out, fades in after delayed playing and logout cancels a pending switch', async ({ page }, info) => {
-  const errors: string[] = [];
-  page.on('pageerror', (error) => errors.push(error.message));
-  await recordOutput(page);
+function expectFadeOut(samples: Sample[], start: number, attempt: string, baseline: number): void {
+  const early = meanRms(samples, start, 150, 300, attempt);
+  const late = meanRms(samples, start, 850, 1050, attempt);
+  expect(early).toBeGreaterThan(baseline * 0.65);
+  expect(late).toBeLessThan(early * 0.5);
+  expect(late).toBeGreaterThan(baseline * 0.03);
+}
+
+function expectFadeIn(samples: Sample[], start: number, attempt: string, baseline: number): void {
+  const early = meanRms(samples, start, 100, 250, attempt);
+  const late = meanRms(samples, start, 900, 1100, attempt);
+  expect(early).toBeGreaterThan(baseline * 0.01);
+  expect(early).toBeLessThan(late * 0.45);
+  expect(late).toBeGreaterThan(baseline * 0.65);
+}
+
+async function installCatalog(page: Page, onSecondStream?: () => Promise<void>) {
   const creates: unknown[] = [];
-  let evidenceAttached = false;
-  let baseline = 0;
   const sounds = [tone(440), tone(880)];
-  let secondStreamRequested = false;
-  let releaseSecondStream!: () => void;
-  const secondStream = new Promise<void>((resolve) => { releaseSecondStream = resolve; });
   await routeApi(page, async (route) => {
     const request = route.request(), path = new URL(request.url()).pathname;
     if (path.endsWith('/stream')) {
       const second = path.includes('/attempt-2/');
-      if (second) { secondStreamRequested = true; await secondStream; }
-      return route.fulfill({ contentType: 'audio/wav', body: sounds[second ? 1 : 0] });
+      if (second) await onSecondStream?.();
+      const sound = sounds[second ? 1 : 0];
+      const range = /^bytes=(\d+)-(\d*)$/.exec(request.headers().range ?? '');
+      if (!range) return route.fulfill({ contentType: 'audio/wav', headers: { 'Accept-Ranges': 'bytes' }, body: sound });
+      const start = Number(range[1]), end = range[2] ? Math.min(Number(range[2]), sound.length - 1) : sound.length - 1;
+      return route.fulfill({ status: 206, contentType: 'audio/wav',
+        headers: { 'Accept-Ranges': 'bytes', 'Content-Range': `bytes ${start}-${end}/${sound.length}` }, body: sound.subarray(start, end + 1) });
     }
     let json: unknown = { items: [], nextCursor: null, nextAfter: null, libraryRevision: '1' };
     if (path.endsWith('/health/ready')) json = { product: 'MusicFS', ready: true, apiVersion: '1', instanceId: 'transition-dsp' };
@@ -101,6 +120,59 @@ test('switching waits for audible fade-out, fades in after delayed playing and l
     if (request.method() === 'DELETE') return route.fulfill({ status: 204 });
     return route.fulfill({ json });
   });
+  return creates;
+}
+
+test('byte-range seeking fades out the old position and restores audio at the target with track fades off', async ({ page }, info) => {
+  await recordOutput(page);
+  await page.addInitScript((fadeDurationMs) => {
+    localStorage.setItem('musicfs:transition-dsp:listener:preferences', JSON.stringify({ trackFadeEnabled: false, fadeDurationMs }));
+  }, duration);
+  const creates = await installCatalog(page);
+  await page.goto(`${origin}/#/library`);
+  await page.getByRole('button', { name: '播放全部', exact: true }).click();
+  await waitPlaying(page);
+  await expect.poll(async () => (await outputSignal(page)).rms).toBeGreaterThan(0.105);
+  const baseline = (await outputSignal(page)).rms;
+  const audio = await page.locator('audio').elementHandle();
+  await seekTo(page, 15);
+  await expect.poll(() => audio!.evaluate((el: HTMLAudioElement) => el.currentTime)).toBeGreaterThan(16.4);
+  const recording = await page.evaluate(() => {
+    const log = (window as unknown as ProbeWindow).musicfsTransitionRecording;
+    clearInterval(log.timer);
+    return { samples: log.samples, events: log.events };
+  });
+  await info.attach('seek-output-envelope', { body: JSON.stringify({ baseline, ...recording }), contentType: 'application/json' });
+  expect(creates).toHaveLength(1);
+  expect(await audio!.evaluate((el) => el === document.querySelector('audio'))).toBe(true);
+  const request = recording.events.find((event) => event.type === 'seek-request')!;
+  const seeking = recording.events.find((event) => event.type === 'seeking' && event.at >= request.at)!;
+  const seeked = recording.events.find((event) => event.type === 'seeked' && event.at >= seeking.at)!;
+  expect(seeking.at - request.at).toBeGreaterThanOrEqual(duration - 80);
+  expectFadeOut(recording.samples, request.at, 'attempt-1', baseline);
+  expectFadeIn(recording.samples, seeked.at, 'attempt-1', baseline);
+  expect(meanRms(recording.samples, seeked.at, 1250, 1350, 'attempt-1')).toBeGreaterThan(baseline * 0.95);
+
+  // 旧曲在跳转的淡出过程中播完时，继续在用户选择的位置播放。
+  await audio!.evaluate((el: HTMLAudioElement) => new Promise<void>((resolve) => {
+    el.addEventListener('playing', () => resolve(), { once: true });
+    el.currentTime = el.duration - 0.8;
+  }));
+  await seekTo(page, 5);
+  await expect.poll(() => audio!.evaluate((el: HTMLAudioElement) => !el.paused && el.currentTime > 6 && el.currentTime < 10)).toBe(true);
+  expect(creates).toHaveLength(1);
+});
+
+test('switching waits for audible fade-out, fades in after delayed playing and logout cancels a pending switch', async ({ page }, info) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await recordOutput(page);
+  let evidenceAttached = false;
+  let baseline = 0;
+  let secondStreamRequested = false;
+  let releaseSecondStream!: () => void;
+  const secondStream = new Promise<void>((resolve) => { releaseSecondStream = resolve; });
+  const creates = await installCatalog(page, () => { secondStreamRequested = true; return secondStream; });
   try {
     await page.goto(`${origin}/#/library`);
     await page.getByRole('button', { name: '设置', exact: true }).click();
@@ -156,16 +228,8 @@ test('switching waits for audible fade-out, fades in after delayed playing and l
     const create = recording.events.find((event) => event.type === 'create')!;
     const playing = recording.events.find((event) => event.type === 'playing' && event.src?.includes('/attempt-2/'))!;
     expect(create.at - click.at).toBeGreaterThanOrEqual(duration - 80);
-    const fadingEarly = meanRms(recording.samples, click.at, 150, 300, 'attempt-1');
-    const fadingLate = meanRms(recording.samples, click.at, 850, 1050, 'attempt-1');
-    expect(fadingEarly).toBeGreaterThan(baseline * 0.65);
-    expect(fadingLate).toBeLessThan(fadingEarly * 0.5);
-    expect(fadingLate).toBeGreaterThan(baseline * 0.03);
-    const risingEarly = meanRms(recording.samples, playing.at, 100, 250, 'attempt-2');
-    const risingLate = meanRms(recording.samples, playing.at, 900, 1100, 'attempt-2');
-    expect(risingEarly).toBeGreaterThan(baseline * 0.01);
-    expect(risingEarly).toBeLessThan(risingLate * 0.45);
-    expect(risingLate).toBeGreaterThan(baseline * 0.65);
+    expectFadeOut(recording.samples, click.at, 'attempt-1', baseline);
+    expectFadeIn(recording.samples, playing.at, 'attempt-2', baseline);
     expect(errors).toEqual([]);
   } finally {
     releaseSecondStream();

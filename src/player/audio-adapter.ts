@@ -15,6 +15,7 @@ export interface MediaObservation {
   type: MediaEvent;
   seconds: number;
   paused: boolean;
+  readyToPlay?: boolean;
   errorCode?: number;
 }
 export interface AudioPort {
@@ -27,6 +28,7 @@ export interface AudioPort {
   fadeIn?(durationMs: number): void;
   cancelFade?(): void;
   readonly seconds: number;
+  readonly ended?: boolean;
   readonly seekable: { start: number; end: number }[];
 }
 export type AudioFactory = (
@@ -59,16 +61,24 @@ export function audioFactory(root: HTMLElement, dsp?: LocalDSPEngine): AudioFact
       audio.addEventListener(
         type,
         () => {
+          if ((type === "ended" && !audio.ended) || (type === "pause" && !audio.paused)) return;
+          const readyToPlay = !audio.paused && !audio.seeking && audio.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA;
           if (type === "pause" || type === "ended") { fadeInDuration = 0; processing?.pause(); }
-          if (type === "seeking") { fadeInDuration = 0; processing?.reset(); }
+          if (type === "seeking") processing?.reset(fadeInDuration > 0);
+          // 本地定位可能始终有足够缓冲，此时 seeked 后不一定再收到 playing。
+          if (fadeInDuration && !audio.paused && !audio.seeking &&
+              (type === "playing" || (type === "seeked" && readyToPlay))) {
+            processing?.fadeIn(fadeInDuration);
+            fadeInDuration = 0;
+          }
           if (type === "playing") {
-            if (fadeInDuration) { processing?.fadeIn(fadeInDuration); fadeInDuration = 0; }
             void processing?.resume().catch(() => audio.pause());
           }
           observe({
             type,
             seconds: audio.currentTime,
             paused: audio.paused,
+            readyToPlay,
             errorCode: audio.error?.code,
           });
         },
@@ -93,8 +103,11 @@ export function audioFactory(root: HTMLElement, dsp?: LocalDSPEngine): AudioFact
           throw error;
         }
       },
-      pause: () => { processing?.pause(); audio.pause(); },
-      fadeOut: (durationMs) => processing?.fadeOut(durationMs) ?? Promise.resolve(),
+      pause: () => { fadeInDuration = 0; processing?.pause(); audio.pause(); },
+      fadeOut: (durationMs) => {
+        fadeInDuration = 0;
+        return processing?.fadeOut(durationMs) ?? Promise.resolve();
+      },
       fadeIn: (durationMs) => { fadeInDuration = durationMs; processing?.prepareFadeIn(); },
       cancelFade: () => { fadeInDuration = 0; processing?.fadeIn(0); },
       seek: (seconds) => {
@@ -107,6 +120,7 @@ export function audioFactory(root: HTMLElement, dsp?: LocalDSPEngine): AudioFact
       get seconds() {
         return audio.currentTime;
       },
+      get ended() { return audio.ended; },
       get seekable() {
         return Array.from({ length: audio.seekable.length }, (_, index) => ({
           start: audio.seekable.start(index),

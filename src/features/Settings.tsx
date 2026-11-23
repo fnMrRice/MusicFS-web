@@ -181,17 +181,27 @@ function PlaybackSettings() {
       </label>
       <div className="playback-setting-divider">
         <label className="playback-setting-row">
+          <span className="playback-setting-label">{tr("进度跳转淡出淡入")}</span>
+          <input
+            className="playback-switch"
+            type="checkbox"
+            checked={prefs.seekFadeEnabled}
+            disabled={!supported}
+            onChange={(event) => s.preference({ seekFadeEnabled: event.target.checked })}
+          />
+        </label>
+        <label className="playback-setting-row">
           <span className="playback-setting-label">{tr("切歌淡出淡入")}</span>
           <input
             className="playback-switch"
             type="checkbox"
             aria-label={tr("切歌淡出淡入")}
-            checked={prefs.fadeEnabled}
+            checked={prefs.trackFadeEnabled}
             disabled={!supported}
-            onChange={(event) => s.preference({ fadeEnabled: event.target.checked })}
+            onChange={(event) => s.preference({ trackFadeEnabled: event.target.checked })}
           />
         </label>
-        {prefs.fadeEnabled && <div className="playback-duration">
+        {(prefs.seekFadeEnabled || prefs.trackFadeEnabled) && <div className="playback-duration">
           <label className="playback-duration-label">
             <span>{tr("淡出淡入时长（毫秒）")}</span>
             <input
