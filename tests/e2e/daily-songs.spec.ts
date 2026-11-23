@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { preview, type PreviewServer } from "vite";
 import { instanceIds, neteasePlugin } from "../fixtures/plugins";
 
@@ -7,11 +7,12 @@ let server: PreviewServer;
 test.beforeAll(async () => { server = await preview({ preview: { host: "127.0.0.1", port: 18288, strictPort: true } }); });
 test.afterAll(async () => { await new Promise<void>((resolve) => server?.httpServer.close(() => resolve())); });
 
-test("daily songs use the signed-in account, recover independently and stay outside playlist history", async ({ page }) => {
-  const id = instanceIds.netease;
-  let account = "A";
-  let response: "error" | "empty" | "songs" = "error";
-  const dailyRequests: string[] = [];
+const id = instanceIds.netease;
+const dailyPath = `#/recommendations/${id}/daily-songs`;
+async function mockRecommendations(page: Page) {
+  const state: { account: string; response: "error" | "empty" | "songs"; feed: "same" | "other" | "empty"; dailyRequests: string[] } = {
+    account: "A", response: "error", feed: "same", dailyRequests: [],
+  };
   const capability = (name: string) => ({ name, supported: true, reason: "" });
   await page.route("**/api/v1/**", (route) => {
     const { pathname, searchParams } = new URL(route.request().url());
@@ -19,6 +20,7 @@ test("daily songs use the signed-in account, recover independently and stay outs
     if (pathname.endsWith("/health/ready")) json = { product: "MusicFS", ready: true, apiVersion: "1", instanceId: "fixture" };
     if (pathname.endsWith("/auth/session")) json = { csrfToken: "fixture", user: { id: "listener", role: "user" } };
     if (pathname.endsWith("/online-instances")) {
+      const account = state.account;
       const source = { instanceId: id, platform: "netease", plugin: neteasePlugin, name: account, accountId: account,
         accountRevision: account, availability: "available", capabilities: [capability("recommendations.tracks")] };
       json = { items: [
@@ -28,42 +30,129 @@ test("daily songs use the signed-in account, recover independently and stay outs
       ] };
     }
     if (pathname.endsWith("/daily-songs")) {
-      dailyRequests.push(pathname);
+      state.dailyRequests.push(pathname);
       expect(searchParams.get("limit")).toBe("50");
-      if (response === "error") return route.fulfill({ status: 503, json: { error: { code: "TEMPORARY_FAILURE", requestId: "daily-attempt" } } });
-      const track = { externalId: "1", title: `Song ${account}`, artists: ["Artist"], album: "", durationMs: 95000, sourceUrl: "" };
-      json = { tracks: response === "empty" ? [] : [track], observedAt: "2026-11-23T00:00:00Z" };
+      if (state.response === "error") return route.fulfill({ status: 503, json: { error: { code: "TEMPORARY_FAILURE", requestId: "daily-attempt" } } });
+      const track = { externalId: "1", title: `Song ${state.account}`, artists: ["Artist"], album: "", durationMs: 95000, sourceUrl: "" };
+      json = { tracks: state.response === "empty" ? [] : [track], observedAt: "2026-11-23T00:00:00Z" };
     }
     if (pathname.endsWith("/recommendations")) {
       const title = searchParams.has("history") ? "Past playlist" : "Current playlist";
-      json = { historyDepth: 1, sources: [{ instanceId: id, items: [{ playlist: { externalId: "mix", title, trackCount: 1 } }] }] };
+      const source = { instanceId: state.feed === "other" ? instanceIds.custom : id,
+        items: [{ playlist: { externalId: "mix", title, trackCount: 1 } }] };
+      json = { historyDepth: 1, sources: state.feed === "empty" ? [] : [source] };
     }
     return route.fulfill({ json });
   });
+  return state;
+}
+
+test("only the current grid links to daily songs, and track requests start on the account detail page", async ({ page }) => {
+  const state = await mockRecommendations(page);
   await page.goto(`${origin}/#/recommendations`);
-  const daily = page.getByRole("region", { name: /每日推荐歌曲$/ });
+  const content = page.locator("#page-scroll");
+  const current = content.getByRole("link", { name: /Current playlist/ });
+  const grid = content.locator(".cards").filter({ has: page.getByRole("link", { name: /Current playlist/ }) });
+  const dailyCards = content.locator('a[href$="/daily-songs"]');
+  const card = grid.locator(`a[href="${dailyPath}"]`);
+  await expect(card).toHaveAccessibleName(/每日推荐歌曲/);
+  await expect(card).toBeVisible();
+  await expect(dailyCards).toHaveCount(1);
+  await expect(content.getByRole("table")).toHaveCount(0);
+  await content.getByRole("button", { name: "时光机" }).click();
+  await expect(content.getByRole("link", { name: /Past playlist/ })).toBeVisible();
+  await expect(dailyCards).toHaveCount(0);
+  await content.getByRole("button", { name: "返回最新推荐" }).click();
+  await expect(card).toBeVisible();
+  expect(state.dailyRequests).toEqual([]);
+  await card.click();
+  await expect(page).toHaveURL(`${origin}/${dailyPath}`);
+  const daily = content;
   await expect(daily.getByRole("alert")).toContainText("daily-attempt");
-  await expect(page.getByRole("link", { name: /Current playlist/ })).toBeVisible();
-  response = "empty";
+  await expect(current).toHaveCount(0);
+  state.response = "empty";
   await daily.getByRole("button", { name: "重试" }).click();
   await expect(daily.getByText("此账号今天暂无推荐歌曲。")).toBeVisible();
-  response = "songs";
+  state.response = "songs";
   await daily.getByRole("button", { name: "刷新每日推荐歌曲" }).click();
   await expect(daily.getByRole("cell", { name: "Song A", exact: true })).toBeVisible();
   await expect(daily.getByRole("button", { name: "播放 Song A" })).toBeVisible();
   await expect(daily.getByRole("button", { name: "将 Song A 添加到歌单" })).toBeVisible();
-  await page.getByRole("button", { name: "时光机" }).click();
-  await expect(page.getByRole("link", { name: /Past playlist/ })).toBeVisible();
-  await expect(daily).toHaveCount(0);
-  await page.getByRole("button", { name: "返回最新推荐" }).click();
-  await expect(daily.getByText("Song A")).toBeVisible();
-  account = "B";
+  const reads = state.dailyRequests.length;
+  await page.getByRole("button", { name: "返回", exact: true }).click();
+  await expect(page).toHaveURL(`${origin}/#/recommendations`);
+  await expect(card).toBeVisible();
+  expect(state.dailyRequests).toHaveLength(reads);
+  state.account = "B";
   await page.goto(`${origin}/#/search`);
   await expect(page.getByRole("combobox").first()).toContainText("B");
   await page.goto(`${origin}/#/recommendations`);
+  await expect(card).toBeVisible();
+  expect(state.dailyRequests).toHaveLength(reads);
+  await card.click();
   await expect(daily.getByRole("cell", { name: "Song B", exact: true })).toBeVisible();
   await expect(page.getByText("Song A", { exact: true })).toHaveCount(0);
   await expect(daily.getByRole("button", { name: "加入队列" })).toHaveCount(0);
   await expect(daily.getByRole("button", { name: /添加到歌单/ })).toHaveCount(0);
-  expect(new Set(dailyRequests)).toEqual(new Set([`/api/v1/online-instances/${id}/daily-songs`]));
+  expect(new Set(state.dailyRequests)).toEqual(new Set([`/api/v1/online-instances/${id}/daily-songs`]));
 });
+
+test("a direct daily-song URL cannot read from a signed-out or unsupported instance", async ({ page }) => {
+  const state = await mockRecommendations(page);
+  for (const source of [instanceIds.neteaseSecond, instanceIds.custom]) {
+    await page.goto(`${origin}/#/recommendations/${source}/daily-songs`);
+    const content = page.locator("#page-scroll");
+    await expect(content).toContainText(/登录|不支持|不可用|推荐歌单/);
+    await expect(content.getByRole("table")).toHaveCount(0);
+  }
+  expect(state.dailyRequests).toEqual([]);
+});
+
+test("an eligible account keeps one daily card when the feed contains other sources or no playlists", async ({ page }) => {
+  const state = await mockRecommendations(page);
+  state.feed = "other";
+  await page.goto(`${origin}/#/recommendations`);
+  const content = page.locator("#page-scroll");
+  const ordinary = page.getByRole("link", { name: /Current playlist/ });
+  const card = content.locator(`.cards a[href="${dailyPath}"]`);
+  await expect(ordinary).toBeVisible();
+  await expect(card).toBeVisible();
+  await expect(content.locator(".cards").filter({ has: ordinary }).locator('a[href$="/daily-songs"]')).toHaveCount(0);
+  await expect(content.locator('a[href$="/daily-songs"]')).toHaveCount(1);
+  state.feed = "empty";
+  await content.getByRole("button", { name: "刷新推荐", exact: true }).click();
+  await expect(ordinary).toHaveCount(0);
+  await expect(card).toBeVisible();
+  await expect(content.locator(".cards a")).toHaveCount(1);
+  await expect(content.getByText("尚未配置可用的推荐来源。")).toHaveCount(0);
+  expect(state.dailyRequests).toEqual([]);
+});
+
+for (const width of [375, 1280]) {
+  test(`playlist title and recommendation controls share a row at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await mockRecommendations(page);
+    await page.goto(`${origin}/#/recommendations`);
+    const content = page.locator("#page-scroll");
+    const heading = content.getByRole("heading", { name: "推荐歌单", exact: true });
+    const history = content.getByRole("button", { name: "时光机", exact: true });
+    const refresh = content.getByRole("button", { name: "刷新推荐", exact: true });
+    async function expectRow() {
+      const boxes = await Promise.all([heading, history, refresh].map(async (control) => {
+        await expect(control).toBeVisible();
+        return (await control.boundingBox())!;
+      }));
+      expect(Math.max(...boxes.map((box) => box.y))).toBeLessThan(Math.min(...boxes.map((box) => box.y + box.height)));
+      for (const [index, box] of boxes.entries()) {
+        expect(box.x).toBeGreaterThanOrEqual(0);
+        expect(box.x + box.width).toBeLessThanOrEqual(width + 1);
+        if (index > 0) expect(boxes[index - 1].x + boxes[index - 1].width).toBeLessThanOrEqual(box.x + 1);
+      }
+    }
+    await expect(content.getByRole("link", { name: /Current playlist/ })).toBeVisible();
+    await expectRow();
+    await history.click();
+    await expect(content.getByRole("link", { name: /Past playlist/ })).toBeVisible();
+    await expectRow();
+  });
+}

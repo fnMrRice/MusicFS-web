@@ -29,7 +29,10 @@
   color: var(--muted);
   margin: 0;
 }
-.recommendation-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
+.section-title.recommendation-heading { gap: 8px; }
+.recommendation-heading h2 { min-width: 0; overflow-wrap: anywhere; }
+.recommendation-actions { display: flex; align-items: center; flex-shrink: 0; gap: 8px; }
+.recommendation-history { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
 .search-form {
   background: var(--panel);
   border: 1px solid var(--line);
@@ -255,6 +258,7 @@
   }
 }
 @media (max-width: 700px) {
+  .recommendation-actions > button { padding-inline: 7px; }
   .login-page {
     grid-template-columns: 1fr;
   }

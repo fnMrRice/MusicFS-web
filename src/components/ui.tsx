@@ -29,6 +29,7 @@ const paths: Record<string, ReactNode> = {
     </>
   ),
   folder: <path d="M3 7V4h6l3 3h9v13H3Z" />,
+  calendar: <><rect x="3" y="5" width="18" height="16" rx="3" /><path d="M7 3v4m10-4v4M3 10h18m-12 5 2 2 4-4" /></>,
   heart: <path d="M12 21 3.5 12.5C-2 6 6 0 12 7c6-7 14-1 8.5 5.5Z" />,
   clock: (
     <>

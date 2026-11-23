@@ -61,6 +61,7 @@ function Application() {
         <Route path="/works/:id" element={<WorkDetail />} />
         <Route path="/search" element={<Search />} />
         <Route path="/recommendations" element={<Recommendations />} />
+        <Route path="/recommendations/:instance/daily-songs" element={<DiscoveryPlaylist daily />} />
         <Route path="/playlists" element={<Playlists />} />
         <Route path="/playlists/:id" element={<PlaylistDetail />} />
         <Route path="/sources/:instance/playlists" element={<SourcePlaylists />} />

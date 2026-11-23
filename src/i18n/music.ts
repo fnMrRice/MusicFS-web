@@ -53,6 +53,8 @@ export default {
   "删除搜索记录 {0}": ["Remove search {0}", "刪除搜尋紀錄 {0}", "検索履歴 {0} を削除"],
   "刷新推荐": ["Refresh recommendations", "重新整理推薦", "おすすめを更新"],
   "{0}的每日推荐歌曲": ["Daily song recommendations for {0}", "{0}的每日推薦歌曲", "{0} のデイリーおすすめ曲"],
+  "每日推荐歌曲": ["Daily songs", "每日推薦歌曲", "デイリーおすすめ曲"],
+  "此来源尚不支持每日推荐歌曲。": ["Daily songs are unavailable for this source.", "此來源尚不支援每日推薦歌曲。", "このソースはデイリーおすすめ曲に対応していません。"],
   "刷新每日推荐歌曲": ["Refresh daily songs", "重新整理每日推薦歌曲", "デイリーおすすめ曲を更新"],
   "此账号今天暂无推荐歌曲。": ["No songs have been recommended for this account today.", "此帳號今天暫無推薦歌曲。", "このアカウントに今日のおすすめ曲はありません。"],
   "推荐歌单": ["Recommended playlists", "推薦歌單", "おすすめのプレイリスト"],
