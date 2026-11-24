@@ -1,5 +1,6 @@
 import { ApiClient, ApiError } from "./client";
 import type { SourceTrack } from "./types";
+import { catalogArtworkPath, mediaObject } from "./artwork";
 import { isLocalizedTitle, type LocalizedTitle } from "./localized-titles";
 
 export interface CatalogArtist { artistId: string; name: string }
@@ -204,7 +205,8 @@ export function displaySource(item: MusicTrack | SourceTrack): SourceTrack | nul
   if (!item.selectedSource) return null;
   return { ...item.selectedSource, playbackSelection: item.playbackSelection, title: item.title, artists: item.artists.map((a) => a.name),
     album: item.albums.map((a) => a.name).join(" / ") || null, genre: item.genre,
-    coverObjectId: item.coverPath ? coverObject(item.coverPath) : item.selectedSource.coverObjectId };
+    catalogCoverPath: catalogArtworkPath(item.coverPath),
+    coverObjectId: mediaObject(item.coverPath) ?? item.selectedSource.coverObjectId };
 }
 
 export type TrackItem = MusicTrack | SourceTrack;
@@ -218,10 +220,6 @@ export function playlistTrack(track: MusicTrack, forcedSourceTrackId: string | n
   const group = track.selectedSource;
   const source = group?.versions?.find((version) => version.sourceTrackId === forcedSourceTrackId);
   return { ...track, playbackSelection, selectedSource: source && group ? { ...source,
-    recordingId: group.recordingId, manualSourceTrackId: group.manualSourceTrackId, versions: group.versions } : null };
-}
-
-// 受鉴权媒体地址可在浏览器内读取，服务器文件路径只作为资料保存。
-export function coverObject(path: string | null): string | null {
-  return path?.match(/^\/api\/v1\/media\/([A-Za-z0-9_-]+)$/)?.[1] ?? null;
+    recordingId: group.recordingId, manualSourceTrackId: group.manualSourceTrackId, versions: group.versions,
+    coverObjectId: group.coverObjectId ?? source.coverObjectId, onlineCoverPath: source.onlineCoverPath ?? group.onlineCoverPath } : null };
 }

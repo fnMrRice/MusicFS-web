@@ -1,4 +1,5 @@
 import type { SourceTrack } from "../api/types";
+import { catalogArtworkPath, onlineArtworkPath } from "../api/artwork";
 import { PlaybackQueue, type PlaybackQueueSnapshot } from "./playback-queue";
 
 const storageKey = "musicfs:playback-queue:v1";
@@ -25,6 +26,7 @@ function trackMetadata(value: unknown): SourceTrack | null {
     durationMs: number(value.durationMs), codec: text(value.codec), container: text(value.container),
     bitrateBps: number(value.bitrateBps), sampleRateHz: number(value.sampleRateHz),
     assetId: text(value.assetId), recordingId: text(value.recordingId), coverObjectId: text(value.coverObjectId),
+    onlineCoverPath: onlineArtworkPath(value.onlineCoverPath), catalogCoverPath: catalogArtworkPath(text(value.catalogCoverPath)),
     album: text(value.album), genre: text(value.genre), playbackSelection,
   };
 }

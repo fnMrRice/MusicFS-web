@@ -31,8 +31,12 @@ function silence(): Buffer {
   data.writeUInt32LE(8000, 24); data.writeUInt32LE(16000, 28); data.writeUInt16LE(2, 32); data.writeUInt16LE(16, 34);
   data.write("data", 36); data.writeUInt32LE(bytes, 40); return data;
 }
-async function mockApi(page: Page, special?: (route: Route, state: ReturnType<typeof initial>) => Promise<boolean>, recording = true) {
+async function mockApi(page: Page, special?: (route: Route, state: ReturnType<typeof initial>) => Promise<boolean>, recording = true, online = false) {
   const state = initial();
+  const proxyPath = "/api/v1/source-tracks/Legacy/online-artwork";
+  const versions = online ? tracks.map(t => ({ ...t, coverObjectId: null, onlineCoverPath: t.sourceTrackId === "Legacy" ? proxyPath : null })) : tracks;
+  const catalog = () => musicPage([{ ...versions[0], recordingId: recording ? "recording" : null,
+    coverObjectId: online ? null : state.coverObjectId, onlineCoverPath: online ? proxyPath : null, versions }], `revision-${state.revision}`);
   const writes: { body: { expectedRevision: number; objectId: string | null }; key: string | undefined }[] = [];
   const plays: string[] = [], errors: string[] = [];
   let reads = 0, pages = 0;
@@ -51,7 +55,7 @@ async function mockApi(page: Page, special?: (route: Route, state: ReturnType<ty
       } else reads++;
       await route.fulfill({ json: state }); return;
     }
-    if (path.includes("/media/")) {
+    if (path.includes("/media/") || path === proxyPath) {
       await route.fulfill({ contentType: "image/png", body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/lVQAAAAASUVORK5CYII=", "base64") }); return;
     }
     if (path.endsWith("/stream")) { await route.fulfill({ contentType: "audio/wav", body: sound }); return; }
@@ -65,9 +69,11 @@ async function mockApi(page: Page, special?: (route: Route, state: ReturnType<ty
     ] };
     if (path.endsWith("/library/tracks")) {
       pages++;
-      json = musicPage([{ ...tracks[0], recordingId: recording ? "recording" : null, coverObjectId: state.coverObjectId,
-        versions: tracks }], `revision-${state.revision}`);
+      json = catalog();
     }
+    if (online && path.endsWith("/me/favorites")) json = { items: [{ musicTrack: catalog().items[0], track: versions[0],
+      forcedSourceTrackId: "Small", recordedAt: "2026-11-24T01:00:00Z" }], nextCursor: null, revision: "1" };
+    if (online && path.endsWith("/library/tracks/recording")) json = catalog().items[0];
     if (path.endsWith("/media-selection")) json = { bindings: [{ objectId: "small", field: "artwork", current: true, state: "available" }] };
     if (path.endsWith("/playback/sessions") && request.method() === "POST") { plays.push(request.postDataJSON().sourceTrackId); json = playback(); }
     await route.fulfill({ json });
@@ -76,6 +82,21 @@ async function mockApi(page: Page, special?: (route: Route, state: ReturnType<ty
   await expect(page.getByRole("button", { name: "展开 Song 的来源版本", exact: true })).toHaveAttribute("aria-expanded", "false");
   return { state, writes, plays, errors, reads: () => reads, pages: () => pages };
 }
+
+test("group and pinned favorite retain online artwork when the selected local file lacks a cover", async ({ page }) => {
+  await mockApi(page, undefined, true, true);
+  const artwork = "/api/v1/source-tracks/Legacy/online-artwork";
+  await expect(page.locator(".track-title .cover img")).toHaveAttribute("src", artwork);
+  await page.getByRole("button", { name: "展开 Song 的来源版本", exact: true }).click();
+  await expect(page.locator(".track-version").filter({ hasText: "Legacy.wav" }).locator(".cover img")).toHaveAttribute("src", artwork);
+  await page.goto(`${origin}/#/favorites`);
+  await expect(page.locator(".track-title .cover img")).toHaveAttribute("src", artwork);
+  await page.getByRole("button", { name: "播放 Song", exact: true }).click();
+  await waitPlaying(page);
+  await expect(page.locator(".now-playing .cover img")).toHaveAttribute("src", artwork);
+  await page.getByRole("button", { name: "歌词", exact: true }).click();
+  await expect(page.locator(".media-artwork")).toHaveAttribute("src", artwork);
+});
 async function open(page: Page) {
   await page.getByRole("button", { name: "Song 的更多操作", exact: true }).click();
   await page.getByRole("menu").getByRole("menuitem", { name: "选择封面", exact: true }).click();

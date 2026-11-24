@@ -4,6 +4,7 @@ import { MatchingApi } from "../../api/matching";
 import { useServices, useStore } from "../../app/services";
 import { useSourceName } from "../../components/use-source-name";
 import { duration, ErrorNotice, Icon, IconButton } from "../../components/ui";
+import { TrackCover } from "../../components/TrackCover";
 import { Modal } from "../../components/Modal";
 import { useResource } from "../../components/query";
 import { tr, useLocale } from "../../i18n";
@@ -51,6 +52,7 @@ export function TrackVersions({ tracks, revision, refresh, recordingId, defaultS
           openActions(track, rect.left, rect.bottom, origin);
         }
       } : undefined}>
+      <TrackCover track={track} />
       <div className="track-version-name">{track.displayName}
         {track.availability !== "available" && <small className="availability">{tr(trackAvailabilityMessage(track.availability))}</small>}
         <SourceDownloads track={track} />

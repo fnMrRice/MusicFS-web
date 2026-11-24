@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import type { SourceTrack } from "../api/types";
 import { useServices, useStore } from "../app/services";
 import { Icon, IconButton } from "../components/ui";
+import { TrackCover } from "../components/TrackCover";
 import { tr, useLocale } from "../i18n";
 import { MediaPanel } from "./MediaPanel";
 import { VolumeControl } from "./VolumeControl";
@@ -118,7 +119,7 @@ export function PlayerPanels({ track }: { track: SourceTrack | null }) {
                         <button className={queue.index === i ? "selected" : ""}
                           aria-current={queue.index === i ? "true" : undefined}
                           onClick={() => s.playQueueIndex(i)}>
-                          {t.title || t.displayName}
+                          <TrackCover track={t} /><span>{t.title || t.displayName}</span>
                         </button>
                       </li>
                     ))}

@@ -20,6 +20,9 @@ export interface SourceTrack {
   sourceTrackId: string; providerInstanceId: string; displayName: string;
   title: string | null; artists: string[] | null; durationMs: number | null;
   album?: string | null; genre?: string | null; coverObjectId?: string | null;
+  onlineCoverPath?: string | null;
+  /** 将规范曲目投影为播放项时保留的封面。 */
+  catalogCoverPath?: string;
   albums?: CatalogAlbum[]; catalogArtists?: CatalogArtist[];
   codec: string | null; container: string | null; bitrateBps: number | null;
   sampleRateHz?: number | null;

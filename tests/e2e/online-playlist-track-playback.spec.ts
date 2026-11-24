@@ -61,13 +61,16 @@ async function openPlaylist(page: Page) {
       const song = songs.find(song => song.externalId === id)!;
       resolutions.push(song.externalId);
       json = { ...sourceTrack, sourceTrackId: "source-" + id, providerInstanceId: source, assetId: "asset-" + id,
-        displayName: song.title, title: song.title, artists: song.artists };
+        displayName: song.title, title: song.title, artists: song.artists, container: null, codec: null,
+        onlineCoverPath: song.coverUrl ? `/api/v1/source-tracks/source-${id}/online-artwork` : null };
     }
+    if (pathname.endsWith("/online-artwork")) return route.fulfill({ contentType: "image/svg+xml",
+      body: '<svg xmlns="http://www.w3.org/2000/svg" width="30" height="30"><rect width="30" height="30" fill="#4779a3"/></svg>' });
     if (pathname.endsWith("/playback/sessions") && request.method() === "POST") {
       const { sourceTrackId } = request.postDataJSON();
       starts.push(sourceTrackId);
       const sessionId = "session-" + starts.length, attemptId = "attempt-" + starts.length;
-      json = { ...playback(attemptId), sessionId, sourceTrackId, assetId: sourceTrackId.replace("source-", "asset-"),
+      json = { ...playback(attemptId), deliveryMode: "proxy", sessionId, sourceTrackId, assetId: sourceTrackId.replace("source-", "asset-"),
         streamUrl: `/api/v1/playback/sessions/${sessionId}/attempts/${attemptId}/stream` };
     }
     if (pathname.endsWith("/stream")) return route.fulfill({ contentType: "audio/wav", body: sound });
@@ -119,9 +122,13 @@ test("online playlist rows show their own artwork and play the chosen track with
   await waitPlaying(page);
   expect(resolutions).toEqual(["103", "102"]);
   expect(starts).toEqual(["source-102"]);
+  const proxyCover = "/api/v1/source-tracks/source-102/online-artwork";
+  await expect(page.locator(".now-playing .cover img")).toHaveAttribute("src", proxyCover);
+  await expect(page.locator(".player-status")).toHaveText(/^WAV → PCM · /);
   await queueToggle.click();
   await expect(queued).toHaveText(["留白", "海潮"]);
   await expect(queue.getByRole("button", { name: "海潮", exact: true })).toHaveAttribute("aria-current", "true");
+  await expect(queue.getByRole("button", { name: "海潮", exact: true }).locator("img")).toHaveAttribute("src", proxyCover);
   await queueToggle.click();
 
   await page.getByRole("button", { name: "播放全部", exact: true }).click();

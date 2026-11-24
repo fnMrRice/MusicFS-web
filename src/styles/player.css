@@ -249,13 +249,16 @@
   padding-left: 22px;
 }
 .queue-list button {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   background: transparent;
   border: 0;
   text-align: left;
   width: 100%;
   line-height: 1.5;
 }
+.queue-list .cover { width: 26px; height: 26px; }
 .queue-list .selected {
   color: var(--accent);
 }

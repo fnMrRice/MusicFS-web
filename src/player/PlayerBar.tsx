@@ -1,11 +1,11 @@
 import { tr, useLocale, statusText } from "../i18n";
 import { useEffect, useState, type CSSProperties } from "react";
 import { useServices, useStore } from "../app/services";
-import { Cover, IconButton } from "../components/ui";
+import { IconButton } from "../components/ui";
 import { PlayerPanels } from "./PlayerPanels";
 import { playbackFormat, playbackFormatTitle } from "./format";
 import type { PlaybackMode } from "./playback-queue";
-import { useTrackCover } from "../components/use-track-cover";
+import { TrackCover } from "../components/TrackCover";
 import { PlayerTime } from "./PlayerTime";
 import { PlayerFavorite } from "./PlayerFavorite";
 
@@ -20,7 +20,6 @@ export function PlayerBar() {
   useLocale();
   const s = useServices();
   const state = useStore(s.playerState);
-  const coverObjectId = useTrackCover(state.track);
   const q = useStore(s.queue);
   const modeIndex = playbackModes.findIndex((option) => option.mode === q.mode);
   const mode = playbackModes[modeIndex];
@@ -78,7 +77,7 @@ export function PlayerBar() {
         }}
       />
       <div className="now-playing">
-        <Cover objectId={coverObjectId} />
+        <TrackCover track={state.track} />
         <div>
           <strong>
             {state.track?.title || state.track?.displayName || tr("暂无音频")}

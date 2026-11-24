@@ -15,7 +15,8 @@ interface Binding {
 export function MediaPanel({ track }: { track: SourceTrack | null }) {
   useLocale();
   const s = useServices();
-  const coverObjectId = useTrackCover(track);
+  const cover = useTrackCover(track);
+  const [failedArtwork, setFailedArtwork] = useState<string>();
   const [scrapingId, setScrapingId] = useState<string | null>(null);
   const [revision, setRevision] = useState(0);
   const [state, setState] = useState({
@@ -66,7 +67,7 @@ export function MediaPanel({ track }: { track: SourceTrack | null }) {
     })();
     return () => controller.abort();
   }, [track?.sourceTrackId, track?.assetId, s, revision]);
-  const artwork = coverObjectId === undefined ? state.artwork : coverObjectId ? s.client.url(`/media/${encodeURIComponent(coverObjectId)}`) : "";
+  const artwork = cover === undefined ? state.artwork : cover;
   return (
     <>
       {track && <button onClick={() => setScrapingId(track.sourceTrackId)}>{tr("搜索在线资料")}</button>}
@@ -79,10 +80,12 @@ export function MediaPanel({ track }: { track: SourceTrack | null }) {
         <pre className="lyrics">{state.lyrics}</pre>
       ) : (
         <>
-          {artwork && (
+          {artwork && artwork !== failedArtwork && (
             <img
               className="media-artwork"
               src={artwork}
+              referrerPolicy="no-referrer"
+              onError={() => setFailedArtwork(artwork)}
               loading="lazy"
               alt={tr("当前曲目封面")}
             />

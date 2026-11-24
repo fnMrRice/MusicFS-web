@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import { coverObject, type MusicTrack } from "../../api/music-catalog";
+import type { MusicTrack } from "../../api/music-catalog";
+import { catalogArtworkPath } from "../../api/artwork";
 import { Cover, Icon, IconButton } from "../../components/ui";
 import { tr } from "../../i18n";
 import { OtherTrackTitles } from "./OtherTrackTitles";
@@ -16,7 +17,7 @@ export function UnavailableMusicRow({ track, credits, showSource, number, checke
     <td><input type="checkbox" aria-label={tr("选择 {0}", { 0: track.title })} checked={checked} onChange={toggle} /></td>
     <td className="row-number">{number}</td>
     <td><div className="track-title">
-      <Cover objectId={coverObject(track.coverPath)} />
+      <Cover src={catalogArtworkPath(track.coverPath)} />
       <div><button className="track-play" disabled aria-label={tr("播放 {0}", { 0: track.title })}>
         <Icon name="play" size={14} /><span>{track.title}</span>
       </button><OtherTrackTitles title={track.title} names={track.localizedTitles} /></div>

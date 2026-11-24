@@ -1,9 +1,9 @@
 import type { OutputProfile, Playback, SourceTrack } from '../api/types';
 import { tr } from '../i18n';
 
-function codecName(codec: string | null | undefined): string {
+function codecName(codec: string | null | undefined): string | undefined {
   const value = codec?.trim();
-  if (!value) return tr('编码未知');
+  if (!value) return;
   const name = value.toLowerCase();
   if (name === 'pcm' || name === 'lpcm' || name.startsWith('pcm_')) return 'PCM';
   if (['eac3', 'e-ac-3', 'ec-3', 'ddp', 'dd+'].includes(name)) return 'DDP';
@@ -29,18 +29,44 @@ function sampleRateLabel(value: number | null | undefined): string {
     : tr('采样率未知');
 }
 
+function sessionSource(track: SourceTrack, playback: Playback | null): SourceTrack | undefined {
+  if (!playback) return track;
+  const matches = (item: SourceTrack) => item.sourceTrackId === playback.sourceTrackId &&
+    (!item.assetId || item.assetId === playback.assetId);
+  return matches(track) ? track : track.versions?.find(matches);
+}
+
+function formatPair(container?: string | null, codec?: string | null): string | undefined {
+  const outer = container?.trim().toUpperCase();
+  const inner = codecName(codec);
+  return outer && inner && outer !== inner ? `${outer} → ${inner}` : outer || inner;
+}
+
+function outputFormat(output: OutputProfile): string | undefined {
+  const declared = formatPair(output.container, output.codec);
+  if (declared) return declared;
+  // MIME 只能说明容器时不推测其中的编码。
+  const mime = output.mime.split(';')[0].trim().toLowerCase();
+  const names: Record<string, string> = { 'audio/mpeg': 'MPEG', 'audio/flac': 'FLAC', 'audio/x-flac': 'FLAC',
+    'audio/wav': 'WAV', 'audio/x-wav': 'WAV', 'audio/aac': 'AAC', 'audio/mp4': 'MP4',
+    'audio/ogg': 'OGG', 'audio/opus': 'OPUS', 'audio/webm': 'WEBM' };
+  return names[mime];
+}
+
 function formatChain(track: SourceTrack, playback: Playback | null): string {
-  const stages: string[] = [];
-  const container = track.container?.trim().toUpperCase();
-  if (container) stages.push(container);
-  const source = codecName(track.codec);
-  if (source !== stages.at(-1)) stages.push(source);
-  if (playback) {
-    const output = codecName(playback.outputProfile.codec);
-    // 原流省略重复编码；转码即使保持同一编码，也保留输入和输出两个阶段。
-    if (playback.deliveryMode === 'processed' || output !== stages.at(-1)) stages.push(output);
+  const source = sessionSource(track, playback);
+  const input = formatPair(source?.container, source?.codec);
+  if (!playback) return input ?? tr('编码未知');
+  const output = outputFormat(playback.outputProfile);
+  if (playback.deliveryMode === 'processed') {
+    const final = codecName(playback.outputProfile.codec) ?? output;
+    return [input, final].filter(Boolean).join(' → ') || tr('编码未知');
   }
-  return stages.join(' → ');
+  // NCM 会话交付解包后的原流，保留已确认的外层容器。
+  if (playback.effectiveProcessing.some(step => typeof step === 'object' && step !== null && 'type' in step && step.type === 'ncmDecrypt')) {
+    return ['NCM', output ?? codecName(source?.codec)].filter(Boolean).join(' → ');
+  }
+  return output ?? input ?? tr('编码未知');
 }
 
 /** 展示源封装、内层编码与服务端交付编码；采样率和码率使用实际交付数据。 */
@@ -54,7 +80,9 @@ export function playbackFormat(track: SourceTrack, playback: Playback | null): s
 }
 
 export function playbackFormatTitle(track: SourceTrack, playback: Playback | null): string {
-  const details = [playbackFormat(track, playback), tr('来源码率：{0}', { 0: bitrateLabel(track.bitrateBps) })];
+  const source = sessionSource(track, playback);
+  const sourceRate = playback && playback.deliveryMode !== 'processed' ? playback.outputProfile.bitrateBps : source?.bitrateBps;
+  const details = [playbackFormat(track, playback), tr('来源码率：{0}', { 0: bitrateLabel(sourceRate) })];
   if (playback) details.push(tr('发送码率：{0}', { 0: bitrateLabel(playback.outputProfile.bitrateBps) }));
   return details.join('\n');
 }

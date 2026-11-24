@@ -34,6 +34,14 @@ function cache(queue: unknown) {
 }
 
 describe("queue persistence", () => {
+  it("restores the authenticated source artwork path and drops untrusted proxy URLs", () => {
+    const path = "/api/v1/source-tracks/first/online-artwork";
+    connected().queue.enqueue([{ ...first, onlineCoverPath: path }, { ...second, onlineCoverPath: "https://cdn.invalid/signed" }]);
+    const [online, invalid] = connected().queue.value.items;
+    expect(online.onlineCoverPath).toBe(path);
+    expect(invalid.onlineCoverPath).toBeUndefined();
+    expect(saved.get(key)).not.toContain("cdn.invalid");
+  });
   it("restores duplicate entries, their selected occurrence and mode from the single cache", () => {
     const { queue } = connected();
     queue.enqueue([first, second, first]);

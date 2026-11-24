@@ -2,9 +2,9 @@ import { Fragment, useState, type ReactNode } from "react";
 import { tr, useLocale } from "../../i18n";
 import type { SourceTrack } from "../../api/types";
 import { useServices, useStore } from "../../app/services";
-import { Cover, duration, Icon, IconButton } from "../../components/ui";
+import { duration, Icon, IconButton } from "../../components/ui";
 import { TrackVersions } from "../matching/TrackVersions";
-import { useTrackCover } from "../../components/use-track-cover";
+import { TrackCover } from "../../components/TrackCover";
 import { trackAvailabilityMessage } from "../../library/track-availability";
 import { TrackPlaybackIndicator } from "../TrackPlaybackIndicator";
 import type { LocalizedTitle } from "../../api/localized-titles";
@@ -49,7 +49,6 @@ export function TrackRow({
   useLocale();
   const s = useServices();
   const currentTrack = useStore(s.currentTrack);
-  const coverObjectId = useTrackCover(t);
   const [expanded, setExpanded] = useState(false);
   const versions = t.versions ?? [t];
   const title = t.title || t.displayName;
@@ -82,7 +81,7 @@ export function TrackRow({
       </td>
       <td>
         <div className="track-title">
-          <Cover objectId={coverObjectId} />
+          <TrackCover track={t} />
           <div>
             <button
               className="track-play"
