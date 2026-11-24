@@ -1,4 +1,11 @@
 export default {
+  "在线音乐下载目录": ["Online music download directory", "線上音樂下載目錄", "オンライン音楽のダウンロード先"],
+  "新下载和边下边播的音频会存到新目录。已下载的音乐仍可从原位置播放。": ["New downloads and audio cached during playback use this directory. Existing downloads still play from their original location.", "新下載和邊下載邊播放的音訊會存到新目錄。已下載的音樂仍可從原位置播放。", "新しいダウンロードと再生中のキャッシュはこのディレクトリに保存します。ダウンロード済みの音楽は元の場所から再生できます。"],
+  "服务器上的绝对路径": ["Absolute path on the server", "伺服器上的絕對路徑", "サーバー上の絶対パス"],
+  "使用默认目录": ["Use the default directory", "使用預設目錄", "既定のディレクトリを使用"],
+  "当前保存位置": ["Current storage location", "目前儲存位置", "現在の保存先"],
+  "恢复默认目录": ["Restore default directory", "恢復預設目錄", "既定のディレクトリに戻す"],
+  "请填写服务器上可写的绝对目录路径。": ["Enter an absolute path to a writable directory on the server.", "請填寫伺服器上可寫入的絕對目錄路徑。", "サーバー上で書き込み可能なディレクトリの絶対パスを入力してください。"],
   "来源标注": ["Reported by source", "來源標註", "音源提供元の情報"],
   "下载文件": ["Downloaded files", "下載檔案", "ダウンロード済みファイル"],
   "下载": ["Download", "下載", "ダウンロード"],

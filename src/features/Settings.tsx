@@ -9,6 +9,7 @@ import { MusicSources } from "./MusicSources";
 import { ScraperOrderSettings } from "./scrapers/ScraperOrderSettings";
 import { DSPSettings } from "./dsp/DSPSettings";
 import { VolumeSlider } from "../player/VolumeControl";
+import { OnlineDownloadDirectory } from "./OnlineDownloadDirectory";
 import "./playback-settings.css";
 import { settingsSections, useSettingsNavigation } from "./useSettingsNavigation";
 import "./settings-navigation.css";
@@ -62,7 +63,7 @@ export default function Settings() {
               </div>
             )
           )}
-          {tab.id === "playback" && <PlaybackSettings />}
+          {tab.id === "playback" && <><PlaybackSettings /><OnlineDownloadDirectory /></>}
           {tab.id === "dsp" && <DSPSettings />}
           {tab.id === "appearance" && <><AppearanceSettings /><RecommendationOrderSettings /></>}
           {tab.id === "user" && <UserSettings />}

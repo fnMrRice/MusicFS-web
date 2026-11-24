@@ -3,6 +3,17 @@ import type { PluginField } from "./plugin-settings";
 import type { DownloadVersion } from "./types";
 import type { OnlineTrack } from "./content";
 
+export interface DownloadDirectory { path: string; effectivePath: string }
+
+export async function onlineDownloadDirectory(client: ApiClient, { path, signal }: { path?: string; signal?: AbortSignal }) {
+  const options = path === undefined ? { signal } : { method: "PUT", body: { path }, signal };
+  const result = await client.request<DownloadDirectory>("/admin/online-download-directory", options);
+  if (!result || typeof result.path !== "string" || typeof result.effectivePath !== "string" || !result.effectivePath) {
+    throw new ApiError("INVALID_RESPONSE", "Invalid online download directory");
+  }
+  return result;
+}
+
 export interface DownloadVersionsPage { downloadVersionsByTrack?: Record<string, DownloadVersion[]> }
 
 function validVersion(v: DownloadVersion | undefined): v is DownloadVersion {
