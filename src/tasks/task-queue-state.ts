@@ -1,10 +1,10 @@
 import { ApiError, errorMessage, randomRequestId } from "../api/client";
-import { TasksApi, taskActive, taskSnapshot, type RefreshTask, type TaskScope } from "../api/tasks";
+import { TasksApi, taskActive, taskSnapshot, type CatalogTaskRequest, type Task, type TaskScope } from "../api/tasks";
 import { Store } from "../app/store";
 
 interface TaskQueueSnapshot {
   scope: TaskScope;
-  items: RefreshTask[];
+  items: Task[];
   activeCount: number;
   nextCursor: string | null;
   loading: boolean;
@@ -19,17 +19,19 @@ export class TaskQueueState extends Store<TaskQueueSnapshot> {
   private enabled = false;
   private admin = false;
   private connected = false;
+  private session = 0;
   private pages = 1;
   private subscription: { id: string; controller: AbortController } | null = null;
-  private history: { controller: AbortController; changes: Map<string, RefreshTask> } | null = null;
+  private history: { controller: AbortController; changes: Map<string, Task> } | null = null;
   private cancellations = new Map<string, AbortController>();
   private active = new Set<string>();
-  constructor(private api: TasksApi, private finished: (task: RefreshTask) => void = () => {}) { super(initial()); }
+  constructor(private api: TasksApi, private finished: (task: Task) => void = () => {}) { super(initial()); }
   start(admin: boolean): void {
     this.clear(); this.enabled = true; this.admin = admin;
     this.set({ ...initial(), loading: true });
   }
   clear(): void {
+    ++this.session;
     this.enabled = false; this.connected = false; this.stopReads();
     this.cancellations.forEach(controller => controller.abort()); this.cancellations.clear();
     this.active.clear(); this.pages = 1; this.set(initial());
@@ -88,22 +90,40 @@ export class TaskQueueState extends Store<TaskQueueSnapshot> {
       const expanded = !reset && this.pages > 1;
       const updates = [...changed, ...page.items];
       if (this.history) for (const task of updates) this.history.changes.set(task.id, task);
+      const previousIds = new Set(this.value.items.map(task => task.id));
       const items = expanded ? mergeWindow(this.value.items, updates) : page.items;
       this.set({ ...this.value, items, activeCount: page.activeCount, nextCursor: expanded ? this.value.nextCursor : page.nextCursor,
         error: null, loading: this.history !== null });
-      this.track(items, changed);
+      this.track([...items, ...changed], reset ? [] : updates.filter(task => !previousIds.has(task.id)));
       if (reset && this.pages > 1 && page.nextCursor) void this.readHistory(page.nextCursor, this.pages - 1);
     } catch (error) {
       this.set({ ...this.value, loading: false, error: errorMessage(error) });
     }
   }
-  private track(items: RefreshTask[], changed: RefreshTask[] = []): void {
-    for (const task of items) if (taskActive(task)) this.active.add(task.id);
-    for (const task of [...items, ...changed])
-      if (!taskActive(task) && this.active.delete(task.id)) this.finished(task);
+  async enqueue(request: CatalogTaskRequest, key: string): Promise<Task> {
+    const session = this.session;
+    const accepted = await this.api.enqueue(request, key);
+    if (!this.enabled || session !== this.session) return accepted;
+    // 很短的任务可能在首次排队快照抵达前完成，提交响应与订阅中较新的终态均可触发页面更新。
+    const task = this.value.items.find(item => item.id === accepted.id) ?? accepted;
+    if (taskActive(task)) this.active.add(task.id);
+    else this.finished(task);
+    return task;
+  }
+  private track(items: Task[], newlyObserved: Task[] = []): void {
+    const completed = new Map<string, Task>();
+    for (const task of items) {
+      if (taskActive(task)) this.active.add(task.id);
+      else if (this.active.delete(task.id)) completed.set(task.id, task);
+    }
+    // 其他客户端提交的曲库任务可能在连续两次推送之间完成。订阅初始历史无需触发更新。
+    for (const task of newlyObserved) {
+      if (task.kind !== "metadataRefresh" && !taskActive(task)) completed.set(task.id, task);
+    }
+    for (const task of completed.values()) this.finished(task);
   }
   private async readHistory(cursor: string, count: number): Promise<void> {
-    const read = { controller: new AbortController(), changes: new Map<string, RefreshTask>() };
+    const read = { controller: new AbortController(), changes: new Map<string, Task>() };
     this.history = read;
     const seen = new Set<string>();
     let loaded = this.pages - count;
@@ -155,13 +175,13 @@ export class TaskQueueState extends Store<TaskQueueSnapshot> {
 }
 
 /** 服务端按 UTC 创建时间、任务 ID 倒序排列。保留当前游标之前新增或变更的行。 */
-function mergeWindow(rows: RefreshTask[], updates: Iterable<RefreshTask>): RefreshTask[] {
-  const ordered = (a: RefreshTask, b: RefreshTask) => {
+function mergeWindow(rows: Task[], updates: Iterable<Task>): Task[] {
+  const ordered = (a: Task, b: Task) => {
     const left = a.createdAt.replace(/Z$/, ""), right = b.createdAt.replace(/Z$/, "");
     if (left !== right) return left > right ? -1 : 1;
     return a.id === b.id ? 0 : a.id > b.id ? -1 : 1;
   };
-  const byId = new Map<string, RefreshTask>();
+  const byId = new Map<string, Task>();
   for (const task of rows) if (!byId.has(task.id)) byId.set(task.id, task);
   const last = rows.at(-1);
   for (const task of updates) if (!last || byId.has(task.id) || ordered(task, last) <= 0) byId.set(task.id, task);

@@ -1,5 +1,5 @@
 import { expect, type Page } from "@playwright/test";
-import type { RefreshTask } from "../../src/api/tasks";
+import type { Task } from "../../src/api/tasks";
 import { instanceIds, localPlugin } from "./plugins";
 import { routeApi } from "./control-mock";
 import { refreshTask } from "./tasks";
@@ -8,7 +8,7 @@ export const taskRoots = [{ id: "music", name: "Music", pathConfigured: true }, 
   { id: "third", name: "Third", pathConfigured: true }];
 const options = { recursive: true, maxDepth: 0, importLyrics: false, importArtwork: false, excludePatterns: [], skipHidden: true, respectNoMedia: true };
 export async function taskQueueMock(page: Page) {
-  const state = { tasks: [] as RefreshTask[], posts: [] as { roots: string[]; key: string }[], scopes: [] as string[],
+  const state = { tasks: [] as Task[], posts: [] as { roots: string[]; key: string }[], scopes: [] as string[],
     cancellations: [] as { id: string; scope: string }[], admin: true, uncertain: "", configWrites: 0, unavailable: false,
     activeCount: null as number | null, listError: false, holdSnapshot: false, httpLists: 0 };
   const keys = new Map<string, string>();
@@ -27,7 +27,7 @@ export async function taskQueueMock(page: Page) {
       expect(body.mode).toBe("full"); expect(body.schemaRevision).toBe("local-import-v5");
       expect(body.options).toEqual({ refreshMetadata: true }); expect(body.rootIds).toHaveLength(1);
       expect(key).toBeTruthy(); state.posts.push({ roots: body.rootIds, key });
-      const existing = keys.get(key) ?? state.tasks.find(task => task.rootIds[0] === body.rootIds[0] && ["queued", "running", "cancelling"].includes(task.status))?.id;
+      const existing = keys.get(key) ?? state.tasks.find(task => task.kind === "metadataRefresh" && task.rootIds[0] === body.rootIds[0] && ["queued", "running", "cancelling"].includes(task.status))?.id;
       if (existing) return route.fulfill({ status: 202, json: { jobId: existing, merged: true } });
       const id = `task-${state.tasks.length + 1}`, root = taskRoots.find(item => item.id === body.rootIds[0])!;
       keys.set(key, id);

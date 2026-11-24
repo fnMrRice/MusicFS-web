@@ -1,7 +1,7 @@
 import { useId, useState, type ReactNode } from "react";
 import type { MusicAlbum, MusicCategoryKind, MusicTrackQuery } from "../../api/music-catalog";
 import type { Provider } from "../../api/types";
-import { useServices } from "../../app/services";
+import { useServices, useStore } from "../../app/services";
 import { usePages, useResource } from "../../components/query";
 import { Empty, ErrorNotice, Icon, Sentinel } from "../../components/ui";
 import { tr } from "../../i18n";
@@ -17,12 +17,14 @@ type Props = { kind: MusicCategoryKind; provider: string; providers: Provider[];
   unknown: boolean; query: string; unscrapedOnly: boolean; refresh: number; trackSearch?: ReactNode; navigate: (id: string | null) => void };
 
 export function MusicCategoryBrowser(props: Props) {
-  return props.id || props.unknown ? <MusicCategoryTracks {...props} /> : <MusicCategoryList {...props} />;
+  const albumRevision = useStore(useServices().albumRevision);
+  const refresh = props.refresh + (props.kind === "album" ? albumRevision : 0);
+  return props.id || props.unknown ? <MusicCategoryTracks {...props} refresh={refresh} /> : <MusicCategoryList {...props} refresh={refresh} />;
 }
 
-function MusicCategoryList({ kind, provider, query, unscrapedOnly, navigate }: Props) {
+function MusicCategoryList({ kind, provider, query, unscrapedOnly, navigate, refresh }: Props) {
   const api = useServices().musicCatalog;
-  const pages = usePages(`${kind}:${provider}:${query}:${unscrapedOnly}`,
+  const pages = usePages(`${kind}:${provider}:${query}:${unscrapedOnly}:${refresh}`,
     (after, signal) => api.categories(kind, provider, query, after, signal, unscrapedOnly), (item) => item.id);
   return <>
     {kind === "album" ? <AlbumCollection items={pages.items} provider={provider} openAlbum={navigate} reload={pages.reload} /> : <div className="category-cards">

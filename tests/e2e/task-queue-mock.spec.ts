@@ -2,11 +2,86 @@ import { test, expect } from "@playwright/test";
 import { preview, type PreviewServer } from "vite";
 import { taskQueueMock } from "../fixtures/task-queue-mock";
 import { refreshTask } from "../fixtures/tasks";
+import { musicPage } from "../fixtures/music-catalog";
+import { track } from "../fixtures/dto";
+import { instanceIds } from "../fixtures/plugins";
+import type { Task } from "../../src/api/tasks";
 
 let server: PreviewServer;
 const origin = "http://127.0.0.1:18158";
 test.beforeAll(async () => { server = await preview({ preview: { host: "127.0.0.1", port: 18158, strictPort: true } }); });
 test.afterAll(async () => { await new Promise<void>(resolve => server?.httpServer.close(() => resolve())); });
+
+test("album queue submits the active source and search, retries the same request and refreshes the album list", async ({ page }) => {
+  const state = await taskQueueMock(page);
+  const task: Task = { ...refreshTask(), kind: "albumAutoScrape", progress: { completed: 0, total: 0 }, phase: "queued" };
+  let submitted: { body: unknown; key: string } | undefined;
+  await page.route("**/api/v1/tasks/album-scrape", async route => {
+    const request = { body: route.request().postDataJSON(), key: route.request().headers()["idempotency-key"] };
+    if (!submitted) { submitted = request; return route.abort("failed"); }
+    expect(request).toEqual(submitted);
+    state.tasks.push(task); state.pushTasks();
+    return route.fulfill({ status: 202, json: task });
+  });
+  await page.route("**/api/v1/library/albums?**", route => route.fulfill({ json: {
+    items: task.status === "succeeded" ? [] : [{ albumId: "album", name: "Night", trackCount: 2 }], nextAfter: null,
+  } }));
+  const params = new URLSearchParams({ category: "专辑", source: instanceIds.local, categoryQuery: "Night", unscrapedOnly: "true" });
+  await page.goto(`${origin}/#/library?${params}`);
+  await expect(page.getByRole("button", { name: "Night 2 首", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "一键自动刮削", exact: true }).click();
+  await page.getByRole("button", { name: "继续确认", exact: true }).click();
+  await expect(page.getByRole("status").filter({ hasText: "已加入任务队列" })).toBeVisible();
+  const enqueue = page.getByRole("button", { name: "一键自动刮削", exact: true });
+  await expect(enqueue).toBeDisabled();
+  state.tasks.pop(); state.pushTasks();
+  await expect(enqueue).toBeEnabled();
+  state.tasks.push(task); state.pushTasks();
+  await expect(enqueue).toBeDisabled();
+  expect(submitted?.key).toBeTruthy();
+  expect(submitted?.body).toEqual({ providerInstanceId: instanceIds.local, q: "Night" });
+  await page.getByRole("textbox", { name: "搜索分类", exact: true }).fill("Day");
+  await page.getByRole("button", { name: "搜索", exact: true }).click();
+  await expect(enqueue).toBeEnabled();
+  await page.getByRole("button", { name: "任务队列", exact: true }).click();
+  const panel = page.getByRole("region", { name: "任务队列详情" });
+  await expect(panel.getByRole("button", { name: "取消任务 专辑自动刮削" })).toBeVisible();
+  Object.assign(task, { status: "running", phase: "scraping", cancellable: false, progress: { completed: 1, total: 2 } }); state.pushTasks();
+  await expect(panel).toContainText("已处理 1/2 张专辑");
+  Object.assign(task, { status: "succeeded", phase: "finished", result: { updated: 1, retained: 0, notFound: 1, failed: 0 } }); state.pushTasks();
+  await expect(panel).toContainText("更新 1 · 保留 0 · 未找到 1 · 失败 0");
+  await expect(page.getByText("没有符合条件的未刮削专辑", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "一键自动刮削", exact: true })).toBeEnabled();
+});
+
+test("bulk merge can be queued with the selected rule and reports the final result after leaving the dialog", async ({ page }) => {
+  const state = await taskQueueMock(page);
+  const task: Task = { ...refreshTask(), kind: "bulkMerge", phase: "queued", progress: { completed: 0, total: 0 },
+    result: { mergedGroups: 0, mergedSources: 0, skippedGroups: 0 } };
+  await page.route("**/api/v1/library/tracks?**", route => route.fulfill({ json: musicPage([{ ...track,
+    title: task.status === "succeeded" ? "Merged track" : "Before merge" }]) }));
+  await page.route("**/api/v1/matching/revision", route => route.fulfill({ json: { revision: 1, bulkMergeAvailable: true } }));
+  await page.route("**/api/v1/tasks/bulk-merge", route => {
+    expect(route.request().postDataJSON()).toEqual({ mode: "title_artist", expectedRevision: 1 });
+    expect(route.request().headers()["idempotency-key"]).toBeTruthy();
+    state.tasks.push(task); state.pushTasks();
+    return route.fulfill({ status: 202, json: task });
+  });
+  await page.goto(`${origin}/#/library`);
+  await page.getByRole("button", { name: "一键合并重复音乐", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "一键合并重复音乐" });
+  await dialog.getByRole("radio", { name: "合并重名重作者" }).check();
+  await dialog.getByRole("button", { name: "加入任务队列" }).click();
+  await expect(dialog).toContainText("已加入任务队列");
+  await dialog.getByRole("button", { name: "关闭", exact: true }).last().click();
+  await page.getByRole("button", { name: "任务队列", exact: true }).click();
+  const panel = page.getByRole("region", { name: "任务队列详情" });
+  await expect(panel).toContainText("任务等待执行");
+  Object.assign(task, { status: "succeeded", phase: "finished", cancellable: false, result: { mergedGroups: 1, mergedSources: 2, skippedGroups: 3 } }); state.pushTasks();
+  await expect(panel).toContainText("已合并 1 组重复音乐，涉及 2 个来源版本。");
+  await expect(panel).toContainText("已跳过 3 个");
+  await expect(page.getByRole("checkbox", { name: "选择 Merged track", exact: true })).toBeVisible();
+});
 
 test("waits for the first pushed snapshot even when randomUUID is unavailable on LAN HTTP", async ({ page }) => {
   await page.addInitScript(() => Object.defineProperty(crypto, "randomUUID", { value: undefined }));
@@ -16,9 +91,9 @@ test("waits for the first pushed snapshot even when randomUUID is unavailable on
   await expect.poll(() => state.scopes).toEqual(["mine"]);
   const panel = page.getByRole("region", { name: "任务队列详情" });
   await expect(panel).toContainText("正在读取任务…");
-  await expect(panel).not.toContainText("暂无刷新任务");
+  await expect(panel).not.toContainText("暂无任务");
   state.pushTasks(true);
-  await expect(panel).toContainText("暂无刷新任务");
+  await expect(panel).toContainText("暂无任务");
   expect(state.httpLists).toBe(0);
 });
 
@@ -27,7 +102,7 @@ test("idle queues stay quiet and reconcile changes on push and reconnect", async
   await page.clock.install(); await page.goto(`${origin}/#/library`);
   await page.getByRole("button", { name: "任务队列", exact: true }).click();
   const panel = page.getByRole("region", { name: "任务队列详情" });
-  await expect(panel).toContainText("暂无刷新任务");
+  await expect(panel).toContainText("暂无任务");
   const idleReads = state.scopes.length;
   await page.clock.fastForward(9000);
   expect(state.scopes.length).toBe(idleReads);

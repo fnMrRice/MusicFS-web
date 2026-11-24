@@ -143,7 +143,19 @@ export class Services {
     void this.libraryApi.providers().catch(() => {});
   });
   private configurationScans = new ConfigurationScans(this.client, (instance) => this.scans.get(instance).requestAutomatic());
+  albumRevision = new Store(0);
   tasks = new TaskQueueState(new TasksApi(this.client), (task) => {
+    if (task.kind === "bulkMerge") {
+      if (task.result.mergedGroups > 0) this.matchingChanged();
+      return;
+    }
+    if (task.kind === "albumAutoScrape") {
+      if (task.result.updated > 0) {
+        this.albumRevision.set(this.albumRevision.value + 1);
+        this.invalidateLibraries();
+      }
+      return;
+    }
     for (const id of ["all", task.providerInstanceId]) void this.libraries.get(id)?.refresh();
     capabilityResources.invalidate();
     void this.libraryApi.providers().catch(() => {});

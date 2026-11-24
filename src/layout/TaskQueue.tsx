@@ -46,7 +46,7 @@ export function TaskQueue() {
       <div className={styles.content}>
         <RefreshSubmissions />
         <ErrorNotice error={value.error} retry={() => void services.tasks.refresh()} />
-        {!value.items.length && <p className={styles.empty}>{tr(value.loading ? "正在读取任务…" : value.error ? "暂时无法读取任务。" : "暂无刷新任务")}</p>}
+        {!value.items.length && <p className={styles.empty}>{tr(value.loading ? "正在读取任务…" : value.error ? "暂时无法读取任务。" : "暂无任务")}</p>}
         <ul className={styles.list} aria-label={tr(value.scope === "all" ? "所有任务" : "我的任务")}>
           {value.items.map(task => <TaskQueueItem key={task.id} task={task} showOwner={value.scope === "all"}
             cancelling={value.cancelling.includes(task.id)} error={value.cancelErrors[task.id] ?? null}

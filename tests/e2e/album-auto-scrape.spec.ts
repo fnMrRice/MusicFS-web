@@ -49,7 +49,9 @@ test("auto-scrape falls back to the first complete edition and retries an uncert
     return route.fulfill({ json: { revision: 2 } });
   });
   await page.goto(`${origin}/#/library?category=${encodeURIComponent("专辑")}&source=${provider}`);
-  await page.getByRole("checkbox", { name: "仅显示未刮削专辑" }).check();
+  const unscrapedOnly = page.getByRole("checkbox", { name: "仅显示未刮削专辑" });
+  await unscrapedOnly.click();
+  await expect(unscrapedOnly).toBeChecked();
   await page.getByRole("button", { name: "列表视图" }).click();
   await page.getByRole("button", { name: `${album.name} 的更多操作` }).click();
   await page.getByRole("menuitem", { name: "自动刮削" }).click();

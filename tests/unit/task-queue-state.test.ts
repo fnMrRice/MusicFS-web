@@ -1,24 +1,37 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { TasksApi, RefreshTask } from "../../src/api/tasks";
+import type { TasksApi, RefreshTask, Task } from "../../src/api/tasks";
 import { TaskQueueState } from "../../src/tasks/task-queue-state";
 import { refreshTask } from "../fixtures/tasks";
 
 const running = refreshTask({ status: "running", phase: "metadata" });
 const older = refreshTask({ id: "older", createdAt: "2026-10-22T00:00:00Z" });
 const done = (task: RefreshTask): RefreshTask => ({ ...task, status: "succeeded", phase: "finished", cancellable: false });
-const page = (items: RefreshTask[], activeCount: number, nextCursor: string | null = null) => ({ items, nextCursor, activeCount });
+const page = (items: Task[], activeCount: number, nextCursor: string | null = null) => ({ items, nextCursor, activeCount });
 function fixture(admin = false) {
   const api = { subscribe: vi.fn().mockResolvedValue(undefined), list: vi.fn(), cancel: vi.fn() };
   const finished = vi.fn();
   const state = new TaskQueueState(api as unknown as TasksApi, finished);
   state.start(admin);
   const id = () => api.subscribe.mock.calls.at(-1)![0];
-  const push = (items: RefreshTask[], activeCount = 1, cursor: string | null = null, changed: RefreshTask[] = [], reset = false) =>
+  const push = (items: Task[], activeCount = 1, cursor: string | null = null, changed: Task[] = [], reset = false) =>
     state.receive({ subscriptionId: id(), page: page(items, activeCount, cursor), changed, reset });
   return { api, state, finished, push, id };
 }
 afterEach(() => vi.useRealTimers());
 describe("global task queue", () => {
+  it("refreshes partial catalog results completed between snapshots and outside the visible page", () => {
+    const { state, push, finished } = fixture();
+    const job: Task = { ...refreshTask(), id: "scrape", kind: "albumAutoScrape", phase: "finished", status: "failed",
+      progress: { total: 2, completed: 2 }, result: { updated: 1, retained: 0, notFound: 0, failed: 1 } };
+    state.connection(true);
+    push([job], 0, null, [], true);
+    expect(finished).not.toHaveBeenCalled();
+    const fast = { ...job, id: "fast" }, outside = { ...job, id: "outside" };
+    push([fast, job], 0, "next", [outside]);
+    push([fast, job], 0, "next");
+    expect(finished.mock.calls.map(([task]) => task.id).sort()).toEqual(["fast", "outside"]);
+    expect(state.value.items).toEqual([fast, job]);
+  });
   it("keeps loading through a delayed subscribe response until the first snapshot arrives", async () => {
     const { state, api, push } = fixture();
     let acknowledge!: () => void;

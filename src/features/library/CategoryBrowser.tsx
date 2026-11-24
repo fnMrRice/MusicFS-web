@@ -11,6 +11,7 @@ import { TrackTable } from "../TrackTable";
 import { useCatalogPages } from "./use-catalog-pages";
 import { MusicCategoryBrowser } from "./MusicCategoryBrowser";
 import { AlbumViewSwitch } from "./AlbumCollection";
+import { QueueAlbumScrape } from "./QueueAlbumScrape";
 import "./categories.css";
 
 export const categoryKinds: Record<string, CategoryKind> = { "歌手": "artist", "专辑": "album", "流派": "genre", "文件夹": "folder" };
@@ -82,6 +83,7 @@ export function CategoryBrowser({ kind, provider, providers, providerError, relo
           setParams(next);
         }} /> {tr("仅显示未刮削专辑")}</label>
         <AlbumViewSwitch />
+        <QueueAlbumScrape key={JSON.stringify([provider, query])} provider={provider} query={query} />
       </>}
       {searchForm}
     </div>}

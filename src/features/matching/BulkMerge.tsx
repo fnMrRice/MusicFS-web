@@ -6,6 +6,7 @@ import { useResource } from "../../components/query";
 import { ErrorNotice } from "../../components/ui";
 import { tr, useLocale } from "../../i18n";
 import { useDecision } from "./useDecision";
+import { useCatalogTask } from "../../tasks/use-catalog-task";
 
 export function BulkMergeButton() {
   const services = useServices();
@@ -30,11 +31,12 @@ function BulkMerge({ close }: { close: () => void }) {
   const [minimumScore, setMinimumScore] = useState("80");
   const [result, setResult] = useState<BulkMergeMutation | null>(null);
   const decision = useDecision((response) => { if (isBulkMergeMutation(response)) setResult(response); });
-  const locked = decision.busy || decision.retryable || decision.conflict || pending.length > 0;
+  const job = useCatalogTask();
+  const locked = decision.busy || decision.retryable || decision.conflict || pending.length > 0 || job.busy || job.retryable;
   const score = Number(minimumScore);
   const validScore = minimumScore.trim() !== "" && Number.isInteger(score) && score >= 0 && score <= 100;
   return <Modal title={tr("一键合并重复音乐")} close={close}>
-    {result ? <BulkMergeSummary result={result} /> : <>
+    {job.submitted ? <p role="status">{tr("已加入任务队列")}</p> : result ? <BulkMergeSummary result={result} /> : <>
       <p>{tr("处理全部来源中你可见的当前可用曲目，不受当前来源筛选、已加载页或所选曲目限制。所有来源和原文件都会保留。")}</p>
       <fieldset className="bulk-merge-options" disabled={locked}>
         <legend>{tr("合并方式")}</legend>
@@ -56,20 +58,27 @@ function BulkMerge({ close }: { close: () => void }) {
       <p className="muted">{tr("手动解除关联的曲目不会被再次自动合并。")}</p>
       <ErrorNotice error={current.error} retry={locked ? undefined : current.reload} />
       <ErrorNotice error={decision.error} />
+      <ErrorNotice error={job.error} />
       {current.data && !current.data.bulkMergeAvailable && <p role="alert">{tr("当前 Server 不支持一键合并，请更新 Server。")}</p>}
       {pending.length > 0 && <p role="status">{tr(decision.busy ? "正在合并重复音乐，可离开此页面。" : "请先确认上次歌曲关联操作的结果。")}</p>}
     </>}
     <div className="list-actions">
-      {!result && (decision.conflict ? <button onClick={() => { decision.reset(); current.reload(); }}>
+      {!result && !job.submitted && (decision.conflict ? <button onClick={() => { decision.reset(); current.reload(); }}>
         {tr("刷新曲库并重新确认")}
       </button> : <button className="primary"
-        disabled={decision.busy || (pending.length > 0 && !decision.retryable) ||
+        disabled={job.busy || job.retryable || decision.busy || (pending.length > 0 && !decision.retryable) ||
           (!decision.retryable && (!current.data?.bulkMergeAvailable || (mode === "score" && !validScore)))}
         onClick={() => { if (decision.retryable) void decision.run();
           else if (current.data) void decision.run(bulkMergeRequest(mode, current.data.revision, score)); }}>
         {tr(decision.busy ? "正在合并…" : decision.retryable ? "继续确认合并结果" : "开始合并")}
       </button>)}
-      <button onClick={close}>{tr(result || locked ? "关闭" : "取消")}</button>
+      {!result && !job.submitted && !decision.conflict && <button type="button"
+        disabled={job.busy || (!job.retryable && (locked || !current.data?.bulkMergeAvailable || (mode === "score" && !validScore)))}
+        onClick={() => { if (current.data) void job.submit({ kind: "bulkMerge", mode, expectedRevision: current.data.revision,
+          ...(mode === "score" ? { minimumScore: score } : {}) }); }}>
+        {tr(job.busy ? "正在加入队列…" : job.retryable ? "继续确认" : "加入任务队列")}
+      </button>}
+      <button onClick={close}>{tr(result || job.submitted || locked ? "关闭" : "取消")}</button>
     </div>
   </Modal>;
 }
