@@ -187,6 +187,7 @@ export default {
   "同步状态：": ["Sync status: ", "同步狀態：", "同期状態："],
   "排队中": ["Queued", "排隊中", "待機中"],
   "同步中": ["Syncing", "同步中", "同期中"],
+  "立即同步": ["Sync now", "立即同步", "今すぐ同期"],
   "重试同步": ["Retry sync", "重試同步", "同期を再試行"],
   "正在提交…": ["Submitting…", "正在提交…", "送信中…"],
   "歌单同步触发请求上限，服务端会在冷却后自动重试。": ["The playlist sync reached a request limit. The server will retry after the cooldown.", "歌單同步觸發請求上限，伺服器會在冷卻後自動重試。", "プレイリスト同期がリクエスト上限に達しました。待機後にサーバーが再試行します。"],

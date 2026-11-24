@@ -163,23 +163,6 @@ function RemoteRow({
 }) {
   useLocale();
   const s = useServices();
-  const [jobId, setJobId] = useState(p.jobId);
-  const [tracking, setTracking] = useState(!!p.jobId);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const sync = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      const receipt = await s.content.sync(p);
-      setTracking(true);
-      setJobId(receipt.jobId);
-    } catch (e) {
-      setError(errorMessage(e));
-    } finally {
-      setBusy(false);
-    }
-  };
   return (
     <div className="remote-row">
       <div>
@@ -189,30 +172,21 @@ function RemoteRow({
           {p.lastSuccessAt &&
             tr(" · 上次成功 {0}", { "0": formatDate(p.lastSuccessAt) })}
         </p>
-        {p.error && !jobId && (
+        {p.error && !p.jobId && (
           <p className="notice">
             {syncFailureMessage(p.error.code)} <small>({p.error.code})</small>
           </p>
         )}
-        {jobId && <PlaylistSyncStatus key={jobId} jobId={jobId} showRetry={false}
-          pending={() => setTracking(true)} finished={async (signal, _job, current) => {
-          try {
+      </div>
+      <div className="linked-playlist-sync">
+        <PlaylistSyncStatus jobId={p.jobId}
+          start={async signal => s.content.sync(await s.content.remotePlaylist(p.playlistId, signal), signal)}
+          synced={() => s.sourcePlaylists.revalidate(p.instanceId, true)}
+          finished={async (signal, _job, current) => {
             const playlist = current ?? await s.content.remotePlaylist(p.playlistId, signal);
             if (!signal.aborted) updated(playlist);
-          } finally {
-            if (!signal.aborted) setTracking(false);
-          }
-        }} />}
-        <ErrorNotice error={error} />
+          }} />
       </div>
-      <button
-        disabled={busy || tracking}
-        onClick={() => {
-          void sync();
-        }}
-      >
-        {tr(p.error && !tracking ? "重试同步" : "同步")}
-      </button>
     </div>
   );
 }

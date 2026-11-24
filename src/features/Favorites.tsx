@@ -6,6 +6,8 @@ import { Empty, ErrorNotice, IconButton } from "../components/ui";
 import { useSourceName } from "../components/use-source-name";
 import { tr, useLocale } from "../i18n";
 import { TrackTable } from "./TrackTable";
+import { LocalPlaylistSync } from "./playlists/LinkedPlaylistSync";
+import { favoritesPlaylistId } from "../api/playlist-links";
 
 export function Favorites() {
   useLocale();
@@ -31,6 +33,7 @@ export function Favorites() {
       <div className="filter-end"><IconButton icon="refresh" label={tr("刷新列表")} disabled={favorites.loading}
         onClick={() => { providers.reload(); void s.favorites.load(true); }} /></div>
     </div>
+    <LocalPlaylistSync playlistId={favoritesPlaylistId} />
     <ErrorNotice error={providers.error} retry={providers.reload} />
     {!tracks.length && <ErrorNotice error={favorites.error} retry={() => { void s.favorites.load(true); }} />}
     {tracks.length > 0 && <TrackTable tracks={tracks} providers={providers.data ?? []}

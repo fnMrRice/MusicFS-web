@@ -8,7 +8,7 @@ import { useSourceName } from "../../components/use-source-name";
 import { ErrorNotice, Icon, SectionToggle } from "../../components/ui";
 import { formatDate, tr, useLocale } from "../../i18n";
 import { PlaylistLinkDialog } from "./PlaylistLinkDialog";
-import { PlaylistSyncStatus } from "./PlaylistSyncStatus";
+import { LinkedPlaylistSync } from "./LinkedPlaylistSync";
 import { partitionAccountPlaylists, useAccountPlaylistFolders } from "./account-playlist-folders";
 import { remotePlaylistLabel, remotePlaylistPath } from "./remote-playlist-link";
 
@@ -76,10 +76,9 @@ function AccountPlaylistList({ source, heading, management, links }: {
           <Icon name="album" /><strong>{title}</strong>
           <small>{tr("{0} 首", { 0: playlist.trackCount ?? tr("未知数量") })}</small>
         </Link>
-        {link?.jobId && <PlaylistSyncStatus key={link.jobId} jobId={link.jobId}
-          finished={linkedToFavorites ? async (_signal, job) => {
-            if (job?.state === "succeeded") await s.favorites.load(true);
-          } : undefined} />}
+        {link && <div className="linked-playlist-sync"><LinkedPlaylistSync link={link} finished={
+          link.instanceId === instanceId ? undefined : () => s.sourcePlaylists.revalidate(instanceId, true, true)
+        } /></div>}
         {(syncStatus || (!management && target)) && <p className="muted">
           {!management && target}{!management && syncStatus && " · "}{syncStatus}
         </p>}

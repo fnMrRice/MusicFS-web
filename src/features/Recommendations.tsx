@@ -10,6 +10,8 @@ import { errorMessage } from "../api/client";
 import { useSourceName } from "../components/use-source-name";
 import { OnlinePlaylistTracks } from "./playlists/OnlinePlaylistTracks";
 import { PlaylistSyncStatus } from "./playlists/PlaylistSyncStatus";
+import { LinkedPlaylistSync } from "./playlists/LinkedPlaylistSync";
+import { playlistLinks } from "../api/playlist-links";
 import { useOnlinePlaylistPlayback } from "./playlists/useOnlinePlaylistPlayback";
 import { usePlaylistObservation } from "./playlists/usePlaylistObservation";
 import { externalLink } from "./scrapers/fields";
@@ -142,6 +144,10 @@ function DiscoveryDetails({ source, external }: { source: OnlineInstance; extern
   const instance = source.instanceId;
   const query = usePlaylistObservation(s.content, source, external);
   const playback = useOnlinePlaylistPlayback(source, query.data);
+  const canLink = !!source.accountId && source.capabilities.some(cap => cap.name === "playlist.addTracks" && cap.supported);
+  const links = useResource(`online-playlist-link:${instance}:${source.accountId}:${source.accountRevision}`, signal =>
+    canLink ? playlistLinks(s.client, signal) : Promise.resolve([]));
+  const link = links.data?.find(item => item.platform === source.platform && item.accountId === source.accountId && item.externalId === external);
   const [busy, setBusy] = useState(false);
   const [jobId, setJobId] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -181,15 +187,17 @@ function DiscoveryDetails({ source, external }: { source: OnlineInstance; extern
                   title={!query.data.complete ? tr("仅获取到部分曲目，请刷新歌单后重试。") : undefined} onClick={playback.play}>
                   <Icon name="play" size={16} />{tr("播放全部")}
                 </button>
-                <button type="button" disabled={busy || !!jobId} onClick={() => void importPlaylist()}>
+                {link ? <LinkedPlaylistSync link={link} finished={() => query.revalidate(link.instanceId !== instance)} /> :
+                <button type="button" disabled={busy || !!jobId || canLink && links.loading} onClick={() => void importPlaylist()}>
                   {busy ? tr("正在导入…") : tr("导入到歌单管理")}
-                </button>
+                </button>}
                 <button type="button" onClick={query.refresh}>{tr("刷新歌单")}</button>
               </div>
               {playback.busy && <p className="muted" role="status">
                 {tr("正在准备音频…")} <button type="button" onClick={playback.cancel}>{tr("取消")}</button>
               </p>}
               <ErrorNotice error={playback.error} />
+              <ErrorNotice error={links.error} retry={links.reload} />
             </div>
           </div>
           <OnlinePlaylistTracks key={query.data.observedAt} source={source} observation={query.data} />

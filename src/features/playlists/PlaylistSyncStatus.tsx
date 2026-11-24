@@ -10,9 +10,10 @@ const states: Record<string, string> = {
   queued: "排队中", running: "同步中", succeeded: "已完成", failed: "失败", cancelled: "已取消",
 };
 
-export function PlaylistSyncStatus({ jobId, finished, showRetry = true, pending }: {
-  jobId: string; finished?: (signal: AbortSignal, job?: SyncJob, playlist?: RemotePlaylist) => Promise<void> | void;
-  showRetry?: boolean; pending?: () => void;
+export function PlaylistSyncStatus({ jobId, finished, start, synced }: {
+  jobId?: string; finished?: (signal: AbortSignal, job?: SyncJob, playlist?: RemotePlaylist) => Promise<void> | void;
+  start?: (signal: AbortSignal, knownPlaylistId?: string) => Promise<{ jobId: string }>;
+  synced?: () => Promise<void> | void;
 }) {
   const s = useServices();
   const [currentId, setCurrentId] = useState(jobId);
@@ -22,13 +23,19 @@ export function PlaylistSyncStatus({ jobId, finished, showRetry = true, pending 
   const [submitError, setSubmitError] = useState<string | null>(null);
   const submission = useRef<AbortController | null>(null);
   const retry = useRef<() => void>(undefined);
-  const onFinish = useEffectEvent((signal: AbortSignal, job?: SyncJob, playlist?: RemotePlaylist) => finished?.(signal, job, playlist));
-  const onPending = useEffectEvent(() => pending?.());
+  const observedProgress = useRef(false);
+  const onFinish = useEffectEvent(async (signal: AbortSignal, job?: SyncJob, playlist?: RemotePlaylist) => {
+    if (job?.state === "succeeded" && observedProgress.current) {
+      observedProgress.current = false;
+      await synced?.();
+    }
+    if (!signal.aborted) await finished?.(signal, job, playlist);
+  });
   useEffect(() => () => submission.current?.abort(), []);
   useEffect(() => {
+    if (!currentId) return;
     let terminal: SyncJob | null = null;
     let reported = false;
-    onPending();
     // 旧任务保持失败状态；关联歌单在重新授权、冷却结束或另一标签页重试后会指向新任务。
     async function followReplacement(previous: SyncJob, signal: AbortSignal) {
       const latest = await s.content.remotePlaylist(previous.playlistId, signal);
@@ -40,6 +47,7 @@ export function PlaylistSyncStatus({ jobId, finished, showRetry = true, pending 
         }
         return;
       }
+      observedProgress.current = true;
       setCurrentId(latest.jobId);
       setJob(null);
       setError(null);
@@ -67,7 +75,9 @@ export function PlaylistSyncStatus({ jobId, finished, showRetry = true, pending 
         if (signal.aborted) return;
         setJob(next);
         setError(null);
-        if (next.state !== "queued" && next.state !== "running") {
+        if (next.state === "queued" || next.state === "running") {
+          observedProgress.current = true;
+        } else {
           if ((next.state === "failed" || next.state === "cancelled") && next.playlistId) {
             terminal = next;
             await followReplacement(next, signal);
@@ -85,17 +95,20 @@ export function PlaylistSyncStatus({ jobId, finished, showRetry = true, pending 
     return watcher.stop;
   }, [s, currentId]);
   async function resubmit() {
-    if (!job?.playlistId || submission.current) return;
+    if (submission.current) return;
+    const submit = start ?? (job?.playlistId ? async (signal: AbortSignal) =>
+      s.content.sync(await s.content.remotePlaylist(job.playlistId, signal), signal) : undefined);
+    if (!submit) return;
     const request = new AbortController();
     submission.current = request;
     setSubmitting(true);
     setSubmitError(null);
     try {
-      const playlist = await s.content.remotePlaylist(job.playlistId, request.signal);
+      const next = await submit(request.signal, job?.playlistId);
       if (request.signal.aborted) return;
-      const next = await s.content.sync(playlist);
-      if (request.signal.aborted) return;
-      setJob(null);
+      observedProgress.current = true;
+      if (next.jobId !== currentId) setJob(null);
+      else retry.current?.();
       setError(null);
       setCurrentId(next.jobId);
     } catch (cause) {
@@ -108,15 +121,19 @@ export function PlaylistSyncStatus({ jobId, finished, showRetry = true, pending 
   }
   const state = job?.state ?? "queued";
   const failed = job?.error;
+  const active = !!currentId && (!error || !!job) && (state === "queued" || state === "running");
+  const retryable = state === "failed" || state === "cancelled";
   return <>
-    {(!error || job) && <p role="status">{tr("同步状态：")}{tr(states[state] ?? state)}
+    {currentId && (!error || job) && <p role="status">{tr("同步状态：")}{tr(states[state] ?? state)}
       {failed && <> · {syncFailureMessage(failed.code)}{" "}
         {failed.code === "RATE_LIMITED" && Number(failed.retryAfter) > 0 &&
           <>{tr("平台给出的冷却时长为 {0} 秒。", { 0: failed.retryAfter! })}{" "}</>}
         <small>({failed.code})</small></>}
     </p>}
-    {showRetry && job?.playlistId && (state === "failed" || state === "cancelled") &&
-      <button type="button" disabled={submitting} onClick={() => void resubmit()}>{tr(submitting ? "正在提交…" : "重试同步")}</button>}
+    {(start || job?.playlistId && retryable) &&
+      <button type="button" disabled={submitting || active} onClick={() => void resubmit()}>
+        {tr(submitting ? "正在提交…" : retryable ? "重试同步" : "立即同步")}
+      </button>}
     <ErrorNotice error={submitError} />
     <ErrorNotice error={error} retry={() => retry.current?.()} />
   </>;

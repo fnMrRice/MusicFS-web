@@ -10,18 +10,20 @@ export function usePlaylistObservation(api: ContentApi, source: OnlineInstance, 
   const [state, setState] = useState<{ data: Observation | null; loading: boolean; error: string | null }>({
     data: null, loading: true, error: null,
   });
-  const read = useCallback(async (force: boolean, background = false) => {
-    if (background && active.current) return;
+  const read = useCallback(async (force: boolean, mode: "load" | "foreground" | "synced" = "load") => {
+    if (mode === "foreground" && active.current) return;
     active.current?.abort();
     const request = new AbortController();
     active.current = request;
     lastForce.current = force;
-    if (!background) setState({ data: null, loading: true, error: null });
+    if (mode === "load") setState({ data: null, loading: true, error: null });
     try {
       const data = await api.observation(instanceId, external, request.signal, platform === "netease" && force);
       if (!request.signal.aborted) setState({ data, loading: false, error: null });
     } catch (error) {
-      if (!request.signal.aborted) setState({ data: null, loading: false, error: errorMessage(error) });
+      if (!request.signal.aborted) setState(previous => ({
+        data: mode === "load" ? null : previous.data, loading: false, error: errorMessage(error),
+      }));
     } finally {
       if (active.current === request) active.current = null;
     }
@@ -30,6 +32,6 @@ export function usePlaylistObservation(api: ContentApi, source: OnlineInstance, 
     void read(false);
     return () => active.current?.abort();
   }, [read]);
-  useForeground(platform === "netease", () => void read(false, true));
-  return { ...state, refresh: () => void read(true), retry: () => void read(lastForce.current) };
+  useForeground(platform === "netease", () => void read(false, "foreground"));
+  return { ...state, refresh: () => void read(true), revalidate: (force: boolean) => void read(force, "synced"), retry: () => void read(lastForce.current) };
 }

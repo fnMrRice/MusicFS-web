@@ -162,9 +162,9 @@ export class ContentApi {
     ++this.onlineEpoch;
     this.onlineInstances.set([]);
   }
-  private async write<T>(path: string, body: unknown, method = "POST"): Promise<T> {
+  private async write<T>(path: string, body: unknown, method = "POST", signal?: AbortSignal): Promise<T> {
     const bytes = crypto.getRandomValues(new Uint8Array(16));
-    const options = { method, body, idempotencyKey: Array.from(bytes, byte => byte.toString(16).padStart(2, "0")).join("") };
+    const options = { method, body, signal, idempotencyKey: Array.from(bytes, byte => byte.toString(16).padStart(2, "0")).join("") };
     try { return await this.client.request<T>(path, options); }
     catch (error) {
       if (!(error instanceof ApiError) || !['TIMEOUT', 'NETWORK_ERROR'].includes(error.code)) throw error;
@@ -380,12 +380,19 @@ export class ContentApi {
     return checked(await this.client.request<RemotePlaylist>(`/remote-playlists/${id(playlistId)}`, { signal }),
       (playlist) => playlist.playlistId === playlistId);
   }
-  async sync(p: RemotePlaylist): Promise<{ jobId: string }> {
+  async sync(p: RemotePlaylist, signal?: AbortSignal): Promise<{ jobId: string }> {
     const receipt = await this.write<{ jobId: string }>(
       `/remote-playlists/${id(p.playlistId)}/sync-jobs`,
-      { expectedBindingRevision: p.bindingRevision },
+      { expectedBindingRevision: p.bindingRevision }, "POST", signal,
     );
     return checked(receipt, (r) => string(r.jobId));
+  }
+  async syncLink(link: { instanceId: string; accountId: string; externalId: string; remotePlaylistId?: string }, signal: AbortSignal) {
+    if (link.remotePlaylistId) return this.sync(await this.remotePlaylist(link.remotePlaylistId, signal), signal);
+    // 尚未建立远程快照的关联，在原平台账号下首次导入时即会启动同步。
+    const { instanceId, externalId, accountId } = link;
+    const result = await this.write<{ jobId: string }>("/remote-playlists", { instanceId, externalId, accountId }, "POST", signal);
+    return checked(result, (r) => string(r.jobId) && !!r.jobId);
   }
   syncJob(job: string, signal?: AbortSignal): Promise<SyncJob> {
     return this.client.request(`/remote-playlist-sync-jobs/${id(job)}`, {

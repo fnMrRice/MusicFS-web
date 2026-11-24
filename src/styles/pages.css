@@ -132,6 +132,8 @@
   margin: 8px 0;
 }
 .account-playlist > div { min-width: 0; }
+.linked-playlist-sync { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-block: 8px; }
+.linked-playlist-sync > span, .linked-playlist-sync > p { margin: 0; color: var(--muted); overflow-wrap: anywhere; }
 .account-playlist-link { display: flex; align-items: center; gap: 12px; text-decoration: none; }
 .account-playlist-link strong { overflow-wrap: anywhere; }
 .account-playlist-link svg, .account-playlist button { flex-shrink: 0; }

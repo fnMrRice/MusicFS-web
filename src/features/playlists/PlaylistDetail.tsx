@@ -9,6 +9,7 @@ import { TrackTable } from "../TrackTable";
 import { PlaylistEditor } from "./PlaylistEditor";
 import { resolvePlaylistTracks } from "./playlist-tracks";
 import { RemotePlaylistEntries } from "./RemotePlaylistEntries";
+import { LocalPlaylistSync } from "./LinkedPlaylistSync";
 
 export default function PlaylistDetail() {
   useLocale();
@@ -71,6 +72,11 @@ export default function PlaylistDetail() {
               </div>
             </div>
           </div>
+        </>
+      )}
+      <LocalPlaylistSync playlistId={id} finished={detail.reload} />
+      {detail.data && (
+        <>
           <ErrorNotice error={error} />
           {detail.data.snapshotRevision > 0 ? (
             <PlaylistTracks

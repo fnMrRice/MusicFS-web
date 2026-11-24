@@ -333,7 +333,8 @@ test("NetEase playlists appear in management and navigation, link once, accept t
   const local = { playlistId: "local-1", name: "开车听", bindings: [], ruleRevision: 1, snapshotRevision: 0, hideRevision: 0, stale: true };
   let created = false, linked = false, additions = 0, linkAttempts = 0, referenceAttempts = 0;
   let targetPlaylistId = local.playlistId;
-  const link = () => ({ platform: "netease", instanceId, accountId, externalId: own.externalId, playlistId: targetPlaylistId, pendingCount: additions, jobId: "catalog-import" });
+  const link = () => ({ platform: "netease", instanceId, accountId, externalId: own.externalId, playlistId: targetPlaylistId,
+    remotePlaylistId: "remote-100", pendingCount: additions, jobId: "catalog-import" });
   await page.route("**/api/v1/**", async (route) => {
     const req = route.request(), path = new URL(req.url()).pathname;
     let json: unknown = { items: [], nextAfter: null, nextCursor: null };
@@ -367,7 +368,7 @@ test("NetEase playlists appear in management and navigation, link once, accept t
       json = { items: [{ remoteSourceId: "ref-21" }] };
     }
     if (path.endsWith("/playlist-links")) json = { items: linked ? [link()] : [] };
-    if (path.endsWith("/remote-playlist-sync-jobs/catalog-import")) json = { jobId: "catalog-import", state: "succeeded", resultRevision: 1, error: null };
+    if (path.endsWith("/remote-playlist-sync-jobs/catalog-import")) json = { jobId: "catalog-import", playlistId: "remote-100", state: "succeeded", resultRevision: 1, error: null };
     if (path.endsWith("/me/favorites")) {
       const sourceTrack = { ...track, sourceTrackId: "source-21", providerInstanceId: instanceId, displayName: track.title,
         availability: "available", assetId: "asset-21", container: null, codec: null, bitrateBps: null,

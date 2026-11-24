@@ -63,14 +63,14 @@ export class SourcePlaylistCatalog {
     this.fetch(instance, null, force);
   }
 
-  revalidate(instance: string): void {
+  revalidate(instance: string, afterSync = false, force = false): void {
     if (!this.sources.has(instance) || this.blocked.has(instance)) return;
     const pending = this.requests.get(instance);
-    if (!pending) this.fetch(instance, null);
-    else if (pending.cursor) {
-      // 保留进行中的翻页，结束后再向 Server 确认当前首屏。
+    if (!pending) this.fetch(instance, null, force);
+    else if (pending.cursor || afterSync) {
+      // 同步前发出的请求可能仍含旧曲目数，等现有请求结束后再确认首屏。
       void pending.promise.finally(() => {
-        if (!pending.controller.signal.aborted) this.revalidate(instance);
+        if (!pending.controller.signal.aborted) this.revalidate(instance, false, force);
       }).catch(() => {});
     }
   }
