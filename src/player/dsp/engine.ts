@@ -7,7 +7,7 @@ import type { AudioOutputConfig, AudioOutputStatus } from './output';
 export interface LocalDSPAttachment {
   resume(): Promise<void>;
   pause(): void;
-  reset(holdSilence?: boolean): void;
+  reset(holdSilence?: boolean, sourceChannels?: number): void;
   fadeOut(durationMs: number): Promise<void>;
   prepareFadeIn(): void;
   fadeIn(durationMs: number, fromCurrent?: boolean): void;
@@ -181,12 +181,13 @@ export class LocalDSPEngine {
           pause: () => {
             if (!detached) { playIntent++; paused = true; started = false; attachedGraph.setPaused(true); cancelFade(); }
           },
-          reset: (holdSilence = false) => {
-            if (detached) return;
+          reset: (holdSilence = false, sourceChannels?: number) => {
+            if (detached || (sourceChannels !== undefined && (!Number.isInteger(sourceChannels) ||
+                sourceChannels < 1 || sourceChannels > 8 || sourceChannels === attachedGraph.channels))) return;
             cancelFade(!holdSilence);
             let replacement: LocalDSPGraph | undefined;
             try {
-              replacement = new LocalDSPGraph(attachedContext, this.config, count);
+              replacement = new LocalDSPGraph(attachedContext, this.config, sourceChannels ?? attachedGraph.channels);
               if (holdSilence) replacement.fadeTo(0, 0);
               replacement.setAutoVolume(this.autoVolume);
               this.output.add(replacement);

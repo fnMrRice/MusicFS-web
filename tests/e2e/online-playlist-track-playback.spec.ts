@@ -4,7 +4,7 @@ import { audioFixture } from "../fixtures/audio";
 import { routeApi } from "../fixtures/control-mock";
 import { deferred, playback, track as sourceTrack } from "../fixtures/dto";
 import { instanceIds, neteasePlugin } from "../fixtures/plugins";
-import { waitPlaying } from "./helpers";
+import { seekTo, waitPlaying } from "./helpers";
 
 let server: PreviewServer;
 let origin: string;
@@ -70,10 +70,18 @@ async function openPlaylist(page: Page) {
       const { sourceTrackId } = request.postDataJSON();
       starts.push(sourceTrackId);
       const sessionId = "session-" + starts.length, attemptId = "attempt-" + starts.length;
-      json = { ...playback(attemptId), deliveryMode: "proxy", sessionId, sourceTrackId, assetId: sourceTrackId.replace("source-", "asset-"),
+      json = { ...playback(attemptId), outputProfilePending: true, deliveryMode: "proxy", sessionId, sourceTrackId, assetId: sourceTrackId.replace("source-", "asset-"),
         streamUrl: `/api/v1/playback/sessions/${sessionId}/attempts/${attemptId}/stream` };
     }
-    if (pathname.endsWith("/stream")) return route.fulfill({ contentType: "audio/wav", body: sound });
+    if (pathname.endsWith("/output-profile")) json = { ...playback().outputProfile, sampleRate: 16000, bitrateBps: 256000, channels: 1 };
+    if (pathname.endsWith("/stream")) {
+      const range = /^bytes=(\d+)-(\d*)$/.exec(request.headers().range ?? "");
+      const headers = { "Accept-Ranges": "bytes" };
+      if (!range) return route.fulfill({ contentType: "audio/wav", headers, body: sound });
+      const start = Number(range[1]), end = range[2] ? Number(range[2]) : sound.length - 1;
+      return route.fulfill({ status: 206, contentType: "audio/wav",
+        headers: { ...headers, "Content-Range": `bytes ${start}-${end}/${sound.length}` }, body: sound.subarray(start, end + 1) });
+    }
     if (request.method() === "DELETE") return route.fulfill({ status: 204 });
     return route.fulfill({ json });
   });
@@ -124,7 +132,9 @@ test("online playlist rows show their own artwork and play the chosen track with
   expect(starts).toEqual(["source-102"]);
   const proxyCover = "/api/v1/source-tracks/source-102/online-artwork";
   await expect(page.locator(".now-playing .cover img")).toHaveAttribute("src", proxyCover);
-  await expect(page.locator(".player-status")).toHaveText(/^WAV → PCM · /);
+  await expect(page.locator(".player-status")).toHaveText("WAV → PCM · 16 kHz · 256 kbps · 1 声道");
+  await seekTo(page, 15);
+  await expect.poll(() => page.locator("audio").evaluate((audio: HTMLAudioElement) => audio.currentTime)).toBeGreaterThanOrEqual(15);
   await queueToggle.click();
   await expect(queued).toHaveText(["留白", "海潮"]);
   await expect(queue.getByRole("button", { name: "海潮", exact: true })).toHaveAttribute("aria-current", "true");

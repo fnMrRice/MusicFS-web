@@ -104,6 +104,20 @@ describe('Local DSP settings validation', () => {
 });
 
 describe('Local DSP audio graph (mock lifecycle; real rendering covered separately)', () => {
+  it('uses detected source channels on the existing media element and keeps them after seeking', () => {
+    const engine = new LocalDSPEngine(defaultLocalDSP());
+    const attachment = engine.attach(media());
+    const context = Context.instances[0];
+    attachment.reset(false, 6);
+    expect(engine.inspectOutput().sourceChannels).toBe(6);
+    const nodeCount = context.nodes.length;
+    attachment.reset(false, 6);
+    expect(context.nodes).toHaveLength(nodeCount);
+    attachment.reset();
+    expect(engine.inspectOutput().sourceChannels).toBe(6);
+    engine.dispose();
+  });
+
   it('changes output live while preserving source, effects, balance gain, final mute and transition', async () => {
     vi.useFakeTimers();
     const status = vi.fn(); const engine = new LocalDSPEngine(configuration('equalizer'), undefined, status);

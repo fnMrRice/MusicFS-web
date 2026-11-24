@@ -8,12 +8,52 @@ import { ApiError } from '../../../src/api/client';
 function setup(create = vi.fn().mockResolvedValue(playback())) {
   let observe: (event: MediaObservation) => void = () => {};
   const audio: AudioPort = { play: vi.fn().mockResolvedValue(undefined), pause: vi.fn(), destroy: vi.fn(), seek: vi.fn(), seconds: 0, seekable: [{ start: 0, end: 30 }] };
-  const api = { create, close: vi.fn().mockResolvedValue(undefined), control: vi.fn().mockResolvedValue(playback('a2')) };
+  const api = { create, close: vi.fn().mockResolvedValue(undefined), control: vi.fn().mockResolvedValue(playback('a2')), outputProfile: vi.fn() };
   const factory = vi.fn((_url: string, callback: typeof observe) => { observe = callback; return audio; });
   const controller = new PlayerController(api, factory, { htmlAudio: true, formats: [] });
   return { controller, api, audio, factory, event: (type: MediaObservation['type'], seconds = 0, paused = false, readyToPlay = false) => observe({ type, seconds, paused, readyToPlay }) };
 }
 describe('Player controller (Mock media; not decoder validation)', () => {
+  it('reads late channels once for the playing attempt without reloading audio or updating another track', async () => {
+    const first = { ...playback(), outputProfilePending: true };
+    const other = { ...playback('new'), outputProfilePending: true };
+    const s = setup(vi.fn().mockResolvedValueOnce(first).mockResolvedValueOnce(other));
+    const delayed = deferred<Playback['outputProfile']>();
+    s.api.outputProfile.mockReturnValueOnce(delayed.promise).mockResolvedValueOnce({ ...other.outputProfile, channels: 1 });
+    s.audio.setSourceChannels = vi.fn();
+    await s.controller.select(track);
+    s.event('loadedmetadata'); s.event('loadedmetadata');
+    expect(s.api.outputProfile).toHaveBeenCalledExactlyOnceWith(first.sessionId, first.attemptId, expect.any(AbortSignal));
+    await s.controller.select(track);
+    delayed.resolve({ ...first.outputProfile, channels: 6 });
+    await Promise.resolve();
+    expect(s.audio.setSourceChannels).not.toHaveBeenCalled();
+    s.event('loadedmetadata'); await Promise.resolve();
+    expect(s.controller.state.playback?.outputProfile.channels).toBe(1);
+    expect(s.audio.setSourceChannels).toHaveBeenCalledExactlyOnceWith(1);
+    expect(s.factory).toHaveBeenCalledTimes(2);
+    s.controller.stop();
+  });
+  it('rechecks a slow channel probe only once as playback advances', async () => {
+    vi.useFakeTimers();
+    const descriptor = { ...playback(), outputProfilePending: true };
+    const s = setup(vi.fn().mockResolvedValue(descriptor));
+    s.api.outputProfile.mockResolvedValue(descriptor.outputProfile);
+    try {
+      await s.controller.select(track);
+      s.event('loadedmetadata'); await Promise.resolve();
+      s.event('timeupdate', 1);
+      expect(s.api.outputProfile).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(2000);
+      s.event('timeupdate', 3); await Promise.resolve();
+      await vi.advanceTimersByTimeAsync(2000);
+      s.event('timeupdate', 5);
+      expect(s.api.outputProfile).toHaveBeenCalledTimes(2);
+      expect(s.controller.state.playback?.outputProfile.channels).toBeUndefined();
+    } finally {
+      s.controller.stop(); vi.useRealTimers();
+    }
+  });
   it('starts a new session on demand after restoring a paused track on an existing player', async () => {
     const s = setup();
     await s.controller.select(track);

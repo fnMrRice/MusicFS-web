@@ -23,6 +23,7 @@ export interface AudioPort {
   pause(): void;
   destroy(): void;
   seek(seconds: number): void;
+  setSourceChannels?(channels: number): void;
   setVolume?(volume: number): void;
   fadeOut?(durationMs: number): Promise<void>;
   fadeIn?(durationMs: number, fromCurrent?: boolean): void;
@@ -121,6 +122,7 @@ export function audioFactory(root: HTMLElement, dsp?: LocalDSPEngine): AudioFact
       seek: (seconds) => {
         audio.currentTime = seconds;
       },
+      setSourceChannels: (count) => processing?.reset(fadeInDuration > 0, count),
       setVolume: (volume) => {
         if (processing) processing.setVolume(volume);
         else audio.volume = volume;

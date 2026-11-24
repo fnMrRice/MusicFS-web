@@ -31,7 +31,7 @@ function setup() {
   };
   const api = {
     create: vi.fn().mockResolvedValue(playback()), close: vi.fn().mockResolvedValue(undefined),
-    control: vi.fn().mockResolvedValue(playback("seeked")),
+    control: vi.fn().mockResolvedValue(playback("seeked")), outputProfile: vi.fn(),
   };
   const player = new PlayerController(api, (_url, listener) => { observe = listener; return audio; }, { htmlAudio: true, formats: [] });
   player.onChange = services.player.onChange;

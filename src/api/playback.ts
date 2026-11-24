@@ -1,5 +1,5 @@
 import { ApiClient, ApiError } from './client';
-import type { Capabilities, ObservedError, Playback, Preferences } from './types';
+import type { Capabilities, ObservedError, OutputProfile, Playback, Preferences } from './types';
 
 export function validatePlayback(value: Playback): Playback {
   if (!value || typeof value.sourceTrackId !== 'string' || !value.sourceTrackId || typeof value.sessionId !== 'string' || typeof value.attemptId !== 'string'
@@ -16,6 +16,14 @@ export function validatePlayback(value: Playback): Playback {
 }
 export class PlaybackApi {
   constructor(private client: ApiClient) {}
+  async outputProfile(sessionId: string, attemptId: string, signal?: AbortSignal): Promise<OutputProfile> {
+    const profile = await this.client.request<OutputProfile>(`/playback/sessions/${encodeURIComponent(sessionId)}/attempts/${encodeURIComponent(attemptId)}/output-profile`, { signal });
+    if (!profile || typeof profile.mime !== 'string' || typeof profile.transport !== 'string' ||
+      [profile.codec, profile.container, profile.layout].some(value => value != null && typeof value !== 'string') ||
+      (profile.channels !== undefined && (!Number.isSafeInteger(profile.channels) || profile.channels < 1)))
+      throw new ApiError('INVALID_RESPONSE', 'Invalid playback output profile');
+    return profile;
+  }
   async create(sourceTrackId: string, capabilities: Capabilities, preferences: Preferences, key: string, signal?: AbortSignal, selection?: { trackId: string; forcedSourceTrackId: string | null }): Promise<Playback> {
     return validatePlayback(await this.client.control('/playback/sessions', {
       method: 'POST', body: { trackId: selection?.trackId, forcedSourceTrackId: selection?.forcedSourceTrackId ?? undefined, sourceTrackId, capabilities, preferences }, idempotencyKey: key, signal,

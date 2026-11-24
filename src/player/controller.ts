@@ -15,6 +15,7 @@ import { ControlQueue, isUncertain } from "./control-queue";
 import { RecoveryBudget } from "./recovery";
 import { trackPosition, seekAllowed } from "./timeline";
 import { playbackErrorMessage } from "./errors";
+import { observeOutputProfile } from "./output-profile";
 import { PlaybackTransitions, type FadeSettings } from "./playback-transitions";
 
 export class PlayerController {
@@ -72,7 +73,7 @@ export class PlayerController {
     }
   }
   constructor(
-    private api: Pick<PlaybackApi, "create" | "close" | "control">,
+    private api: Pick<PlaybackApi, "create" | "close" | "control" | "outputProfile">,
     private createAudio: AudioFactory,
     private capabilities: Capabilities,
     private unlockAudio: () => void = () => {},
@@ -211,12 +212,19 @@ export class PlayerController {
     this.state.phase = "loading";
     this.state.message = null;
     this.state.positionMs = playback.positionOriginMs;
+    const refreshProfile = observeOutputProfile(this.api, playback, this.controller?.signal, profile => {
+      if (this.state.playback !== playback || !this.audio) return;
+      this.state.playback = { ...playback, outputProfile: profile, outputProfilePending: false };
+      this.audio.setSourceChannels?.(profile.channels);
+      this.emit();
+    });
     this.audio = this.createAudio(playback.streamUrl, (event) => {
       if (
         generation !== this.generation ||
         this.state.playback?.attemptId !== playback.attemptId
       )
         return;
+      refreshProfile(event.type);
       this.observe(event);
     }, playback.outputProfile.channels);
     this.audio.setVolume?.(this.volume);

@@ -41,7 +41,7 @@ export interface Playback {
   sourceTrackId: string;
   sessionId: string; attemptId: string; assetId: string; representationId: string;
   dspExecution: 'server' | 'client';
-  deliveryMode: 'direct' | 'proxy' | 'processed'; outputProfile: OutputProfile;
+  deliveryMode: 'direct' | 'proxy' | 'processed'; outputProfile: OutputProfile; outputProfilePending?: boolean;
   streamUrl: string; expiresAt: string; seekMode: 'byteRange' | 'timeRestart' | 'none';
   seekableRange: { startMs: number; endMs: number } | null;
   positionOriginMs: number; effectiveProcessing: unknown[];
