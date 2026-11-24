@@ -136,7 +136,11 @@ test("network rows recover from offline and signed-out snapshots without changin
   await expect(play).toBeEnabled();
 });
 async function open(page: Page) {
-  await page.getByRole("button", { name: "Song 的更多操作", exact: true }).click();
+  const trigger = page.getByRole("button", { name: "Song 的更多操作", exact: true });
+  // 窄屏先横向滚到行操作列，等待滚动事件结束后再打开会在滚动时关闭的菜单。
+  await trigger.scrollIntoViewIfNeeded();
+  await page.evaluate(() => new Promise<void>(done => requestAnimationFrame(() => requestAnimationFrame(() => done()))));
+  await trigger.click();
   await page.getByRole("menu").getByRole("menuitem", { name: "选择封面", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "选择封面", exact: true });
   await expect(dialog.getByRole("radio", { name: "自动选择最高分辨率", exact: true })).toBeVisible();
