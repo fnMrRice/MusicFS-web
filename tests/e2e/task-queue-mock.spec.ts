@@ -8,6 +8,20 @@ const origin = "http://127.0.0.1:18158";
 test.beforeAll(async () => { server = await preview({ preview: { host: "127.0.0.1", port: 18158, strictPort: true } }); });
 test.afterAll(async () => { await new Promise<void>(resolve => server?.httpServer.close(() => resolve())); });
 
+test("waits for the first pushed snapshot even when randomUUID is unavailable on LAN HTTP", async ({ page }) => {
+  await page.addInitScript(() => Object.defineProperty(crypto, "randomUUID", { value: undefined }));
+  const state = await taskQueueMock(page); state.holdSnapshot = true;
+  await page.goto(`${origin}/#/library`);
+  await page.getByRole("button", { name: "任务队列", exact: true }).click();
+  await expect.poll(() => state.scopes).toEqual(["mine"]);
+  const panel = page.getByRole("region", { name: "任务队列详情" });
+  await expect(panel).toContainText("正在读取任务…");
+  await expect(panel).not.toContainText("暂无刷新任务");
+  state.pushTasks(true);
+  await expect(panel).toContainText("暂无刷新任务");
+  expect(state.httpLists).toBe(0);
+});
+
 test("idle queues stay quiet and reconcile changes on push and reconnect", async ({ page }) => {
   const state = await taskQueueMock(page);
   await page.clock.install(); await page.goto(`${origin}/#/library`);
@@ -18,7 +32,7 @@ test("idle queues stay quiet and reconcile changes on push and reconnect", async
   await page.clock.fastForward(9000);
   expect(state.scopes.length).toBe(idleReads);
   state.tasks.push(refreshTask());
-  state.control.event("activity.changed", { resources: ["tasks"] });
+  state.pushTasks();
   await expect(panel.getByRole("listitem")).toHaveCount(1);
   const reads = state.scopes.length;
   await page.clock.fastForward(9000);
@@ -29,6 +43,9 @@ test("idle queues stay quiet and reconcile changes on push and reconnect", async
   await sessionCheck;
   await page.clock.runFor(1000);
   await expect(panel.getByRole("listitem")).toHaveCount(2);
+  await page.evaluate(() => { window.dispatchEvent(new Event("focus")); document.dispatchEvent(new Event("visibilitychange")); });
+  expect(state.scopes).toEqual(["mine", "mine"]);
+  expect(state.httpLists).toBe(0);
 });
 
 test("refresh all enqueues one task per folder with independent keys", async ({ page }, info) => {
@@ -49,7 +66,7 @@ test("running work allows other directories to join and queued tasks can be canc
   await page.getByRole("button", { name: "刷新目录 Music 的元数据", exact: true }).click();
   await expect.poll(() => state.tasks.length).toBe(1);
   Object.assign(state.tasks[0], { status: "running", phase: "metadata" });
-  state.control.event("activity.changed", { resources: ["tasks"] });
+  state.pushTasks();
   await page.getByRole("button", { name: "刷新目录 Other 的元数据", exact: true }).click();
   await expect.poll(() => state.tasks.length).toBe(2);
   await page.getByRole("button", { name: "任务队列", exact: true }).click();

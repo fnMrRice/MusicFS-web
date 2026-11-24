@@ -14,13 +14,7 @@ export function TaskQueue() {
   const root = useRef<HTMLDivElement>(null), id = useId(), location = useLocation();
   useEffect(() => { setOpen(false); }, [location.pathname]);
   useEffect(() => {
-    const refresh = () => { if (document.visibilityState === "visible") void services.tasks.refresh(); };
-    window.addEventListener("focus", refresh); document.addEventListener("visibilitychange", refresh);
-    return () => { window.removeEventListener("focus", refresh); document.removeEventListener("visibilitychange", refresh); };
-  }, [services]);
-  useEffect(() => {
     if (!open) return;
-    void services.tasks.refresh();
     const close = (event: PointerEvent) => { if (!root.current?.contains(event.target as Node)) setOpen(false); };
     const escape = (event: KeyboardEvent) => {
       if (event.key === "Escape") { event.stopPropagation(); setOpen(false); root.current?.querySelector("button")?.focus(); }
@@ -28,7 +22,7 @@ export function TaskQueue() {
     document.addEventListener("pointerdown", close);
     document.addEventListener("keydown", escape);
     return () => { document.removeEventListener("pointerdown", close); document.removeEventListener("keydown", escape); };
-  }, [open, services]);
+  }, [open]);
   if (!auth.session) return null;
   return <div className={styles.root} ref={root} onBlur={event => {
     if (event.relatedTarget && !event.currentTarget.contains(event.relatedTarget)) setOpen(false);

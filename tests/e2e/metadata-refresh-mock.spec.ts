@@ -17,7 +17,7 @@ test('single-folder refresh stays queued through metadata and reload without blo
   await expect.poll(() => state.posts.length).toBe(1);
   await expect(page.getByRole('button', { name: '刷新目录 Other 的元数据', exact: true })).toBeEnabled();
   Object.assign(state.tasks[0], { status: 'running', phase: 'metadata', progress: { observed: 2, metadataTotal: 2, metadataCompleted: 1 } });
-  state.control.event('activity.changed', { resources: ['tasks'] });
+  state.pushTasks();
   await page.getByRole('button', { name: '任务队列', exact: true }).click();
   const panel = page.getByRole('region', { name: '任务队列详情' });
   await expect(panel).toContainText('正在更新歌曲信息、封面和歌词 · 1/2');
@@ -29,7 +29,7 @@ test('single-folder refresh stays queued through metadata and reload without blo
   expect(state.posts).toHaveLength(1);
   Object.assign(state.tasks[0], { status: 'succeeded', phase: 'finished', cancellable: false,
     result: { updated: 1, retained: 1, notFound: 0, failed: 0 } });
-  state.control.event('activity.changed', { resources: ['tasks'] });
+  state.pushTasks();
   await expect(panel).toContainText('刷新完成');
   await expect(panel).toContainText('更新 1 · 保留 1 · 未找到 0 · 失败 0');
   expect(state.configWrites).toBe(0);
@@ -42,7 +42,7 @@ test('metadata partial failures are visible in the task result', async ({ page }
   await expect.poll(() => state.tasks.length).toBe(1);
   Object.assign(state.tasks[0], { status: 'failed', phase: 'finished', cancellable: false,
     result: { updated: 1, retained: 0, notFound: 0, failed: 1 } });
-  state.control.event('activity.changed', { resources: ['tasks'] });
+  state.pushTasks();
   await page.getByRole('button', { name: '任务队列', exact: true }).click();
   const panel = page.getByRole('region', { name: '任务队列详情' });
   await expect(panel).toContainText('刷新未完成');

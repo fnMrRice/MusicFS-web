@@ -1,4 +1,4 @@
-const resources = ["scans", "tasks", "pluginJobs", "playlistSync"] as const;
+const resources = ["scans", "pluginJobs", "playlistSync"] as const;
 type ActivityTopic = typeof resources[number] | "configuration";
 
 /** 按资源通知订阅方重新读取当前会话有权查看的数据。 */

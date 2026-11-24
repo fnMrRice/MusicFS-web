@@ -4,7 +4,7 @@ import type { Page, Request, Route, WebSocketRoute } from "@playwright/test";
 export async function routeApi(page: Page, handler: (route: Route) => Promise<unknown> | unknown, pattern = "**/api/v1/**") {
   const sockets = new Set<WebSocketRoute>();
   const control = {
-    lifecycle: null as string | null, pings: 0,
+    lifecycle: null as string | null, pings: 0, handleTaskSubscriptions: false,
     event: (event: string, data: unknown) => sockets.forEach(socket => socket.send(JSON.stringify({ type: "event", event, data }))),
     disconnect: () => sockets.forEach(socket => socket.close({ code: 1011, reason: "Fixture interruption" })),
   };
@@ -21,6 +21,13 @@ export async function routeApi(page: Page, handler: (route: Route) => Promise<un
       }
       if (frame.type === "ping") { ++control.pings; socket.send(JSON.stringify({ type: "pong" })); return; }
       if (frame.type !== "request") return;
+      if (frame.path === "/tasks/subscription" && !control.handleTaskSubscriptions) {
+        socket.send(JSON.stringify({ type: "response", id: frame.id, status: 204 }));
+        socket.send(JSON.stringify({ type: "event", event: "tasks.snapshot", data: {
+          subscriptionId: frame.body.subscriptionId, page: { items: [], activeCount: 0, nextCursor: null }, changed: [], reset: true,
+        } }));
+        return;
+      }
       const request = {
         url: () => new URL(`/api/v1${frame.path}`, socket.url().replace(/^ws/, "http")).href,
         method: () => frame.method, postDataJSON: () => frame.body,

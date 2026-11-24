@@ -10,8 +10,16 @@ const options = { recursive: true, maxDepth: 0, importLyrics: false, importArtwo
 export async function taskQueueMock(page: Page) {
   const state = { tasks: [] as RefreshTask[], posts: [] as { roots: string[]; key: string }[], scopes: [] as string[],
     cancellations: [] as { id: string; scope: string }[], admin: true, uncertain: "", configWrites: 0, unavailable: false,
-    activeCount: null as number | null, listError: false };
+    activeCount: null as number | null, listError: false, holdSnapshot: false, httpLists: 0 };
   const keys = new Map<string, string>();
+  let subscription: { subscriptionId: string; scope: string } | null = null;
+  const taskPage = (scope: string) => {
+    const items = state.tasks.filter(task => scope === "all" || task.ownerId === "user");
+    return { items, nextCursor: null, activeCount: state.activeCount ?? items.filter(task => ["queued", "running", "cancelling"].includes(task.status)).length };
+  };
+  function pushTasks(reset = false) {
+    if (subscription) control.event("tasks.snapshot", { subscriptionId: subscription.subscriptionId, page: taskPage(subscription.scope), changed: [], reset });
+  }
   const control = await routeApi(page, async route => {
     const url = new URL(route.request().url()), path = url.pathname, method = route.request().method();
     if (path.endsWith("/scan-jobs") && method === "POST") {
@@ -24,16 +32,23 @@ export async function taskQueueMock(page: Page) {
       const id = `task-${state.tasks.length + 1}`, root = taskRoots.find(item => item.id === body.rootIds[0])!;
       keys.set(key, id);
       state.tasks.unshift(refreshTask({ id, providerInstanceId: instanceIds.local, rootIds: [root.id], roots: [{ id: root.id, name: root.name }] }));
+      pushTasks();
       if (state.uncertain === root.id) { state.uncertain = ""; return route.abort("failed"); }
       return route.fulfill({ status: 202, json: { jobId: id, merged: false } });
     }
-    if (path === "/api/v1/tasks") {
-      const scope = url.searchParams.get("scope")!; state.scopes.push(scope);
+    if (path === "/api/v1/tasks/subscription") {
+      const { scope, subscriptionId } = route.request().postDataJSON();
+      state.scopes.push(scope);
       if (state.listError) return route.fulfill({ status: 503, json: { error: { code: "SOURCE_UNAVAILABLE", message: "Task queue unavailable" } } });
       if (!state.admin && scope === "all") return route.fulfill({ status: 403, json: { error: { code: "FORBIDDEN", message: "Forbidden" } } });
-      const items = state.tasks.filter(task => scope === "all" || task.ownerId === "user");
-      return route.fulfill({ json: { items, nextCursor: null,
-        activeCount: state.activeCount ?? items.filter(task => ["queued", "running", "cancelling"].includes(task.status)).length } });
+      subscription = { subscriptionId, scope };
+      await route.fulfill({ status: 204 });
+      if (!state.holdSnapshot) pushTasks(true);
+      return;
+    }
+    if (path === "/api/v1/tasks") {
+      ++state.httpLists;
+      return route.fulfill({ json: taskPage(url.searchParams.get("scope")!) });
     }
     if (path.startsWith("/api/v1/tasks/")) {
       const id = path.split("/")[4], task = state.tasks.find(item => item.id === id), scope = url.searchParams.get("scope")!;
@@ -42,6 +57,7 @@ export async function taskQueueMock(page: Page) {
         state.cancellations.push({ id, scope }); expect(route.request().postDataJSON()).toEqual({});
         Object.assign(task, { status: "cancelled", phase: "finished", cancelRequested: true, cancellable: false,
           error: { code: "CANCELED", message: "Task cancelled" } });
+        pushTasks();
       }
       return route.fulfill({ json: task });
     }
@@ -62,5 +78,6 @@ export async function taskQueueMock(page: Page) {
     }
     await route.fulfill({ json });
   });
-  return Object.assign(state, { control });
+  control.handleTaskSubscriptions = true;
+  return Object.assign(state, { control, pushTasks });
 }

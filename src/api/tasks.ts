@@ -21,6 +21,7 @@ export interface RefreshTask {
   error: { code: string; message: string; requestId?: string } | null;
 }
 export interface TaskPage { items: RefreshTask[]; nextCursor: string | null; activeCount: number }
+export interface TaskSnapshot { page: TaskPage; changed: RefreshTask[]; reset: boolean }
 export const taskActive = (task: RefreshTask) => ["queued", "running", "cancelling"].includes(task.status);
 const count = (value: unknown) => Number.isInteger(value) && (value as number) >= 0;
 function validTask(task: RefreshTask, id?: string): RefreshTask {
@@ -39,14 +40,14 @@ function validTask(task: RefreshTask, id?: string): RefreshTask {
 }
 export class TasksApi {
   constructor(private client: ApiClient) {}
+  subscribe(subscriptionId: string, scope: TaskScope, signal: AbortSignal): Promise<void> {
+    return this.client.control("/tasks/subscription", { method: "POST", body: { subscriptionId, scope }, signal });
+  }
   async list(scope: TaskScope, cursor: string | null = null, signal?: AbortSignal): Promise<TaskPage> {
     const query = new URLSearchParams({ scope, limit: "50" });
     if (cursor) query.set("cursor", cursor);
     const page = await this.client.request<TaskPage>(`/tasks?${query}`, { signal });
-    if (!page || !Array.isArray(page.items) || !count(page.activeCount)
-      || page.nextCursor !== null && (typeof page.nextCursor !== "string" || !page.nextCursor))
-      throw new ApiError("INVALID_RESPONSE", "Invalid task page");
-    return { ...page, items: page.items.map(task => validTask(task)) };
+    return validPage(page);
   }
   async get(id: string, scope: TaskScope, signal?: AbortSignal): Promise<RefreshTask> {
     return validTask(await this.client.request<RefreshTask>(`/tasks/${encodeURIComponent(id)}?scope=${scope}`, { signal }), id);
@@ -55,4 +56,19 @@ export class TasksApi {
     return validTask(await this.client.request<RefreshTask>(`/tasks/${encodeURIComponent(id)}/cancel?scope=${scope}`,
       { method: "POST", body: {}, signal }), id);
   }
+}
+
+function validPage(page: TaskPage): TaskPage {
+  if (!page || !Array.isArray(page.items) || !count(page.activeCount)
+    || page.nextCursor !== null && (typeof page.nextCursor !== "string" || !page.nextCursor))
+    throw new ApiError("INVALID_RESPONSE", "Invalid task page");
+  return { ...page, items: page.items.map(task => validTask(task)) };
+}
+
+export function taskSnapshot(data: unknown, subscriptionId: string): TaskSnapshot | null {
+  if (!data || typeof data !== "object" || !("subscriptionId" in data) || data.subscriptionId !== subscriptionId) return null;
+  const snapshot = data as TaskSnapshot & { subscriptionId: string };
+  if (!Array.isArray(snapshot.changed) || typeof snapshot.reset !== "boolean")
+    throw new ApiError("INVALID_RESPONSE", "Invalid task snapshot");
+  return { page: validPage(snapshot.page), changed: snapshot.changed.map(task => validTask(task)), reset: snapshot.reset };
 }

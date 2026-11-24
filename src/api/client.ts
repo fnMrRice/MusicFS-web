@@ -1,3 +1,9 @@
+/** 控制请求与幂等键共用 128 位随机标识，局域网 HTTP 页面也可生成。 */
+export function randomRequestId(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  return Array.from(bytes, byte => byte.toString(16).padStart(2, "0")).join("");
+}
+
 export interface ScraperFailure {
   pluginId: string;
   reason: "upstream" | "cooldown" | "busy";

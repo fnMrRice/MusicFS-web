@@ -1,5 +1,5 @@
 import type { ScansApi, ScanRequest } from "../api/scans";
-import { ApiError } from "../api/client";
+import { ApiError, randomRequestId } from "../api/client";
 import { Store } from "../app/store";
 import { refreshError } from "./refresh-errors";
 
@@ -84,7 +84,7 @@ export class RefreshSubmission extends Store<SubmissionSnapshot> {
       if (generation !== this.generation) return;
       // 一次冻结全部目录与配置，之后每根独立确认，不重新读取或重发已成功的目录。
       const additions = prepared.filter(item => !this.isPending(provider, item.request.rootIds[0]))
-        .map(item => ({ provider, ...item, key: crypto.randomUUID(), sending: false, error: null, rejected: false, uncertain: false }));
+        .map(item => ({ provider, ...item, key: randomRequestId(), sending: false, error: null, rejected: false, uncertain: false }));
       keys = additions.map(item => item.key);
       this.persist([...this.value.pending, ...additions]);
     } catch (error) {
@@ -112,7 +112,7 @@ export class RefreshSubmission extends Store<SubmissionSnapshot> {
         try {
           const [prepared] = await this.api.prepareRefresh(pending.provider, controller.signal, pending.request.rootIds[0]);
           if (generation !== this.generation) return;
-          pending = { ...pending, ...prepared, key: crypto.randomUUID(), rejected: false, uncertain: false, sending: true, error: null };
+          pending = { ...pending, ...prepared, key: randomRequestId(), rejected: false, uncertain: false, sending: true, error: null };
           this.persist(this.value.pending.map(item => item.key === key ? pending! : item));
           key = pending.key;
         } finally {

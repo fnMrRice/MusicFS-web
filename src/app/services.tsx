@@ -103,9 +103,11 @@ export class Services {
     (signal) => this.client.request("/auth/session", { signal }),
     () => this.clear(),
     () => { this.player.stop(); void this.connect(); },
+    { ready: () => this.tasks.connection(true), disconnected: () => this.tasks.connection(false), receive: data => this.tasks.receive(data) },
   );
   controlStatus = this.capabilityEvents.channel.status;
   activity = this.capabilityEvents.activity;
+  downloads = this.capabilityEvents.downloads;
   auth = new Store<AuthState>({
     session: null,
     ready: null,
@@ -148,7 +150,6 @@ export class Services {
     void this.scans.get(task.providerInstanceId).refreshStatus();
   });
   refreshSubmissions = new RefreshSubmission(new ScansApi(this.client, this.libraryApi), (instance) => {
-    void this.tasks.refresh();
     void this.scans.get(instance).refreshStatus();
   });
   localScan(instance: string): LocalScanState { return this.scans.get(instance); }
@@ -183,7 +184,6 @@ export class Services {
   }
   constructor(root: HTMLElement) {
     this.client.controlTransport = this.capabilityEvents.channel;
-    this.activity.subscribe("tasks", () => this.tasks.invalidate());
     this.activity.subscribe("scans", () => this.scans.invalidate());
     this.activity.subscribe("configuration", () => {
       this.configurationScans.invalidate();
@@ -279,6 +279,7 @@ export class Services {
     this.audioOutput.setSession(new URL(this.client.url(""), window.location.href).href, session.user.id);
     this.reloadSourceNames();
     this.capabilityEvents.start(session.csrfToken);
+    if (["online", "ready", "not-ready"].includes(this.controlStatus.getSnapshot().phase)) this.tasks.connection(true);
     let saved: Partial<PreferencesState> = {};
     try {
       saved = JSON.parse(localStorage.getItem(this.key()!) ?? "{}");

@@ -1,4 +1,4 @@
-import { ApiError, type ControlTransport, type RequestOptions } from "./client";
+import { ApiError, randomRequestId, type ControlTransport, type RequestOptions } from "./client";
 import { ControlStatus } from "./control-status";
 
 export interface ControlSocket {
@@ -20,6 +20,7 @@ interface Pending {
 
 interface Callbacks {
   ready(): void;
+  disconnected?(): void;
   event(name: string, data: unknown): void;
   checkSession(signal: AbortSignal): Promise<unknown>;
   unauthorized(): void;
@@ -80,7 +81,7 @@ export class ControlChannel implements ControlTransport {
     if (options.signal?.aborted) return Promise.reject(new ApiError("CANCELLED", "Request cancelled"));
     if (!this.identity) return Promise.reject(new ApiError("NETWORK_ERROR", "Control channel is unavailable"));
     if (this.pending.size + this.late.size >= 128) return Promise.reject(new ApiError("NETWORK_ERROR", "Too many pending control requests"));
-    const id = crypto.randomUUID();
+    const id = randomRequestId();
     const method = options.method ?? "GET";
     return new Promise<T>((resolve, reject) => {
       const cancel = () => { this.retainCleanup(id); this.finish(id, new ApiError("CANCELLED", "Request cancelled")); };
@@ -239,6 +240,7 @@ export class ControlChannel implements ControlTransport {
     this.closeSocket();
     this.status.set("unreachable");
     this.rejectPending();
+    this.callbacks.disconnected?.();
     this.reconnect = setTimeout(() => {
       this.reconnect = null;
       if (generation === this.generation) this.open();

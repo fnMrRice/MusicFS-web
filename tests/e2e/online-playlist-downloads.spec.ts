@@ -32,7 +32,7 @@ async function fixture(page: Page) {
   const sideEffects: string[] = [];
   const state = { qualityError: false, firstSubmitError: false, account: "listener-account", playable: true,
     qualities: ["standard", "lossless"], platform: "netease", complete: true, externalIds: ["1", "missing", "1", "2"] };
-  await routeApi(page, async route => {
+  const control = await routeApi(page, async route => {
     const req = route.request();
     const { pathname, searchParams } = new URL(req.url());
     let json: unknown = { items: [], nextCursor: null, nextAfter: null };
@@ -89,11 +89,11 @@ async function fixture(page: Page) {
     if (req.method() !== "GET" && /playback|remote-playlists|plugin-settings|\/resolve/.test(pathname)) sideEffects.push(pathname);
     return route.fulfill({ json });
   });
-  return { more, created, jobs, reads, detailReads, sideEffects, state };
+  return { more, created, jobs, reads, detailReads, sideEffects, state, control };
 }
 
 test("batch downloads preserve cross-page selection, deduplicate tracks and restore their actual results", async ({ page }) => {
-  const { more, created, jobs, reads, detailReads, sideEffects, state } = await fixture(page);
+  const { more, created, jobs, reads, detailReads, sideEffects, state, control } = await fixture(page);
   const all = page.getByRole("checkbox", { name: "全选已加载的可下载曲目", exact: true });
   const dialog = page.getByRole("dialog", { name: "选择下载音质", exact: true });
   const history = page.getByRole("region", { name: "歌单下载任务", exact: true });
@@ -123,10 +123,16 @@ test("batch downloads preserve cross-page selection, deduplicate tracks and rest
     expect(created[0].csrf).toBe("test-csrf");
     expect(created[0].body).toEqual({ accountId: "listener-account", accountRevision: "revision-1", externalIds: ["1", "2"], quality: "lossless" });
     const job = jobs.get("job-1")!;
+    await expect.poll(() => reads.length).toBeGreaterThan(0);
+    const initialReads = reads.length;
     jobs.set(job.jobId, { ...job, state: "running", completed: 1, items: [
       { externalId: "1", state: "succeeded", version }, { externalId: "2", state: "running" },
     ] });
+    control.event("downloads.progress", { jobs: [{ jobId: job.jobId, state: "running", total: 2, completed: 1, failed: 0 }], invalidated: [] });
     await expect(history).toContainText("共 2 首，已下载 1 首，失败 0 首");
+    await page.clock.install();
+    await page.clock.fastForward(4500);
+    expect(reads).toHaveLength(initialReads);
     await page.goto(locationOf("other"));
     await expect(page.getByRole("heading", { name: "夜晚" })).toBeVisible();
     await expect(history).toHaveCount(0);
@@ -138,6 +144,7 @@ test("batch downloads preserve cross-page selection, deduplicate tracks and rest
       { externalId: "1", state: "succeeded", version },
       { externalId: "2", state: "failed", error: { code: "AUDIO_CACHE_DISABLED", message: "Audio cache is disabled" } },
     ] });
+    control.disconnect();
     await expect(history).toContainText("部分下载失败");
     expect(detailReads).toEqual([]);
     await history.getByRole("button", { name: "查看下载明细" }).click();

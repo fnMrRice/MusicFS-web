@@ -25,8 +25,9 @@ function fixture() {
   const create = vi.fn((_url: string, _protocol: string) => {
     const socket = new FakeSocket(); sockets.push(socket); return socket;
   });
-  const events = new CapabilityEvents(invalidate, check, unauthorized, instanceChanged, create, () => "ws://localhost/api/v1/control");
-  return { events, channel: events.channel, sockets, invalidate, unauthorized, instanceChanged, check, create };
+  const tasks = { ready: vi.fn(), disconnected: vi.fn(), receive: vi.fn() };
+  const events = new CapabilityEvents(invalidate, check, unauthorized, instanceChanged, tasks, create, () => "ws://localhost/api/v1/control");
+  return { events, channel: events.channel, sockets, invalidate, unauthorized, instanceChanged, check, create, tasks };
 }
 
 afterEach(() => vi.useRealTimers());
@@ -34,21 +35,26 @@ afterEach(() => vi.useRealTimers());
 describe("authenticated control channel", () => {
   it("routes each changed resource once, reconciles on ready and unsubscribes", async () => {
     vi.useFakeTimers();
-    const s = fixture(), tasks = vi.fn(), scans = vi.fn(), configuration = vi.fn();
-    const unsubscribe = s.events.activity.subscribe("tasks", tasks);
+    const s = fixture(), playlist = vi.fn(), scans = vi.fn(), configuration = vi.fn();
+    const unsubscribe = s.events.activity.subscribe("playlistSync", playlist);
     s.events.activity.subscribe("scans", scans);
     s.events.activity.subscribe("configuration", configuration);
     s.events.start("csrf"); const first = s.sockets[0]; first.ready();
-    first.emit({ type: "event", event: "activity.changed", data: { resources: ["tasks", "tasks", "unknown"] } });
+    first.emit({ type: "event", event: "activity.changed", data: { resources: ["playlistSync", "playlistSync", "tasks"] } });
     for (const data of [null, {}, { resources: "scans" }])
       first.emit({ type: "event", event: "activity.changed", data });
     first.changed();
-    expect(tasks).toHaveBeenCalledTimes(2); expect(scans).toHaveBeenCalledOnce();
+    expect(playlist).toHaveBeenCalledTimes(2); expect(scans).toHaveBeenCalledOnce();
+    expect(s.tasks.ready).toHaveBeenCalledOnce();
+    expect(s.tasks.receive).not.toHaveBeenCalled();
+    first.emit({ type: "event", event: "tasks.snapshot", data: { subscriptionId: "s1" } });
+    expect(s.tasks.receive).toHaveBeenCalledExactlyOnceWith({ subscriptionId: "s1" });
     expect(configuration).toHaveBeenCalledTimes(2);
     unsubscribe(); first.dispatchEvent(new Event("close")); await vi.advanceTimersByTimeAsync(500);
     first.emit({ type: "event", event: "activity.changed", data: { resources: ["scans"] } });
     s.sockets[1].ready();
-    expect(tasks).toHaveBeenCalledTimes(2); expect(scans).toHaveBeenCalledTimes(2);
+    expect(playlist).toHaveBeenCalledTimes(2); expect(scans).toHaveBeenCalledTimes(2);
+    expect(s.tasks.ready).toHaveBeenCalledTimes(2);
     s.events.stop();
   });
   it("uses one connection, authenticates without a URL token and refreshes after reconnect", async () => {

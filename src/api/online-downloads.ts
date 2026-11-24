@@ -57,11 +57,17 @@ function validItem(item: DownloadJobItem) {
   return (item.state === "queued" || item.state === "running") && item.version === undefined && item.error === undefined;
 }
 
+export function isDownloadSummary(value: unknown): value is DownloadSummary {
+  if (!value || typeof value !== "object") return false;
+  const job = value as DownloadSummary;
+  return typeof job.jobId === "string" && !!job.jobId && ["queued", "running", "succeeded", "partial", "failed"].includes(job.state) &&
+    Number.isInteger(job.total) && job.total >= 1 && job.total <= 10_000 &&
+    Number.isInteger(job.completed) && job.completed >= 0 && Number.isInteger(job.failed) && job.failed >= 0 &&
+    job.completed + job.failed <= job.total;
+}
+
 function checkSummary(job: DownloadSummary) {
-  if (!job || typeof job.jobId !== "string" || !job.jobId || !["queued", "running", "succeeded", "partial", "failed"].includes(job.state) ||
-      !Number.isInteger(job.total) || job.total < 1 || job.total > 10_000 ||
-      !Number.isInteger(job.completed) || job.completed < 0 || !Number.isInteger(job.failed) || job.failed < 0 ||
-      job.completed + job.failed > job.total) {
+  if (!isDownloadSummary(job)) {
     throw new ApiError("INVALID_RESPONSE", "Invalid online download progress");
   }
   return job;

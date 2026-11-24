@@ -9,13 +9,17 @@ test("the real server pushes a refresh submitted outside the open task panel", a
   test.setTimeout(180_000);
   const server = await startDirectoryServer();
   try {
-    const changed = new Set<string>();
+    const completed = new Set<string>();
+    const taskReads: string[] = [];
+    page.on("request", request => {
+      if (request.method() === "GET" && new URL(request.url()).pathname === "/api/v1/tasks") taskReads.push(request.url());
+    });
     page.on("websocket", socket => {
       if (!socket.url().endsWith("/api/v1/control")) return;
       socket.on("framereceived", ({ payload }) => {
         const frame = JSON.parse(String(payload));
-        if (frame.type === "event" && frame.event === "activity.changed")
-          for (const resource of frame.data.resources) changed.add(resource);
+        if (frame.type === "event" && frame.event === "tasks.snapshot")
+          for (const task of frame.data.page.items) if (task.status === "succeeded") completed.add(task.id);
       });
     });
     await login(page, server);
@@ -42,10 +46,15 @@ test("the real server pushes a refresh submitted outside the open task panel", a
       data: { ...await scanRequest(api, server.origin), options: { refreshMetadata: true } },
     });
     expect(submitted.status()).toBe(202);
+    const { jobId } = await submitted.json();
     const task = panel.getByRole("listitem").filter({ hasText: "Push test folder" });
     await expect(task).toContainText("刷新完成");
-    expect(changed.has("tasks")).toBe(true);
-    expect(changed.has("scans")).toBe(true);
+    expect(completed.has(jobId)).toBe(true);
+    await page.getByRole("button", { name: "任务队列", exact: true }).click();
+    await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+    await page.getByRole("button", { name: "任务队列", exact: true }).click();
+    await expect(panel).toContainText("刷新完成");
+    expect(taskReads).toEqual([]);
   } finally {
     await server.stop();
   }

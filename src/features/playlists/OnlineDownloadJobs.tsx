@@ -50,42 +50,68 @@ const stateLabels = {
 const finished = (job: DownloadSummary) => job.state !== "queued" && job.state !== "running";
 
 function JobStatus({ scope, receipt, tracks }: { scope: string; receipt: Receipt; tracks: Map<string, OnlineTrack> }) {
-  const { client } = useServices();
+  const { client, downloads } = useServices();
   const { locale } = useLocale();
   const [job, setJob] = useState<DownloadSummary | undefined>(receipt.initial);
   const [items, setItems] = useState<DownloadJob["items"]>();
   const [retry, setRetry] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [detailError, setDetailError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [visible, setVisible] = useState(50);
   useEffect(() => {
-    const request = new AbortController();
-    let timer: ReturnType<typeof setTimeout>;
-    let previous: DownloadSummary | undefined;
+    let request: AbortController | undefined;
+    const apply = (next: DownloadSummary) => {
+      // 较早的合并通知可能晚于一次 HTTP 补读到达。
+      setJob(prev => prev && (prev.completed > next.completed || prev.failed > next.failed ||
+        (finished(prev) && !finished(next)) || (prev.state === "running" && next.state === "queued")) ? prev : next);
+      setError(null);
+    };
     async function read() {
+      request?.abort();
+      request = new AbortController();
+      const { signal } = request;
       try {
-        let result = await getDownloadSummary(client, receipt.id, request.signal);
-        if (request.signal.aborted) return;
-        if (expanded && (previous?.state !== result.state || previous.completed !== result.completed || previous.failed !== result.failed)) {
-          const detail = await getDownloadJob(client, receipt.id, request.signal);
-          if (request.signal.aborted) return;
-          setItems(detail.items);
-          result = detail;
-        }
-        if (request.signal.aborted) return;
-        previous = result;
-        setJob(result);
-        setError(null);
-        if (!finished(result)) timer = setTimeout(() => void read(), 1500);
+        const result = await getDownloadSummary(client, receipt.id, signal);
+        if (!signal.aborted) apply(result);
       } catch (cause) {
-        if (request.signal.aborted) return;
+        if (signal.aborted) return;
         if (cause instanceof ApiError && cause.status === 404) forgetDownload(scope, receipt.id);
         else setError(errorMessage(cause));
       }
     }
+    const unsubscribe = downloads.subscribe(receipt.id, next => {
+      if (next) apply(next);
+      else void read();
+    });
     void read();
-    return () => { request.abort(); clearTimeout(timer); };
-  }, [client, scope, receipt.id, retry, expanded]);
+    return () => { unsubscribe(); request?.abort(); };
+  }, [client, downloads, scope, receipt.id, retry]);
+
+  useEffect(() => {
+    if (!expanded) return;
+    const request = new AbortController();
+    let reading = false, pending = false;
+    async function refresh() {
+      if (reading) { pending = true; return; }
+      reading = true;
+      do {
+        pending = false;
+        try {
+          const detail = await getDownloadJob(client, receipt.id, request.signal);
+          if (!request.signal.aborted) { setItems(detail.items); setDetailError(null); }
+        } catch (cause) {
+          if (request.signal.aborted) return;
+          if (cause instanceof ApiError && cause.status === 404) forgetDownload(scope, receipt.id);
+          else setDetailError(errorMessage(cause));
+        }
+      } while (pending && !request.signal.aborted);
+      reading = false;
+    }
+    const unsubscribe = downloads.subscribe(receipt.id, refresh);
+    void refresh();
+    return () => { unsubscribe(); request.abort(); };
+  }, [client, downloads, expanded, scope, receipt.id, retry]);
   return <div className="online-download-job">
     {job && <>
       <p role="status"><strong>{tr(stateLabels[job.state])}</strong>{" · "}
@@ -96,7 +122,7 @@ function JobStatus({ scope, receipt, tracks }: { scope: string; receipt: Receipt
         {tr(expanded ? "收起下载明细" : "查看下载明细")}</button>
       {finished(job) && <button type="button" className="text-button" onClick={() => forgetDownload(scope, receipt.id)}>
         {tr("移除此任务记录")}</button>}
-      {expanded && !items && !error && <span role="status">{tr("正在读取下载任务…")}</span>}
+      {expanded && !items && !error && !detailError && <span role="status">{tr("正在读取下载任务…")}</span>}
       {expanded && items && <ul className="online-download-results">
         {items.slice(0, visible).map(item => <li key={item.externalId}>
           <strong>{tracks.get(item.externalId)?.title ?? item.externalId}</strong>{" · "}{tr(stateLabels[item.state])}
@@ -109,7 +135,7 @@ function JobStatus({ scope, receipt, tracks }: { scope: string; receipt: Receipt
         {tr("显示更多下载结果")}</button>}
     </>}
     {!job && !error && <span role="status">{tr("正在读取下载任务…")}</span>}
-    <ErrorNotice error={error} retry={() => setRetry(n => n + 1)} />
+    <ErrorNotice error={error ?? (expanded ? detailError : null)} retry={() => setRetry(n => n + 1)} />
   </div>;
 }
 

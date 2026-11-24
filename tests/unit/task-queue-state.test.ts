@@ -3,75 +3,141 @@ import type { TasksApi, RefreshTask } from "../../src/api/tasks";
 import { TaskQueueState } from "../../src/tasks/task-queue-state";
 import { refreshTask } from "../fixtures/tasks";
 
-const states: TaskQueueState[] = [];
-function fixture(items: RefreshTask[] = [refreshTask()]) {
-  vi.useFakeTimers();
-  const api = { list: vi.fn().mockResolvedValue({ items, nextCursor: null, activeCount: 1 }), cancel: vi.fn() };
+const running = refreshTask({ status: "running", phase: "metadata" });
+const older = refreshTask({ id: "older", createdAt: "2026-10-22T00:00:00Z" });
+const done = (task: RefreshTask): RefreshTask => ({ ...task, status: "succeeded", phase: "finished", cancellable: false });
+const page = (items: RefreshTask[], activeCount: number, nextCursor: string | null = null) => ({ items, nextCursor, activeCount });
+function fixture(admin = false) {
+  const api = { subscribe: vi.fn().mockResolvedValue(undefined), list: vi.fn(), cancel: vi.fn() };
   const finished = vi.fn();
-  const state = new TaskQueueState(api as unknown as TasksApi, finished); states.push(state);
-  return { api, state, finished };
+  const state = new TaskQueueState(api as unknown as TasksApi, finished);
+  state.start(admin);
+  const id = () => api.subscribe.mock.calls.at(-1)![0];
+  const push = (items: RefreshTask[], activeCount = 1, cursor: string | null = null, changed: RefreshTask[] = [], reset = false) =>
+    state.receive({ subscriptionId: id(), page: page(items, activeCount, cursor), changed, reset });
+  return { api, state, finished, push, id };
 }
-const settle = async () => { await Promise.resolve(); await Promise.resolve(); };
-afterEach(() => { states.splice(0).forEach(state => state.clear()); vi.useRealTimers(); });
+afterEach(() => vi.useRealTimers());
 describe("global task queue", () => {
-  it("restores tasks, waits for notifications and reports completion once", async () => {
-    const { api, state, finished } = fixture([refreshTask({ status: "running", phase: "metadata" })]);
-    state.start(false); await settle();
-    expect(state.value.items[0].phase).toBe("metadata");
-    api.list.mockResolvedValue({ items: [refreshTask({ status: "succeeded", phase: "finished" })], nextCursor: null, activeCount: 0 });
-    await vi.advanceTimersByTimeAsync(60_000);
-    expect(api.list).toHaveBeenCalledTimes(1);
-    state.invalidate(); await settle();
-    expect(state.value.activeCount).toBe(0); expect(finished).toHaveBeenCalledTimes(1);
-    await state.refresh(); expect(finished).toHaveBeenCalledTimes(1);
+  it("keeps loading through a delayed subscribe response until the first snapshot arrives", async () => {
+    const { state, api, push } = fixture();
+    let acknowledge!: () => void;
+    api.subscribe.mockImplementation(() => new Promise<void>(done => { acknowledge = done; }));
+    expect(state.value.loading).toBe(true);
+    state.connection(true); expect(state.value.loading).toBe(true);
+    acknowledge(); await Promise.resolve();
+    expect(state.value.loading).toBe(true);
+    push([], 0, null, [], true);
+    expect(state.value).toMatchObject({ loading: false, items: [], activeCount: 0 });
   });
-  it("coalesces notifications during a read and reconciles after that read", async () => {
-    const { api, state } = fixture();
+  it("subscribes on ready and applies pushed progress and badge counts without listing tasks", async () => {
+    vi.useFakeTimers();
+    const { api, state, finished, push } = fixture();
+    expect(api.subscribe).not.toHaveBeenCalled();
+    state.connection(true); push([running], 130, null, [], true);
+    expect(api.subscribe).toHaveBeenCalledExactlyOnceWith(expect.any(String), "mine", expect.any(AbortSignal));
+    expect(state.value).toMatchObject({ activeCount: 130, items: [running], loading: false });
+    await vi.advanceTimersByTimeAsync(60_000);
+    push([done(running)], 0); push([done(running)], 0);
+    expect(state.value.activeCount).toBe(0);
+    expect(finished).toHaveBeenCalledExactlyOnceWith(done(running));
+    expect(api.list).not.toHaveBeenCalled();
+  });
+  it("isolates a subscription by user scope and drops late snapshots", () => {
+    const ordinary = fixture(); ordinary.state.connection(true); ordinary.state.setScope("all");
+    expect(ordinary.api.subscribe).toHaveBeenCalledTimes(1); expect(ordinary.state.value.scope).toBe("mine");
+    const { state, api, push, id } = fixture(true);
+    state.connection(true); const mine = id();
+    state.setScope("all"); expect(id()).not.toBe(mine);
+    expect(api.subscribe.mock.calls[1][1]).toBe("all");
+    state.receive({ subscriptionId: mine, page: page([running], 10), changed: [], reset: true });
+    expect(state.value.items).toEqual([]);
+    push([running], 42);
+    state.clear(); state.receive({ subscriptionId: id(), page: page([running], 42), changed: [], reset: false });
+    expect(state.value.activeCount).toBe(0);
+  });
+  it("reads another page only on demand and applies changes beyond the first page", async () => {
+    const { state, api, push, finished } = fixture();
+    state.connection(true); push([running], 72, "cursor");
+    api.list.mockResolvedValue(page([older], 999, "next"));
+    await state.more();
+    expect(api.list).toHaveBeenCalledExactlyOnceWith("mine", "cursor", expect.any(AbortSignal));
+    expect(state.value.activeCount).toBe(72);
+    push([running], 71, "cursor", [done(older)]);
+    expect(state.value.items).toEqual([running, done(older)]);
+    expect(state.value.nextCursor).toBe("next"); expect(finished).toHaveBeenCalledExactlyOnceWith(done(older));
+    expect(api.list).toHaveBeenCalledTimes(1);
+  });
+  it("keeps push updates that arrive during a historical page request", async () => {
+    const { state, api, push } = fixture();
+    state.connection(true); push([running], 2, "cursor");
+    let resolve!: (value: unknown) => void;
+    api.list.mockImplementation(() => new Promise(done => { resolve = done; }));
+    const more = state.more();
+    push([running], 1, "cursor", [done(older)]);
+    resolve(page([older], 2));
+    await more;
+    expect(state.value.items).toEqual([running, done(older)]); expect(state.value.activeCount).toBe(1);
+  });
+  it("restores expanded history on a fresh subscription and ignores reads from its predecessor", async () => {
+    const { state, api, push, id } = fixture();
+    state.connection(true); push([running], 2, "cursor");
     let resolve!: (value: unknown) => void;
     api.list.mockImplementationOnce(() => new Promise(done => { resolve = done; }));
-    state.start(false); state.invalidate(); state.invalidate();
-    expect(api.list).toHaveBeenCalledTimes(1);
-    resolve({ items: [], nextCursor: null, activeCount: 0 }); await settle();
-    expect(api.list).toHaveBeenCalledTimes(2);
-    expect(state.value.items[0].id).toBe("task-1");
+    const oldMore = state.more(), oldId = id();
+    state.connection(false); expect(api.list.mock.calls[0][2].aborted).toBe(true);
+    state.connection(true); expect(id()).not.toBe(oldId);
+    api.list.mockResolvedValue(page([done(older)], 0));
+    push([done(running)], 0, "new cursor", [], true);
+    resolve(page([older], 8)); await oldMore;
+    expect(state.value).toMatchObject({ items: [done(running), done(older)], activeCount: 0, loading: false });
+    expect(api.list.mock.calls.map(call => call[1])).toEqual(["cursor", "new cursor"]);
   });
-  it("defaults to mine and prevents non-admin all requests", async () => {
-    const { api, state } = fixture(); state.start(false); await settle(); state.setScope("all");
-    expect(api.list).toHaveBeenCalledTimes(1);
-    expect(api.list.mock.calls[0][0]).toBe("mine"); expect(state.value.scope).toBe("mine");
+  it("reconciles a reset during load-more and applies a later push over both stale history responses", async () => {
+    const { state, api, push } = fixture();
+    state.connection(true); push([running], 2, "cursor A", [], true);
+    let oldRead!: (value: unknown) => void, newRead!: (value: unknown) => void;
+    api.list.mockImplementationOnce(() => new Promise(done => { oldRead = done; }))
+      .mockImplementationOnce(() => new Promise(done => { newRead = done; }));
+    const more = state.more();
+    push([running], 2, "cursor B", [], true);
+    expect(api.list.mock.calls[0][2].aborted).toBe(true);
+    push([done(running)], 0, "cursor C", [done(older)]);
+    newRead(page([running, older], 2, "next")); oldRead(page([older], 2, "stale")); await more;
+    expect(state.value).toMatchObject({ items: [done(running), done(older)], activeCount: 0, nextCursor: "next", loading: false });
+    expect(api.list.mock.calls.map(call => call[1])).toEqual(["cursor A", "cursor B"]);
   });
-  it("drops stale mine responses after an admin switches scope", async () => {
-    const { api, state } = fixture(); let resolve!: (value: unknown) => void;
-    api.list.mockImplementationOnce(() => new Promise(done => { resolve = done; }));
-    state.start(true); const signal = api.list.mock.calls[0][2];
-    state.setScope("all"); await settle();
-    resolve({ items: [refreshTask({ id: "stale" })], nextCursor: null, activeCount: 7 }); await settle();
-    expect(signal.aborted).toBe(true); expect(state.value.scope).toBe("all"); expect(state.value.items[0].id).toBe("task-1");
+  it("keeps displaced first-page items and the historical cursor when a new task joins", async () => {
+    const { state, api, push } = fixture();
+    state.connection(true); push([running], 2, "head cursor", [], true);
+    api.list.mockResolvedValueOnce(page([older], 2, "tail cursor"));
+    await state.more();
+    const newest = refreshTask({ id: "new", createdAt: "2026-10-24T00:00:00Z" });
+    push([newest], 2, "new head cursor", [done(older)]);
+    expect(state.value.items).toEqual([newest, running, done(older)]);
+    expect(state.value.nextCursor).toBe("tail cursor");
+    api.list.mockResolvedValueOnce(page([], 2)); await state.more();
+    expect(api.list.mock.calls[1][1]).toBe("tail cursor");
   });
-  it("loads further pages, deduplicates overlap, and keeps scope-wide count", async () => {
-    const { api, state } = fixture();
-    api.list.mockImplementation(async (_scope, cursor) => cursor
-      ? { items: [refreshTask(), refreshTask({ id: "task-2" })], nextCursor: null, activeCount: 72 }
-      : { items: [refreshTask()], nextCursor: "next", activeCount: 72 });
-    state.start(true); await settle(); await state.more();
-    expect(state.value.items.map(task => task.id)).toEqual(["task-1", "task-2"]);
-    expect(state.value.activeCount).toBe(72);
-    await state.refresh(); expect(api.list.mock.calls.at(-1)?.[1]).toBe("next");
+  it("keeps pushed completion when an earlier cancellation response arrives later", async () => {
+    const { state, api, push, finished } = fixture();
+    state.connection(true); push([running]); let resolve!: (value: unknown) => void;
+    api.cancel.mockImplementation(() => new Promise(done => { resolve = done; }));
+    const cancelling = state.cancel(running.id);
+    expect(state.value.cancelling).toEqual([running.id]);
+    const cancelled = { ...running, status: "cancelled", phase: "finished" } as const;
+    push([cancelled], 0); resolve({ ...running, status: "cancelling" }); await cancelling;
+    expect(state.value).toMatchObject({ items: [cancelled], cancelling: [], activeCount: 0 });
+    expect(finished).toHaveBeenCalledOnce(); expect(api.list).not.toHaveBeenCalled();
   });
-  it("cancels in selected scope and does not restart cancelled tasks", async () => {
-    const { api, state, finished } = fixture(); state.start(true); await settle(); state.setScope("all"); await settle();
-    const cancelled = refreshTask({ status: "cancelled", phase: "finished", cancellable: false });
-    api.cancel.mockResolvedValue(cancelled); api.list.mockResolvedValue({ items: [cancelled], nextCursor: null, activeCount: 0 });
-    await state.cancel("task-1"); await settle();
-    expect(api.cancel.mock.calls[0].slice(0, 2)).toEqual(["task-1", "all"]);
-    expect(state.value.items[0].status).toBe("cancelled"); expect(finished).toHaveBeenCalledTimes(1);
-    await vi.advanceTimersByTimeAsync(8000); expect(api.cancel).toHaveBeenCalledTimes(1);
-  });
-  it("keeps cancellation errors on their task and clears requests on logout", async () => {
-    const { api, state } = fixture(); state.start(false); await settle();
-    api.cancel.mockRejectedValue(new Error("Offline")); await state.cancel("task-1");
-    expect(state.value.cancelErrors["task-1"]).toBeTruthy();
-    state.clear(); const calls = api.list.mock.calls.length; await vi.advanceTimersByTimeAsync(10000);
-    expect(api.list).toHaveBeenCalledTimes(calls); expect(state.value.items).toEqual([]);
+  it("offers retry after an invalid snapshot and retains per-task cancellation errors", async () => {
+    const { state, api, push, id } = fixture();
+    state.connection(true); push([running]);
+    state.receive({ subscriptionId: id(), page: null, changed: [] });
+    expect(state.value.error).toBeTruthy();
+    const first = id(); await state.refresh(); expect(id()).not.toBe(first);
+    push([running]); api.cancel.mockRejectedValue(new Error("Offline")); await state.cancel(running.id);
+    expect(state.value.cancelErrors[running.id]).toBeTruthy();
+    state.clear(); expect(state.value.items).toEqual([]);
   });
 });
