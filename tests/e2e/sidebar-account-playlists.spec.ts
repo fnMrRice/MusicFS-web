@@ -111,6 +111,21 @@ test("account folders and their saved NetEase playlists fold independently acros
   await expect(b).toHaveAttribute("aria-expanded", "true");
 });
 
+test("settings and playlist management load their scripts on first navigation from the library", async ({ page }) => {
+  await mockPlaylists(page);
+  await page.goto(`${origin}/#/library`);
+  const settings = page.getByRole("button", { name: "设置", exact: true });
+  const playlists = page.getByRole("link", { name: "歌单管理", exact: true });
+  const nextScript = () => page.waitForRequest(request =>
+    request.resourceType() === "script" && new URL(request.url()).pathname.startsWith("/assets/"));
+
+  await expect(settings).toBeVisible();
+  await Promise.all([nextScript(), settings.click()]);
+  await expect(page.getByRole("navigation", { name: "设置分类" })).toBeVisible();
+  await Promise.all([nextScript(), playlists.click()]);
+  await expect(page.locator("#page-scroll").getByRole("button", { name: "新建歌单", exact: true })).toBeVisible();
+});
+
 test("management independently folds accounts and their collected NetEase playlists across pages and reloads", async ({ page }) => {
   const state = await mockPlaylists(page);
   await page.goto(`${origin}/#/playlists`);

@@ -7,7 +7,7 @@ import { Empty, ErrorNotice } from "../../components/ui";
 import { tr } from "../../i18n";
 import { PublicPlaylistLink } from "./PublicPlaylistLink";
 
-export function SourcePlaylists() {
+export default function SourcePlaylists() {
   const { instance = "" } = useParams();
   const s = useServices();
   const sourceName = useSourceName();

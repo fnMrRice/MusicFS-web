@@ -12,7 +12,7 @@ import { PluginListEntry } from "./PluginListEntry";
 import { PluginSettings } from "./plugin-settings/PluginSettings";
 import "./plugin-status.css";
 
-export function PluginStatus() {
+export default function PluginStatus() {
   const { locale } = useLocale();
   const s = useServices();
   const auth = useStore(s.auth);

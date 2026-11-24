@@ -10,7 +10,7 @@ import { PlaylistEditor } from "./PlaylistEditor";
 import { resolvePlaylistTracks } from "./playlist-tracks";
 import { RemotePlaylistEntries } from "./RemotePlaylistEntries";
 
-export function PlaylistDetail() {
+export default function PlaylistDetail() {
   useLocale();
   const { id = "" } = useParams();
   const s = useServices();

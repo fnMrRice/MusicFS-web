@@ -9,7 +9,7 @@ import { errorMessage } from "../../api/client";
 import { RemotePlaylists } from "./RemotePlaylists";
 import { AccountPlaylistLists } from "./AccountPlaylistList";
 import { supportsAccountPlaylists } from "../../app/source-playlists";
-export function Playlists() {
+export default function Playlists() {
   useLocale();
   const s = useServices();
   const [params, setParams] = useSearchParams();

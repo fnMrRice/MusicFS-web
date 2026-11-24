@@ -1,5 +1,5 @@
 import { tr, useLocale } from "../i18n";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useServices, useStore } from "../app/services";
 import { ErrorNotice, Icon, IconButton } from "../components/ui";
@@ -15,7 +15,7 @@ import { TaskQueue } from "./TaskQueue";
 import { LibraryNavigation } from "./LibraryNavigation";
 import { NeteasePlaylistFolder } from "./NeteasePlaylistFolder";
 import { useWorkTypes, workSectionTitle } from "../features/works/navigation";
-import { remotePlaylistLabel, remotePlaylistPath } from "../features/playlists/AccountPlaylistList";
+import { remotePlaylistLabel, remotePlaylistPath } from "../features/playlists/remote-playlist-link";
 import { useForeground } from "../components/use-foreground";
 
 const links = [
@@ -363,7 +363,9 @@ export function AppShell() {
           <ErrorNotice error={auth.error} />
           <div ref={content}>
             <ErrorBoundary key={location.pathname}>
-              <Outlet context={workTypes} />
+              <Suspense fallback={<p className="loading" role="status">{tr("正在加载…")}</p>}>
+                <Outlet context={workTypes} />
+              </Suspense>
             </ErrorBoundary>
           </div>
         </div>

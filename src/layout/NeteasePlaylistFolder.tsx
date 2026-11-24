@@ -2,7 +2,7 @@ import { useId, type ReactNode } from "react";
 import { NavLink } from "react-router-dom";
 import type { OnlineInstance, OnlinePlaylist } from "../api/content";
 import { Icon } from "../components/ui";
-import { remotePlaylistLabel, remotePlaylistPath } from "../features/playlists/AccountPlaylistList";
+import { remotePlaylistLabel, remotePlaylistPath } from "../features/playlists/remote-playlist-link";
 import { partitionAccountPlaylists, useAccountPlaylistFolders } from "../features/playlists/account-playlist-folders";
 import { tr, useLocale } from "../i18n";
 import styles from "./NeteasePlaylistFolder.module.css";

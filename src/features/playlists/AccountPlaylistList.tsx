@@ -4,18 +4,13 @@ import type { OnlineInstance, OnlinePlaylist } from "../../api/content";
 import { favoritesPlaylistId, playlistLinks, type PlaylistLink } from "../../api/playlist-links";
 import { useServices, useStore } from "../../app/services";
 import { useResource } from "../../components/query";
-import { pluginName } from "../../components/source-name";
 import { useSourceName } from "../../components/use-source-name";
 import { ErrorNotice, Icon, SectionToggle } from "../../components/ui";
 import { formatDate, tr, useLocale } from "../../i18n";
 import { PlaylistLinkDialog } from "./PlaylistLinkDialog";
 import { PlaylistSyncStatus } from "./PlaylistSyncStatus";
 import { partitionAccountPlaylists, useAccountPlaylistFolders } from "./account-playlist-folders";
-
-export const remotePlaylistPath = (instanceId: string, externalId: string) =>
-  `/discover/${encodeURIComponent(instanceId)}/${encodeURIComponent(externalId)}`;
-export const remotePlaylistLabel = (instance: OnlineInstance, playlist: OnlinePlaylist, locale: string) =>
-  `${pluginName(instance.plugin, locale)}-${playlist.title}`;
+import { remotePlaylistLabel, remotePlaylistPath } from "./remote-playlist-link";
 
 function supportsLinks(source: OnlineInstance) {
   return !!source.accountId && source.capabilities.some((c) => c.name === "playlist.addTracks" && c.supported);

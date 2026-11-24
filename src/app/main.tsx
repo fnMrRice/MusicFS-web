@@ -1,5 +1,5 @@
 import { useLocale } from "../i18n";
-import { StrictMode, useLayoutEffect } from "react";
+import { lazy, StrictMode, useLayoutEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Services, ServicesContext, useServices, useStore } from "./services";
@@ -15,13 +15,14 @@ import {
   Recommendations,
   DiscoveryPlaylist,
 } from "../features/Recommendations";
-import { Playlists } from "../features/playlists/Playlists";
-import { PlaylistDetail } from "../features/playlists/PlaylistDetail";
-import { SourcePlaylists } from "../features/playlists/SourcePlaylists";
 import { AlbumDetail } from "../features/AlbumDetail";
-import { Settings } from "../features/Settings";
 import { History } from "../features/History";
 import "../styles/global.css";
+
+const Settings = lazy(() => import("../features/Settings"));
+const Playlists = lazy(() => import("../features/playlists/Playlists"));
+const PlaylistDetail = lazy(() => import("../features/playlists/PlaylistDetail"));
+const SourcePlaylists = lazy(() => import("../features/playlists/SourcePlaylists"));
 
 const root = document.getElementById("app");
 if (!root) throw new Error("Missing application root");

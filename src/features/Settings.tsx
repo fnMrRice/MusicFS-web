@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from "react";
+import { lazy, Suspense, useState, type CSSProperties } from "react";
 import { version as webVersion } from "../../package.json";
 import { tr, useLocale } from "../i18n";
 import { useServices, useStore } from "../app/services";
@@ -7,14 +7,15 @@ import { ThemeChoices } from "../components/ThemeChoices";
 import { RecommendationOrderSettings } from "./RecommendationOrderSettings";
 import { MusicSources } from "./MusicSources";
 import { ScraperOrderSettings } from "./scrapers/ScraperOrderSettings";
-import { PluginStatus } from "./PluginStatus";
 import { DSPSettings } from "./dsp/DSPSettings";
 import { VolumeSlider } from "../player/VolumeControl";
 import "./playback-settings.css";
 import { settingsSections, useSettingsNavigation } from "./useSettingsNavigation";
 import "./settings-navigation.css";
 
-export function Settings() {
+const PluginStatus = lazy(() => import("./PluginStatus"));
+
+export default function Settings() {
   useLocale();
   const s = useServices();
   const auth = useStore(s.auth);
@@ -51,10 +52,15 @@ export function Settings() {
           <h2 id={`settings-heading-${tab.id}`} className="settings-section-title">{tr(tab.label)}</h2>
           {tab.id === "sources" && <><MusicSources /><ScraperOrderSettings kind="album" /><ScraperOrderSettings kind="lyrics" /></>}
           {tab.id === "plugins" && (
-            auth.session?.user.role === "admin" ? <PluginStatus />
-              : <div className="settings-card">
+            auth.session?.user.role === "admin" ? (
+              <Suspense fallback={<p className="loading" role="status">{tr("正在加载…")}</p>}>
+                <PluginStatus />
+              </Suspense>
+            ) : (
+              <div className="settings-card">
                 <p className="muted">{tr("插件管理仅对管理员开放。")}</p>
               </div>
+            )
           )}
           {tab.id === "playback" && <PlaybackSettings />}
           {tab.id === "dsp" && <DSPSettings />}
