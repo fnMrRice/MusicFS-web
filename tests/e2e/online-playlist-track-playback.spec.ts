@@ -140,6 +140,32 @@ test("online playlist rows show their own artwork and play the chosen track with
   expect(playlistWrites).toEqual([]);
 });
 
+test("a visible online source cover retries once after temporary pressure and keeps a placeholder on permanent failure", async ({ page }) => {
+  const { row } = await openPlaylist(page);
+  const attempts: Record<string, number> = {};
+  await page.route("**/source-tracks/*/online-artwork", route => {
+    const id = new URL(route.request().url()).pathname.split("/").at(-2)!;
+    attempts[id] = (attempts[id] || 0) + 1;
+    if (id === "source-101") return route.fulfill({ status: 404 });
+    if (attempts[id] === 1) return route.fulfill({ status: 429 });
+    return route.fulfill({ contentType: "image/png", body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/lVQAAAAASUVORK5CYII=", "base64") });
+  });
+  await page.clock.install();
+  const cover = page.locator(".now-playing .cover");
+  for (const [id, name] of [["source-102", "海潮"], ["source-101", "山色"]]) {
+    await row(name).getByRole("button", { name: "播放 " + name, exact: true }).click();
+    await expect.poll(() => attempts[id]).toBe(1);
+    await expect(cover.locator("svg")).toBeVisible();
+    await page.evaluate(() => new Promise<void>(done => requestAnimationFrame(() => requestAnimationFrame(() => done()))));
+    await page.clock.fastForward(16_000);
+    await expect.poll(() => attempts[id]).toBe(2);
+    if (id === "source-102") await expect(cover.locator("img")).toBeVisible();
+    else await expect(cover.locator("svg")).toBeVisible();
+    await page.clock.fastForward(20_000);
+    expect(attempts[id]).toBe(2);
+  }
+});
+
 test("play all supersedes a pending row even when the row resolves after playback starts", async ({ page }) => {
   const { starts, songs } = await openPlaylist(page);
   const stale = await holdNextResolve(page, "102");

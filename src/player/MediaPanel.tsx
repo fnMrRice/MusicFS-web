@@ -5,6 +5,7 @@ import type { SourceTrack } from "../api/types";
 import { ErrorNotice } from "../components/ui";
 import { errorMessage } from "../api/client";
 import { useTrackCover } from "../components/use-track-cover";
+import { useArtworkFailure } from "../components/use-artwork-failure";
 import { TrackScraping } from "../features/scrapers/TrackScraping";
 interface Binding {
   objectId: string;
@@ -16,7 +17,6 @@ export function MediaPanel({ track }: { track: SourceTrack | null }) {
   useLocale();
   const s = useServices();
   const cover = useTrackCover(track);
-  const [failedArtwork, setFailedArtwork] = useState<string>();
   const [scrapingId, setScrapingId] = useState<string | null>(null);
   const [revision, setRevision] = useState(0);
   const [state, setState] = useState({
@@ -68,6 +68,7 @@ export function MediaPanel({ track }: { track: SourceTrack | null }) {
     return () => controller.abort();
   }, [track?.sourceTrackId, track?.assetId, s, revision]);
   const artwork = cover === undefined ? state.artwork : cover;
+  const { failed, onError } = useArtworkFailure(artwork);
   return (
     <>
       {track && <button onClick={() => setScrapingId(track.sourceTrackId)}>{tr("搜索在线资料")}</button>}
@@ -80,12 +81,12 @@ export function MediaPanel({ track }: { track: SourceTrack | null }) {
         <pre className="lyrics">{state.lyrics}</pre>
       ) : (
         <>
-          {artwork && artwork !== failedArtwork && (
+          {artwork && !failed && (
             <img
               className="media-artwork"
               src={artwork}
               referrerPolicy="no-referrer"
-              onError={() => setFailedArtwork(artwork)}
+              onError={onError}
               loading="lazy"
               alt={tr("当前曲目封面")}
             />

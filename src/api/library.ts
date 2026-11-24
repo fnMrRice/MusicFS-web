@@ -19,6 +19,7 @@ export class LibraryApi {
   private providerEpoch = 0;
   private providerRequest = 0;
   private providerApplied = 0;
+  private lastProviderRead = 0;
   constructor(private client: ApiClient) {}
   async track(sourceTrackId: string, signal?: AbortSignal): Promise<SourceTrack> {
     const response = await this.client.request<SourceTrack>(`/source-tracks/${encodeURIComponent(sourceTrackId)}`, { signal });
@@ -46,6 +47,7 @@ export class LibraryApi {
     this.downloadChanges.set(new Map());
   }
   async providers(signal?: AbortSignal): Promise<Provider[]> {
+    this.lastProviderRead = Date.now();
     const epoch = this.providerEpoch;
     const request = ++this.providerRequest;
     const response = await this.client.request<{ items: Provider[] }>(
@@ -65,6 +67,12 @@ export class LibraryApi {
       this.providerInstances.set(response.items);
     }
     return response.items;
+  }
+  recheckUnavailableNetworkProviders(): void {
+    if (Date.now() - this.lastProviderRead < 30_000) return;
+    if (this.providerInstances.value.some(p => p.sourceType === "network" && ["offline", "unavailable"].includes(p.availability))) {
+      void this.providers().catch(() => { /* 保留上次确认的实例状态。 */ });
+    }
   }
   async page(
     providerId: string,

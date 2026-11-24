@@ -97,6 +97,44 @@ test("group and pinned favorite retain online artwork when the selected local fi
   await page.getByRole("button", { name: "歌词", exact: true }).click();
   await expect(page.locator(".media-artwork")).toHaveAttribute("src", artwork);
 });
+
+test("network rows recover from offline and signed-out snapshots without changing local availability", async ({ page }) => {
+  const now = new Date("2026-11-24T02:00:00Z");
+  await page.clock.install({ time: now });
+  const remote = { ...tracks[0], sourceTrackId: "remote", providerInstanceId: "netease", title: "Online song", recordingId: null };
+  const local = { ...tracks[1], title: "Local group", versions: [tracks[1], remote] };
+  let state = "offline", requests = 0;
+  await routeApi(page, route => {
+    const path = new URL(route.request().url()).pathname;
+    let json: unknown = { items: [], nextCursor: null, nextAfter: null };
+    if (path.endsWith("/health/ready")) json = { product: "MusicFS", apiVersion: "1", ready: true, instanceId: "fixture" };
+    if (path.endsWith("/auth/session")) json = { csrfToken: "fixture", user: { id: "listener", role: "user" } };
+    if (path.endsWith("/library/tracks")) json = musicPage([remote, local]);
+    if (path.endsWith("/provider-instances")) {
+      requests++;
+      json = { items: [{ id: "netease", name: "NetEase", sourceType: "network", availability: state,
+        accountState: state === "available" ? "authorized" : "authRequired" }] };
+    }
+    return route.fulfill({ json });
+  });
+  await page.goto(origin + "/#/library");
+  const play = page.getByRole("button", { name: "播放 Online song", exact: true });
+  const row = page.getByRole("row").filter({ has: play });
+  await expect(play).toBeDisabled();
+  await expect(row).toContainText("来源离线");
+  await expect(page.getByRole("button", { name: "播放 Local group", exact: true })).toBeEnabled();
+  state = "unavailable";
+  await page.getByRole("button", { name: "刷新列表", exact: true }).click();
+  await expect(row).toContainText("来源需要登录");
+  const afterRefresh = requests;
+  state = "available";
+  await page.clock.setSystemTime(new Date(now.getTime() + 60_000));
+  await page.evaluate(() => { window.dispatchEvent(new Event("focus")); document.dispatchEvent(new Event("visibilitychange")); });
+  await expect(play).toBeEnabled();
+  expect(requests).toBe(afterRefresh + 1);
+  await page.reload();
+  await expect(play).toBeEnabled();
+});
 async function open(page: Page) {
   await page.getByRole("button", { name: "Song 的更多操作", exact: true }).click();
   await page.getByRole("menu").getByRole("menuitem", { name: "选择封面", exact: true }).click();

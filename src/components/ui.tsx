@@ -4,10 +4,10 @@ import { Tooltip } from "./Tooltip";
 import {
   useEffect,
   useRef,
-  useState,
   type ButtonHTMLAttributes,
   type ReactNode,
 } from "react";
+import { useArtworkFailure } from "./use-artwork-failure";
 
 const paths: Record<string, ReactNode> = {
   music: (
@@ -255,11 +255,11 @@ export function Cover({ large = false, objectId, src, alt = "" }: {
 }) {
   const s = useServices();
   const source = objectId ? s.client.url(`/media/${encodeURIComponent(objectId)}`) : src;
-  const [failed, setFailed] = useState<string | null>(null);
+  const { failed, onError } = useArtworkFailure(source);
   return (
     <span className={`cover ${large ? "large" : ""}`}>
-      {source && source !== failed ? <img key={source} src={source} alt={alt}
-        loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={() => setFailed(source)} /> : <Icon name="music" size={large ? 46 : 22} />}
+      {source && !failed ? <img key={source} src={source} alt={alt}
+        loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={onError} /> : <Icon name="music" size={large ? 46 : 22} />}
     </span>
   );
 }

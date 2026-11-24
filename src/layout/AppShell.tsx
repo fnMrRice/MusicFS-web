@@ -32,6 +32,7 @@ export function AppShell() {
   const playlists = useStore(s.playlists);
   const sources = useMusicSources();
   useForeground(true, () => {
+    s.libraryApi.recheckUnavailableNetworkProviders();
     for (const { online } of sources) if (online?.platform === "netease") s.sourcePlaylists.revalidate(online.instanceId);
   });
   const sourcePlaylists = useStore(s.sourcePlaylists.pages);

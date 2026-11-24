@@ -8,6 +8,7 @@ export interface AuthSession { user: { id: string; role: string }; csrfToken: st
 export interface Provider {
   id: string; name: string; capabilities: string[]; availability: string; scanState?: string;
   sourceType?: "local" | "network";
+  accountState?: "notRequired" | "authorized" | "authRequired";
   plugin?: PluginIdentity;
   configuration?: { schemaRevision: string } | null;
   roots?: { id: string; name: string }[];
