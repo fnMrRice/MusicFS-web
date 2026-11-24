@@ -4,6 +4,7 @@ export function playbackErrorMessage(error: unknown): string {
   if (!(error instanceof ApiError) || error.status === 401 || error.status === 403)
     return errorMessage(error);
   const messages: Record<string, string> = {
+    SESSION_EXPIRED: "播放会话已失效，请选择从头播放。",
     UNSUPPORTED: "无法播放此音频，请检查解密或转码插件是否已启用并配置完成，以及音频文件是否完整。",
     PLUGIN_DISABLED: "播放所需的插件已禁用，请启用相关插件后重试。",
     RESOURCE_CHANGED: "曲目来源已变更或无法读取，请重新扫描该来源后播放。",

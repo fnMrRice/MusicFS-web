@@ -38,6 +38,21 @@ describe("Playback failure messages", () => {
     }
   });
 
+  it("points to the restart action when the playback session has expired", () => {
+    const error = new ApiError("SESSION_EXPIRED", "Playback session expired", 410, "req-session");
+    const message = playbackErrorMessage(error);
+    const translations = {
+      "zh-CN": "播放会话已失效，请选择从头播放。 请求编号：req-session",
+      en: "The playback session has ended. Select “Play from start” to play again. Request ID: req-session",
+      "zh-TW": "播放工作階段已失效，請選擇「從頭播放」。 請求編號：req-session",
+      ja: "再生セッションが終了しました。「最初から再生」を選んでください。 リクエスト ID：req-session",
+    };
+    for (const locale of ["zh-CN", "en", "zh-TW", "ja"] as const) {
+      setLanguage(locale);
+      expect(statusText(message)).toBe(translations[locale]);
+    }
+  });
+
   it("preserves authentication and unexpected-error handling without exposing details", () => {
     for (const error of [
       new ApiError("UNSUPPORTED", "Private details", 401),

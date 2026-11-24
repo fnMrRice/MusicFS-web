@@ -61,6 +61,7 @@ export default {
   "无法播放此音频，请检查解密或转码插件是否已启用并配置完成，以及音频文件是否完整。": ["This audio cannot be played. Check that decryption or transcoding plugins are enabled and configured, and that the audio file is complete and undamaged.", "無法播放此音訊，請檢查解密或轉碼外掛是否已啟用並設定完成，以及音訊檔案是否完整。", "この音声を再生できません。復号または変換プラグインが有効で設定済みであることと、音声ファイルが完全で破損していないことを確認してください。"],
   "播放所需的插件已禁用，请启用相关插件后重试。": ["A plugin required for playback is disabled. Enable it and try again.", "播放所需的外掛已停用，請啟用相關外掛後重試。", "再生に必要なプラグインが無効です。有効にしてから再試行してください。"],
   "曲目来源已变更或无法读取，请重新扫描该来源后播放。": ["The track’s source has changed or could not be read. Rescan the source and try playing again.", "曲目來源已變更或無法讀取，請重新掃描該來源後播放。", "曲のソースが変更されたか、読み取れません。ソースを再スキャンしてから再生してください。"],
+  "播放会话已失效，请选择从头播放。": ["The playback session has ended. Select “Play from start” to play again.", "播放工作階段已失效，請選擇「從頭播放」。", "再生セッションが終了しました。「最初から再生」を選んでください。"],
   "音乐来源暂不可用，请检查音乐目录及其所在磁盘或网络连接后重试。": ["The music source is unavailable. Check the music folder and its disk or network connection, then try again.", "音樂來源暫不可用，請檢查音樂目錄及其所在磁碟或網路連線後重試。", "音楽ソースを利用できません。音楽フォルダーと、その保存先のディスクまたはネットワーク接続を確認して再試行してください。"],
   "此来源需要登录，目前尚未开放账号接入。": ["This source requires sign-in, which is not supported yet.", "此來源需要登入，目前尚未開放帳號接入。", "このソースにはログインが必要ですが、まだ対応していません。"],
   "内容已发生变化，请刷新后重新编辑。": ["The content has changed. Refresh before editing again.", "內容已變更，請重新整理後再編輯。", "内容が変更されました。更新してから編集してください。"],
