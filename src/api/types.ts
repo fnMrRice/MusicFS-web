@@ -43,7 +43,7 @@ export interface Playback {
   dspExecution: 'server' | 'client';
   deliveryMode: 'direct' | 'proxy' | 'processed'; outputProfile: OutputProfile; outputProfilePending?: boolean;
   streamUrl: string; expiresAt: string; seekMode: 'byteRange' | 'timeRestart' | 'none';
-  seekableRange: { startMs: number; endMs: number } | null;
+  seekableRange: { startMs: number; endMs: number; growing?: boolean } | null;
   positionOriginMs: number; effectiveProcessing: unknown[];
   resumeDecision: 'continue' | 'restartRequired' | 'unavailable';
 }

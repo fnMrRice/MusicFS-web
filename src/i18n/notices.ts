@@ -4,6 +4,8 @@ export default {
   "已暂停": ["Paused", "已暫停", "一時停止中"],
   "正在缓冲…": ["Buffering…", "正在緩衝…", "バッファリング中…"],
   "正在定位…": ["Seeking…", "正在定位…", "再生位置を変更中…"],
+  "正在下载目标位置的音频…": ["Downloading audio at the selected position…", "正在下載目標位置的音訊…", "指定した位置の音声をダウンロード中…"],
+  "无法读取目标位置的音频，请重新播放。": ["Audio at the selected position could not be read. Restart playback.", "無法讀取目標位置的音訊，請重新播放。", "指定した位置の音声を読み込めませんでした。再生をやり直してください。"],
   "正在恢复…": ["Recovering…", "正在恢復…", "復旧中…"],
   "播放结束": ["Playback ended", "播放結束", "再生終了"],
   "播放失败": ["Playback failed", "播放失敗", "再生に失敗しました"],

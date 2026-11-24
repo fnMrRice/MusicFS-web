@@ -34,6 +34,7 @@ export class PlayerController {
   private selection = 0;
   private pendingSelection: number | null = null;
   private seekingOut = false;
+  private waitingForRange = false;
   private transitions = new PlaybackTransitions();
   setTransitions(settings: FadeSettings): void {
     this.transitions.configure(settings, this.audio);
@@ -191,6 +192,7 @@ export class PlayerController {
     this.emit();
   }
   private attach(playback: Playback, generation: number): void {
+    this.waitingForRange = false;
     if (playback.dspExecution !== "client" || playback.effectiveProcessing.some((step) =>
       !step || typeof step !== "object" || !("type" in step) ||
       !["ncmDecrypt", "transcode"].includes(String(step.type)))) {
@@ -274,6 +276,7 @@ export class PlayerController {
       }
       case "playing":
         if (this.transitions.pausing || event.paused) return;
+        this.waitingForRange = false;
         this.transitions.userPaused = false;
         this.reportStarted();
         this.clearBufferingTimer();
@@ -291,6 +294,12 @@ export class PlayerController {
       case "waiting":
       case "stalled":
         if (this.state.wantsPlay) {
+          // 目标字节可能还在下载；原生媒体会在就绪后自动继续同一次定位。
+          if (this.waitingForRange) {
+            this.state.phase = "seeking";
+            this.state.message = "正在下载目标位置的音频…";
+            break;
+          }
           this.state.phase = "buffering";
           if (!this.bufferingTimer)
             this.bufferingTimer = setTimeout(
@@ -303,15 +312,26 @@ export class PlayerController {
         this.state.phase = "seeking";
         break;
       case "seeked":
+        if (this.waitingForRange && (event.readyToPlay || event.paused)) {
+          this.waitingForRange = false;
+          this.state.message = null;
+        }
         this.state.phase = event.paused ? "paused" : event.readyToPlay ? "playing" : "loading";
         if (this.state.phase === "playing") this.clearBufferingTimer();
         break;
       case "ended":
+        if (this.waitingForRange) this.state.message = null;
+        this.waitingForRange = false;
         this.clearBufferingTimer();
         this.state.phase = "ended";
         this.state.wantsPlay = false;
         break;
       case "error":
+        if (this.waitingForRange) {
+          this.waitingForRange = false;
+          this.fail("无法读取目标位置的音频，请重新播放。");
+          return;
+        }
         this.recover(`MEDIA_ERROR_${event.errorCode ?? "UNKNOWN"}`);
         return;
     }
@@ -387,6 +407,8 @@ export class PlayerController {
       this.queue?.seek(positionMs);
     } else if (audio) {
       const resumeEnded = audio.ended && this.state.wantsPlay;
+      this.waitingForRange = playback.seekableRange?.growing === true;
+      if (this.waitingForRange) this.clearBufferingTimer();
       this.transitions.fadeIn(audio);
       audio.seek(seconds);
       if (resumeEnded) this.playAttached(playback, this.generation);

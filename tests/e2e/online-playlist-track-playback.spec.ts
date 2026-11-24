@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { preview, type PreviewServer } from "vite";
+import type { IncomingMessage, ServerResponse } from "node:http";
 import { audioFixture } from "../fixtures/audio";
 import { routeApi } from "../fixtures/control-mock";
 import { deferred, playback, track as sourceTrack } from "../fixtures/dto";
@@ -8,8 +9,17 @@ import { seekTo, waitPlaying } from "./helpers";
 
 let server: PreviewServer;
 let origin: string;
+let serveSlowAudio: ((req: IncomingMessage, res: ServerResponse) => void) | undefined;
 test.beforeAll(async () => {
-  server = await preview({ preview: { host: "127.0.0.1", port: 0 } });
+  server = await preview({ preview: { host: "127.0.0.1", port: 0 }, plugins: [{
+    name: "slow-audio-fixture",
+    configurePreviewServer(preview) {
+      preview.middlewares.use((req, res, next) => {
+        if (serveSlowAudio && req.url?.endsWith("/stream")) serveSlowAudio(req, res);
+        else next();
+      });
+    },
+  }] });
   const address = server.httpServer.address();
   if (!address || typeof address === "string") throw new Error("Preview address unavailable");
   origin = `http://127.0.0.1:${address.port}`;
@@ -71,10 +81,12 @@ async function openPlaylist(page: Page) {
       starts.push(sourceTrackId);
       const sessionId = "session-" + starts.length, attemptId = "attempt-" + starts.length;
       json = { ...playback(attemptId), outputProfilePending: true, deliveryMode: "proxy", sessionId, sourceTrackId, assetId: sourceTrackId.replace("source-", "asset-"),
+        seekableRange: { startMs: 0, endMs: serveSlowAudio ? 180_000 : 30_000, growing: true },
         streamUrl: `/api/v1/playback/sessions/${sessionId}/attempts/${attemptId}/stream` };
     }
     if (pathname.endsWith("/output-profile")) json = { ...playback().outputProfile, sampleRate: 16000, bitrateBps: 256000, channels: 1 };
     if (pathname.endsWith("/stream")) {
+      if (serveSlowAudio) return route.continue();
       const range = /^bytes=(\d+)-(\d*)$/.exec(request.headers().range ?? "");
       const headers = { "Accept-Ranges": "bytes" };
       if (!range) return route.fulfill({ contentType: "audio/wav", headers, body: sound });
@@ -91,6 +103,42 @@ async function openPlaylist(page: Page) {
   await expect(page.getByRole("heading", { name: playlist.title })).toBeVisible();
   return { row, songs, coverRequests, starts, resolutions, playlistWrites };
 }
+
+test("a forward seek waits for a slow download and resumes on the original audio element", async ({ page }) => {
+  const sound = audioFixture(180), available = 44 + 40 * 32_000;
+  const complete = deferred<void>();
+  let requestedFutureRange = false;
+  serveSlowAudio = (req, res) => {
+    const range = /^bytes=(\d+)-(\d*)$/.exec(req.headers.range ?? "");
+    const start = Number(range?.[1] ?? 0), end = range?.[2] ? Number(range[2]) : sound.length - 1;
+    res.writeHead(range ? 206 : 200, { "Accept-Ranges": "bytes", "Content-Type": "audio/wav", "Content-Length": end - start + 1,
+      ...(range ? { "Content-Range": `bytes ${start}-${end}/${sound.length}` } : {}) });
+    const split = Math.max(start, Math.min(available, end + 1));
+    if (start >= available) requestedFutureRange = true;
+    res.write(sound.subarray(start, split));
+    if (split === end + 1) res.end();
+    else void complete.promise.then(() => { if (!res.destroyed) res.end(sound.subarray(split, end + 1)); });
+  };
+  try {
+    const { row, starts } = await openPlaylist(page);
+    await row("海潮").getByRole("button", { name: "播放 海潮", exact: true }).click();
+    await waitPlaying(page);
+    const audio = await page.locator("audio").elementHandle();
+    await seekTo(page, 150);
+    await expect(page.getByRole("alert")).toHaveText("正在下载目标位置的音频…");
+    // 保持真实媒体请求挂起，越过常规缓冲的十秒恢复阈值。
+    await new Promise(resolve => setTimeout(resolve, 11_000));
+    expect(requestedFutureRange).toBe(true);
+    expect(await audio!.evaluate(element => element.isConnected)).toBe(true);
+    complete.resolve();
+    await expect.poll(() => audio!.evaluate((element: HTMLAudioElement) => element.currentTime)).toBeGreaterThan(150.1);
+    await expect(page.getByText("正在下载目标位置的音频…")).toHaveCount(0);
+    expect(starts).toEqual(["source-102"]);
+  } finally {
+    complete.resolve();
+    serveSlowAudio = undefined;
+  }
+});
 
 async function holdNextResolve(page: Page, externalId: string) {
   const received = deferred<void>(), resume = deferred<void>(), released = deferred<void>();

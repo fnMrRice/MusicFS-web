@@ -394,6 +394,27 @@ describe('Player controller (Mock media; not decoder validation)', () => {
     const s = setup(); await s.controller.select(track); s.controller.seek(40_000); expect(s.audio.seek).not.toHaveBeenCalled();
     s.controller.seek(10_000); expect(s.audio.seek).toHaveBeenCalledWith(10); s.controller.stop();
   });
+
+  it('reports a real media failure while an online seek waits and leaves normal buffering recovery available', async () => {
+    vi.useFakeTimers();
+    const descriptor = { ...playback(), seekableRange: { startMs: 0, endMs: 30_000, growing: true } };
+    const s = setup(vi.fn().mockResolvedValue(descriptor));
+    try {
+      await s.controller.select(track);
+      await s.controller.seek(20_000);
+      s.event('seeking'); s.event('waiting');
+      s.event('error');
+      expect(s.controller.state.phase).toBe('error');
+      expect(s.audio.destroy).toHaveBeenCalledTimes(1);
+      expect(s.api.control).not.toHaveBeenCalled();
+      await s.controller.select(track);
+      s.event('stalled');
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(s.api.control).toHaveBeenCalledOnce();
+    } finally {
+      s.controller.stop(); vi.useRealTimers();
+    }
+  });
   it('ignores old media callbacks after stop', async () => {
     const s = setup(); await s.controller.select(track); s.controller.stop(); s.event('playing');
     expect(s.controller.state.phase).toBe('idle');
