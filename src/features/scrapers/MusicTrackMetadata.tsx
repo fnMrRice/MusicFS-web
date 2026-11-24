@@ -64,7 +64,7 @@ function MusicTrackSearch({ track, finished, refresh, savingChanged }: {
   const selection = version && media.data?.target.sourceTrackId === sourceId && media.data.target.assetId === version.assetId ? media.data : null;
   const names = track.localizedTitles ?? [];
   const titlesWith = (candidate: ScrapeCandidate) => mergeScrapedTitles(track.title, names, candidate);
-  return <ScraperSearch preferredField="trackDetails" allowedFields={["trackDetails", "lyrics", "artwork"]}
+  return <ScraperSearch preferredField="trackDetails" allowedFields={["trackDetails", "lyrics", "artwork"]} sourceTrackId={sourceId || undefined}
     titleOptions={names} initial={{ title: track.title, artist: track.artists.map(artist => artist.name).join(", "),
       album: track.albums[0]?.name, duration: track.selectedSource?.durationMs ? track.selectedSource.durationMs / 1000 : undefined }}
     fieldChanged={setField} fieldControls={field => field === "trackDetails" ? undefined : <>

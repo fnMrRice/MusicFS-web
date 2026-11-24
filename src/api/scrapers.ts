@@ -120,6 +120,9 @@ function items<T>(value: unknown, valid: (value: unknown) => value is T): T[] {
     throw new ApiError("INVALID_RESPONSE", "Invalid scraper response");
   return value.items;
 }
+function isCandidate(item: unknown): item is ScrapeCandidate {
+  return isItem(item) && "candidateToken" in item && nonempty(item.candidateToken);
+}
 function trackSelection(value: unknown, trackId: string): TrackMediaSelection {
   if (!record(value) || !record(value.target) || value.target.sourceTrackId !== trackId ||
     !nonempty(value.target.assetId) || !nonempty(value.target.assetVersion) ||
@@ -136,8 +139,17 @@ export class ScrapersApi {
   async search(pluginId: string, field: string, query: ScraperQuery, signal?: AbortSignal, refresh = false): Promise<ScrapeCandidate[]> {
     const result = await this.client.request<unknown>(`/scrapers/${encodeURIComponent(pluginId)}/search`,
       { method: "POST", body: { field, query, ...(refresh ? { refresh: true } : {}) }, signal, timeoutMs: 45_000 });
-    return items(result, (item): item is ScrapeCandidate =>
-      isItem(item) && "candidateToken" in item && nonempty(item.candidateToken));
+    return items(result, isCandidate);
+  }
+  async searchLyrics(query: ScraperQuery, sourceTrackId: string | undefined, localOnly: boolean, signal?: AbortSignal) {
+    const result = await this.client.request<unknown>("/scrapers/lyrics-auto-search", {
+      method: "POST", body: { query, sourceTrackId, ...(localOnly ? { localOnly: true } : {}) }, signal, timeoutMs: 120_000,
+    });
+    const candidates = items(result, isCandidate);
+    if (!record(result) || (candidates.length ? !nonempty(result.pluginId)
+      : result.pluginId != null && typeof result.pluginId !== "string"))
+      throw new ApiError("INVALID_RESPONSE", "Invalid lyrics source");
+    return { pluginId: typeof result.pluginId === "string" ? result.pluginId : "", items: candidates };
   }
   async saved(workId: string, signal?: AbortSignal): Promise<SavedScrapedField[]> {
     const result = await this.client.request<unknown>(`/works/${encodeURIComponent(workId)}/scraped-fields`, { signal });

@@ -51,6 +51,21 @@ describe("Scraper content declarations and selection", () => {
     expect(options.headers.get("Idempotency-Key")).toBe("stable-key");
     expect(JSON.parse(options.body)).toEqual({ expectedRevision: 2, assetId: "asset", assetVersion: "v1", pluginId: "plugin", candidateToken: "token" });
   });
+  it("uses local-only lookup for an explicit local lyrics search and preserves the winning source", async () => {
+    const pluginId = "musicfs.scraper.local";
+    const candidate = { id: "embedded", title: "Song", lyrics: "First line", candidateToken: "selection" };
+    const fetch = vi.fn().mockResolvedValueOnce(reply({ pluginId, items: [candidate] }))
+      .mockResolvedValueOnce(reply({ pluginId: "", items: [] }))
+      .mockResolvedValueOnce(reply({ pluginId: "", items: [candidate] }));
+    const api = new ScrapersApi(new ApiClient(fetch));
+    const query = { title: "Song" };
+    await expect(api.searchLyrics(query, "track", true)).resolves.toEqual({ pluginId, items: [candidate] });
+    expect(fetch.mock.calls[0][0]).toBe("/api/v1/scrapers/lyrics-auto-search");
+    expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({ query, sourceTrackId: "track", localOnly: true });
+    await expect(api.searchLyrics(query, undefined, false)).resolves.toEqual({ pluginId: "", items: [] });
+    expect(JSON.parse(fetch.mock.calls[1][1].body)).toEqual({ query });
+    await expect(api.searchLyrics(query, "track", false)).rejects.toMatchObject({ code: "INVALID_RESPONSE" });
+  });
   it("restricts outgoing result links to credential-free HTTPS URLs", () => {
     expect(externalLink("javascript:alert(1)")).toBeUndefined();
     expect(externalLink("https://a:b@example.org/page")).toBeUndefined();

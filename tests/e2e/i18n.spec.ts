@@ -44,6 +44,8 @@ async function mock(context: BrowserContext, authenticated = true) {
       json = musicPage([track]);
     if (path.endsWith("/scrapers/album-auto-settings"))
       json = { revision: 0, localPluginOrder: ["musicfs.scraper.musicbrainz"] };
+    if (path.endsWith("/scrapers/lyrics-auto-settings"))
+      json = { revision: 0, pluginOrder: ["musicfs.scraper.local", "musicfs.scraper.netease", "musicfs.scraper.qqmusic"] };
     if (path.endsWith("/online-instances"))
       json = {
         items: [

@@ -46,6 +46,7 @@ async function mockApi(page: Page, special: (route: Route, path: string) => Prom
 
 test("the track menu opens a logical track and lyrics use the explicitly selected asset", async ({ page }) => {
   const pluginId = "example.lyrics";
+  const localPlugin = "musicfs.scraper.local";
   const target = { sourceTrackId: "Alpha", assetId: "Alpha", assetVersion: "v2" };
   let attempts = 0;
   await mockApi(page, async (route, path) => {
@@ -55,11 +56,19 @@ test("the track menu opens a logical track and lyrics use the explicitly selecte
       await route.fulfill({ json: musicTrack({ ...tracks[0], versions: tracks }) });
     } else if (path.endsWith("/Alpha/media-selection")) {
       await route.fulfill({ json: { revision: 4, target, bindings: [] } });
+    } else if (path.endsWith("/scrapers/lyrics-auto-search")) {
+      const body = route.request().postDataJSON();
+      expect(body.query).toMatchObject({ artist: "Library artist", title: "Alpha", duration: 120 });
+      if (body.sourceTrackId) expect(body.sourceTrackId).toBe("Alpha");
+      await route.fulfill({ json: { pluginId: body.sourceTrackId ? localPlugin : pluginId, items: [{
+        id: "123", title: "Alpha", lyrics: body.sourceTrackId ? "[00:02]Local preview" : "[00:01]Automatic preview",
+        candidateToken: body.sourceTrackId ? "local-token" : "auto-token",
+      }] } });
     } else if (path.endsWith(`/scrapers/${pluginId}/search`)) {
       expect(route.request().postDataJSON()).toMatchObject({ field: "lyrics", query: { artist: "Library artist", title: "Alpha", duration: 120 } });
       await route.fulfill({ json: { items: [{ id: "123", title: "Alpha", lyrics: "[00:05]Lyric preview", candidateToken: "token" }] } });
     } else if (path.endsWith("/Alpha/scraped-fields/lyrics")) {
-      expect(route.request().postDataJSON()).toEqual({ assetId: "Alpha", assetVersion: "v2", expectedRevision: 4, pluginId, candidateToken: "token" });
+      expect(route.request().postDataJSON()).toEqual({ assetId: "Alpha", assetVersion: "v2", expectedRevision: 4, pluginId: localPlugin, candidateToken: "local-token" });
       attempts++;
       await route.fulfill({ json: { revision: 5, target, bindings: [] } });
     } else return false;
@@ -73,11 +82,20 @@ test("the track menu opens a logical track and lyrics use the explicitly selecte
   await page.getByRole("button", { name: "Alpha 的更多操作", exact: true }).click();
   await page.getByRole("menuitem", { name: "搜索在线资料" }).click();
   const search = page.getByRole("dialog", { name: "搜索在线资料" });
+  const sources = search.getByRole("combobox", { name: "资料来源", exact: true });
+  await expect(sources).toHaveValue("auto-lyrics");
+  await search.getByRole("button", { name: "搜索", exact: true }).click();
+  await expect(search.getByText("[00:01]Automatic preview")).toBeVisible();
+  await sources.selectOption(pluginId);
   await search.getByRole("button", { name: "搜索", exact: true }).click();
   await expect(search.getByText("[00:05]Lyric preview")).toBeVisible();
   expect(attempts).toBe(0);
   await expect(search.getByRole("button", { name: "选用这项资料" })).toHaveCount(0);
   await search.getByLabel("保存到来源版本", { exact: true }).selectOption("Alpha");
+  await sources.selectOption("auto-lyrics");
+  await search.getByRole("button", { name: "搜索", exact: true }).click();
+  await expect(search.getByText("[00:02]Local preview")).toBeVisible();
+  await expect(search.getByText("歌词来源：本地歌词")).toBeVisible();
   await search.getByRole("button", { name: "选用这项资料" }).click();
   await expect(search).toHaveCount(0);
   expect(attempts).toBe(1);

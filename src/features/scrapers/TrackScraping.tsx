@@ -20,7 +20,7 @@ export function TrackScraping({ track, close, applied }: { track: SourceTrack; c
     <p>{track.displayName}</p>
     <ErrorNotice error={media.error} retry={media.reload} />
     {media.data && !selection && <p className="notice">{tr("来源文件已发生变化，请重新扫描曲库。")}</p>}
-    <ScraperSearch key={`${selection?.target.assetVersion}:${selection?.revision}`} preferredField="lyrics"
+    <ScraperSearch key={`${selection?.target.assetVersion}:${selection?.revision}`} preferredField="lyrics" sourceTrackId={track.sourceTrackId}
       initial={{ title: track.title || track.displayName, album: track.album ?? undefined,
         artist: track.artists?.join(", "), duration: track.durationMs ? track.durationMs / 1000 : undefined }}
       apply={selection ? (field, pluginId, item, key) => api.applyMedia(selection, field, pluginId, item.candidateToken, key) : undefined}

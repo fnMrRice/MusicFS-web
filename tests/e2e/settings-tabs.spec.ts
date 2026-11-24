@@ -24,10 +24,12 @@ test.afterAll(async () => { await new Promise<void>((resolve) => server?.httpSer
 async function mock(page: Page, role = "admin") {
   const requests: string[] = [];
   const prefix = "musicfs.scraper.";
-  const scrapers = ["musicbrainz", "itunes", "netease", "qqmusic"].map(name => ({
-    pluginId: prefix + name, name, type: "scraper", fields: ["albumDetails", "albumTracks"], available: true,
+  const scrapers = ["musicbrainz", "itunes", "netease", "qqmusic", "lrclib"].map(name => ({
+    pluginId: prefix + name, name, type: "scraper", fields: name === "lrclib" ? ["lyrics"] :
+      ["albumDetails", "albumTracks", ...(["netease", "qqmusic"].includes(name) ? ["lyrics"] : [])], available: true,
   }));
   let albumSettings = { revision: 0, localPluginOrder: scrapers.slice(0, 3).map(source => source.pluginId) };
+  let lyricsSettings = { revision: 0, pluginOrder: ["local", "netease", "qqmusic"].map(name => prefix + name) };
   await routeApi(page, (route) => {
     const path = new URL(route.request().url()).pathname;
     requests.push(path);
@@ -38,6 +40,15 @@ async function mock(page: Page, role = "admin") {
     if (path.endsWith("/auth/session")) json = { csrfToken: "fixture", user: { id: "listener", role } };
     if (path.endsWith("/provider-instances")) json = { items: [local] };
     if (path.endsWith("/scrapers")) json = { items: scrapers };
+    if (path.endsWith("/scrapers/lyrics-auto-settings")) {
+      if (route.request().method() === "PUT") {
+        const body = route.request().postDataJSON();
+        expect(body.expectedRevision).toBe(lyricsSettings.revision);
+        expect(route.request().headers()["idempotency-key"]).toBeTruthy();
+        lyricsSettings = { revision: lyricsSettings.revision + 1, pluginOrder: body.pluginOrder };
+      }
+      json = lyricsSettings;
+    }
     if (path.endsWith("/scrapers/album-auto-settings")) {
       if (route.request().method() === "PUT") {
         const body = route.request().postDataJSON();
@@ -118,6 +129,26 @@ test("listeners can save and reload the local album scraper order", async ({ pag
   await expect(settings.getByRole("status")).toHaveText("设置已保存。");
   await page.reload();
   await expect(names).toHaveText(["Apple Music (iTunes)", "MusicBrainz", "QQ 音乐"]);
+});
+
+test("lyrics order supports local and online sources and can be emptied", async ({ page }) => {
+  await mock(page);
+  await page.goto(`${origin}/#/settings`);
+  const settings = section(page, "歌词刮削顺序");
+  const labels = settings.locator("li span");
+  await expect(labels).toHaveText(["本地歌词", "网易云音乐", "QQ 音乐"]);
+  await settings.getByLabel("添加刮削来源").selectOption("musicfs.scraper.lrclib");
+  await settings.getByRole("button", { name: "下移 本地歌词" }).click();
+  await settings.getByRole("button", { name: "保存设置" }).click();
+  await expect(settings.getByRole("status")).toHaveText("设置已保存。");
+  await page.reload();
+  await expect(labels).toHaveText(["网易云音乐", "本地歌词", "QQ 音乐", "LRCLIB"]);
+  for (const name of ["网易云音乐", "本地歌词", "QQ 音乐", "LRCLIB"]) await settings.getByRole("button", { name: "移除 " + name }).click();
+  await settings.getByRole("button", { name: "保存设置" }).click();
+  await expect(settings.getByRole("status")).toHaveText("设置已保存。");
+  await page.reload();
+  await expect(settings.getByLabel("添加刮削来源")).toBeVisible();
+  await expect(labels).toHaveCount(0);
 });
 
 test("settings keep every section mounted and preserve playback preferences after scrolling and refresh", async ({ page }, info) => {

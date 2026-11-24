@@ -1,4 +1,9 @@
 export default {
+  "歌词刮削顺序": ["Lyrics source order", "歌詞刮削順序", "歌詞の検索順序"],
+  "目录刷新和自动搜索按此顺序查找歌词，找到后停止。移除全部来源可关闭自动查找。": ["Folder refresh and automatic search check each source in order until lyrics are found. Remove all sources to turn off automatic lookup.", "目錄重新整理和自動搜尋會依此順序查找歌詞，找到後停止。移除全部來源可關閉自動查找。", "フォルダーの更新と自動検索では、歌詞が見つかるまでこの順序で検索します。すべての検索元を削除すると自動検索が無効になります。"],
+  "本地歌词": ["Local lyrics", "本機歌詞", "ローカルの歌詞"],
+  "自动（按歌词刮削顺序）": ["Automatic (lyrics source order)", "自動（依歌詞刮削順序）", "自動（歌詞の検索順序）"],
+  "歌词来源：{name}": ["Lyrics source: {name}", "歌詞來源：{name}", "歌詞の取得元：{name}"],
   "本地专辑刮削顺序": ["Local album scraper order", "本機專輯刮削順序", "ローカルアルバムの検索順序"],
   "按以下顺序查找本地专辑。网易云音乐和 QQ 音乐的专辑优先使用各自的平台。": ["Local albums use the sources below in order. NetEase Cloud Music and QQ Music albums use their own platforms first.", "按以下順序查找本機專輯。網易雲音樂和 QQ 音樂的專輯優先使用各自的平台。", "ローカルアルバムは以下の順序で検索します。NetEase Cloud Music と QQ Music のアルバムはそれぞれのサービスを優先します。"],
   "添加刮削来源": ["Add a metadata source", "新增刮削來源", "検索元を追加"],

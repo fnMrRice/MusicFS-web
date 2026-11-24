@@ -1,38 +1,44 @@
 import { useEffect, useRef, useState } from "react";
-import { albumAutoSettings, type AlbumAutoSettings as Preferences } from "../../api/album-auto-settings";
+import { localLyricsId, scraperOrder, type ScraperOrder, type ScraperOrderKind } from "../../api/scraper-order";
 import { ApiError, errorMessage } from "../../api/client";
 import { ScrapersApi, type Scraper } from "../../api/scrapers";
 import { useServices, useStore } from "../../app/services";
 import { useResource } from "../../components/query";
 import { ErrorNotice } from "../../components/ui";
 import { tr, useLocale } from "../../i18n";
-import { albumScraperName } from "./fields";
+import { scraperName } from "./fields";
 
-export function AlbumAutoSettings() {
+export function ScraperOrderSettings({ kind }: { kind: ScraperOrderKind }) {
   useLocale();
   const services = useServices();
   const auth = useStore(services.auth);
-  const key = `album-auto-settings:${auth.ready?.instanceId}:${auth.session?.user.id}`;
+  const key = `${kind}-auto-settings:${auth.ready?.instanceId}:${auth.session?.user.id}`;
+  const heading = `${kind}-scraper-priority`;
   const resource = useResource(key, async signal => {
     const [settings, scrapers] = await Promise.all([
-      albumAutoSettings(services.client, signal), new ScrapersApi(services.client).list(signal),
+      scraperOrder(services.client, kind, signal), new ScrapersApi(services.client).list(signal),
     ]);
-    return { settings, scrapers: scrapers.filter(source => !source.requiresExternalId &&
-      source.fields.includes("albumDetails") && source.fields.includes("albumTracks")) };
+    const eligible = scrapers.filter(source => !source.requiresExternalId && (kind === "lyrics" ? source.fields.includes("lyrics")
+      : source.fields.includes("albumDetails") && source.fields.includes("albumTracks")));
+    if (kind === "lyrics" && !eligible.some(source => source.pluginId === localLyricsId)) {
+      eligible.unshift({ pluginId: localLyricsId, name: "本地歌词", type: "scraper", fields: ["lyrics"], available: true });
+    }
+    return { settings, scrapers: eligible };
   });
-  return <section className="settings-card album-auto-settings" aria-labelledby="album-scraper-priority">
-    <h3 id="album-scraper-priority">{tr("本地专辑刮削顺序")}</h3>
-    <p className="muted">{tr("按以下顺序查找本地专辑。网易云音乐和 QQ 音乐的专辑优先使用各自的平台。")}</p>
+  return <section className="settings-card album-auto-settings" aria-labelledby={heading}>
+    <h3 id={heading}>{tr(kind === "lyrics" ? "歌词刮削顺序" : "本地专辑刮削顺序")}</h3>
+    <p className="muted">{tr(kind === "lyrics" ? "目录刷新和自动搜索按此顺序查找歌词，找到后停止。移除全部来源可关闭自动查找。"
+      : "按以下顺序查找本地专辑。网易云音乐和 QQ 音乐的专辑优先使用各自的平台。")}</p>
     {resource.loading && <p role="status">{tr("正在读取设置…")}</p>}
     <ErrorNotice error={resource.error} retry={resource.reload} />
-    {resource.data && <SourceOrder key={key} initial={resource.data.settings} scrapers={resource.data.scrapers} reload={resource.reload} />}
+    {resource.data && <SourceOrder key={key} initial={resource.data.settings} scrapers={resource.data.scrapers} kind={kind} reload={resource.reload} />}
   </section>;
 }
 
-function SourceOrder({ initial, scrapers, reload }: { initial: Preferences; scrapers: Scraper[]; reload: () => void }) {
+function SourceOrder({ initial, scrapers, kind, reload }: { initial: ScraperOrder; scrapers: Scraper[]; kind: ScraperOrderKind; reload: () => void }) {
   const { client } = useServices();
   const [saved, setSaved] = useState(initial);
-  const [order, setOrder] = useState(initial.localPluginOrder);
+  const [order, setOrder] = useState(initial.order);
   const [saving, setSaving] = useState(false);
   const [conflict, setConflict] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -40,7 +46,7 @@ function SourceOrder({ initial, scrapers, reload }: { initial: Preferences; scra
   const operation = useRef<AbortController | null>(null);
   const requestKey = useRef<string | null>(null);
   useEffect(() => () => operation.current?.abort(), []);
-  const dirty = order.length !== saved.localPluginOrder.length || order.some((id, i) => id !== saved.localPluginOrder[i]);
+  const dirty = order.length !== saved.order.length || order.some((id, i) => id !== saved.order[i]);
   const available = scrapers.filter(source => source.available && !order.includes(source.pluginId));
   function edit(next: string[]) {
     requestKey.current = null;
@@ -61,13 +67,13 @@ function SourceOrder({ initial, scrapers, reload }: { initial: Preferences; scra
     setSaving(true);
     setError(null);
     try {
-      const result = await albumAutoSettings(client, controller.signal, {
-        settings: { revision: saved.revision, localPluginOrder: order }, key: requestKey.current,
+      const result = await scraperOrder(client, kind, controller.signal, {
+        settings: { revision: saved.revision, order }, key: requestKey.current,
       });
       if (controller.signal.aborted) return;
       requestKey.current = null;
       setSaved(result);
-      setOrder(result.localPluginOrder);
+      setOrder(result.order);
       setConfirmed(true);
     } catch (cause) {
       if (controller.signal.aborted) return;
@@ -80,17 +86,17 @@ function SourceOrder({ initial, scrapers, reload }: { initial: Preferences; scra
     }
   }
   function name(id: string) {
-    return albumScraperName(id, scrapers.find(source => source.pluginId === id)?.name);
+    return scraperName(id, scrapers.find(source => source.pluginId === id)?.name);
   }
   return <>
-    <fieldset disabled={saving || conflict} aria-labelledby="album-scraper-priority">
+    <fieldset disabled={saving || conflict} aria-labelledby={`${kind}-scraper-priority`}>
       <ol>{order.map((id, index) => <li key={id}><div className="album-scraper-row">
         <span>{name(id)}</span>
         <button type="button" aria-label={tr("上移 {name}", { name: name(id) })} disabled={index === 0}
           onClick={() => move(index, index - 1)}>↑</button>
         <button type="button" aria-label={tr("下移 {name}", { name: name(id) })} disabled={index === order.length - 1}
           onClick={() => move(index, index + 1)}>↓</button>
-        <button type="button" aria-label={tr("移除 {name}", { name: name(id) })} disabled={order.length === 1}
+        <button type="button" aria-label={tr("移除 {name}", { name: name(id) })} disabled={kind === "album" && order.length === 1}
           onClick={() => edit(order.filter(value => value !== id))}>{tr("移除")}</button>
       </div></li>)}</ol>
       {available.length > 0 && <select aria-label={tr("添加刮削来源")} value="" onChange={e => edit([...order, e.target.value])}>

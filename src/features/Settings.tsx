@@ -6,7 +6,7 @@ import { LanguageSelect } from "../i18n/LanguageSelect";
 import { ThemeChoices } from "../components/ThemeChoices";
 import { RecommendationOrderSettings } from "./RecommendationOrderSettings";
 import { MusicSources } from "./MusicSources";
-import { AlbumAutoSettings } from "./scrapers/AlbumAutoSettings";
+import { ScraperOrderSettings } from "./scrapers/ScraperOrderSettings";
 import { PluginStatus } from "./PluginStatus";
 import { DSPSettings } from "./dsp/DSPSettings";
 import { VolumeSlider } from "../player/VolumeControl";
@@ -49,7 +49,7 @@ export function Settings() {
           tabIndex={-1}
         >
           <h2 id={`settings-heading-${tab.id}`} className="settings-section-title">{tr(tab.label)}</h2>
-          {tab.id === "sources" && <><MusicSources /><AlbumAutoSettings /></>}
+          {tab.id === "sources" && <><MusicSources /><ScraperOrderSettings kind="album" /><ScraperOrderSettings kind="lyrics" /></>}
           {tab.id === "plugins" && (
             auth.session?.user.role === "admin" ? <PluginStatus />
               : <div className="settings-card">

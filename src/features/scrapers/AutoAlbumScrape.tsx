@@ -7,7 +7,7 @@ import { ErrorNotice } from "../../components/ui";
 import { tr, useLocale } from "../../i18n";
 import { AlbumPreviews, type AlbumEdition } from "./album-previews";
 import { albumLookupMessage, albumSaveMessage } from "./album-search-errors";
-import { albumScraperName } from "./fields";
+import { scraperName } from "./fields";
 
 type Selection = { edition: AlbumEdition; revision: number; key: string };
 type Notice = { kind: "progress" | "result" | "error"; message: string };
@@ -39,7 +39,7 @@ export function AutoAlbumScrape({ albumId, name, provider, close }: {
         signal.addEventListener("abort", cancel, { once: true });
         setFeedback({ kind: "confirm",
           message: tr("将采用 {0} 的《{1}》，更新已保存的平台专辑资料和曲目表。", {
-            0: albumScraperName(edition.pluginId), 1: edition.details.title,
+            0: scraperName(edition.pluginId), 1: edition.details.title,
           }),
           accept: () => { signal.removeEventListener("abort", cancel); resolve(true); },
         });
@@ -56,7 +56,7 @@ export function AutoAlbumScrape({ albumId, name, provider, close }: {
         pending.current = null;
         reload.current = true;
         services.invalidateLibraries();
-        show("result", tr("已采用 {0} 的《{1}》。", { 0: albumScraperName(edition.pluginId), 1: edition.details.title }));
+        show("result", tr("已采用 {0} 的《{1}》。", { 0: scraperName(edition.pluginId), 1: edition.details.title }));
       } catch (cause) {
         const uncertain = cause instanceof ApiError && (cause.status === 0 || cause.status >= 500 || cause.code === "INVALID_RESPONSE");
         pending.current = uncertain ? choice : null;
