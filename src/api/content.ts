@@ -116,9 +116,10 @@ export interface RemotePlaylist {
 }
 export interface SyncJob {
   jobId: string;
+  playlistId: string;
   state: string;
   resultRevision: number | null;
-  error: { code: string } | null;
+  error: { code: string; retryAfter?: number | null } | null;
 }
 export interface Album {
   sourceAlbumId: string;
@@ -160,7 +161,8 @@ export class ContentApi {
     this.onlineInstances.set([]);
   }
   private async write<T>(path: string, body: unknown, method = "POST"): Promise<T> {
-    const options = { method, body, idempotencyKey: crypto.randomUUID() };
+    const bytes = crypto.getRandomValues(new Uint8Array(16));
+    const options = { method, body, idempotencyKey: Array.from(bytes, byte => byte.toString(16).padStart(2, "0")).join("") };
     try { return await this.client.request<T>(path, options); }
     catch (error) {
       if (!(error instanceof ApiError) || !['TIMEOUT', 'NETWORK_ERROR'].includes(error.code)) throw error;

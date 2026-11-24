@@ -8,6 +8,7 @@ import { Modal } from "../../components/Modal";
 import { errorMessage } from "../../api/client";
 import type { Observation, RemotePlaylist } from "../../api/content";
 import { PlaylistSyncStatus } from "./PlaylistSyncStatus";
+import { syncFailureMessage } from "./sync-error";
 import { useSourceName } from "../../components/use-source-name";
 export function RemotePlaylists() {
   useLocale();
@@ -188,14 +189,19 @@ function RemoteRow({
           {p.lastSuccessAt &&
             tr(" · 上次成功 {0}", { "0": formatDate(p.lastSuccessAt) })}
         </p>
-        {p.error && (
+        {p.error && !jobId && (
           <p className="notice">
-            {tr("上次同步失败（{0}），已有内容仍然保留。", { 0: p.error.code })}
+            {syncFailureMessage(p.error.code)} <small>({p.error.code})</small>
           </p>
         )}
-        {jobId && <PlaylistSyncStatus key={jobId} jobId={jobId} finished={async signal => {
-          const playlist = await s.content.remotePlaylist(p.playlistId, signal);
-          if (!signal.aborted) { updated(playlist); setTracking(false); }
+        {jobId && <PlaylistSyncStatus key={jobId} jobId={jobId} showRetry={false}
+          pending={() => setTracking(true)} finished={async (signal, _job, current) => {
+          try {
+            const playlist = current ?? await s.content.remotePlaylist(p.playlistId, signal);
+            if (!signal.aborted) updated(playlist);
+          } finally {
+            if (!signal.aborted) setTracking(false);
+          }
         }} />}
         <ErrorNotice error={error} />
       </div>
@@ -205,7 +211,7 @@ function RemoteRow({
           void sync();
         }}
       >
-        {tr("同步")}
+        {tr(p.error && !tracking ? "重试同步" : "同步")}
       </button>
     </div>
   );

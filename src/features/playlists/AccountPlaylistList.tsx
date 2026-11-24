@@ -68,7 +68,7 @@ function AccountPlaylistList({ source, heading, management, links }: {
     </Link>;
     const syncStatus = link && [
       link.pendingCount > 0 && tr("{0} 首待同步", { 0: link.pendingCount }),
-      link.lastErrorCode && tr("同步失败（{0}）", { 0: link.lastErrorCode }),
+      link.lastErrorCode && tr("向远程歌单添加曲目失败（{0}）", { 0: link.lastErrorCode }),
     ].filter(Boolean).join(" · ");
     const linkAction = canLink && (link || playlist.writable === true)
       ? <button disabled={!links.data} onClick={() => setEditing({ playlist, link })}>
@@ -81,7 +81,10 @@ function AccountPlaylistList({ source, heading, management, links }: {
           <Icon name="album" /><strong>{title}</strong>
           <small>{tr("{0} 首", { 0: playlist.trackCount ?? tr("未知数量") })}</small>
         </Link>
-        {link?.jobId && <PlaylistSyncStatus key={link.jobId} jobId={link.jobId} />}
+        {link?.jobId && <PlaylistSyncStatus key={link.jobId} jobId={link.jobId}
+          finished={linkedToFavorites ? async (_signal, job) => {
+            if (job?.state === "succeeded") await s.favorites.load(true);
+          } : undefined} />}
         {(syncStatus || (!management && target)) && <p className="muted">
           {!management && target}{!management && syncStatus && " · "}{syncStatus}
         </p>}
