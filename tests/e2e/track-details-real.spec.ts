@@ -3,11 +3,12 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { duplicateFixture, groupedTracks } from './duplicates-fixture';
 import type { DirectoryTestServer } from './directory-server';
+import type { TrackDetails } from '../../src/api/track-details';
 
 let server: DirectoryTestServer | undefined;
 test.afterEach(async () => { await server?.stop(); server = undefined; });
 
-test('expanded versions display details from the selected source plugin and reject changed files', async ({ page }, info) => {
+test('source version menus open plugin details and respect indexed file version semantics', async ({ page }, info) => {
   test.setTimeout(180_000);
   const fixture = await duplicateFixture(page);
   server = fixture.server;
@@ -24,6 +25,7 @@ test('expanded versions display details from the selected source plugin and reje
   const versions = page.getByLabel('来源版本', { exact: true });
   await expect(versions.getByRole('button', { name: /的更多操作$/ })).toHaveCount(2);
 
+  let selectedVersion: string | undefined;
   for (const [name, root] of [['selected.wav', 'first-root'], ['second-selected.wav', 'second-root']]) {
     const track = fixture.tracks.find(item => item.displayName === name)!;
     const more = versions.getByRole('button', { name: `${name} 的更多操作`, exact: true });
@@ -33,9 +35,10 @@ test('expanded versions display details from the selected source plugin and reje
       page.getByRole('menuitem', { name: '详情', exact: true }).click(),
     ]);
     expect(response.status()).toBe(200);
-    const details = await response.json();
+    const details: TrackDetails = await response.json();
     expect(details).toMatchObject({ sourceTrackId: track.sourceTrackId, title: name });
-    const fields = details.sections.flatMap((section: { fields: { id: string; value: string }[] }) => section.fields);
+    const fields = details.sections.flatMap(section => section.fields);
+    if (name === 'selected.wav') selectedVersion = fields.find(field => field.id === 'observedVersion')?.value;
     expect(fields).toEqual(expect.arrayContaining([
       expect.objectContaining({ id: 'relativePath', value: name }),
       expect.objectContaining({ id: 'root', value: root }),
@@ -56,6 +59,16 @@ test('expanded versions display details from the selected source plugin and reje
   writeFileSync(filePath, Buffer.concat([original, Buffer.from([0])]));
   const track = fixture.tracks.find(item => item.displayName === 'selected.wav')!;
   const response = await page.request.get(`${server.origin}/api/v1/source-tracks/${track.sourceTrackId}/details`);
-  expect(response.status()).toBe(409);
-  expect(await response.json()).toMatchObject({ error: { code: 'RESOURCE_CHANGED' } });
+  if (process.platform === 'win32') {
+    expect(response.status()).toBe(200);
+    expect(selectedVersion).toBeTruthy();
+    const details: TrackDetails = await response.json();
+    expect(details.sections.flatMap(section => section.fields)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'observedVersion', value: selectedVersion }),
+      expect.objectContaining({ id: 'size', value: `${original.length} 字节` }),
+    ]));
+  } else {
+    expect(response.status()).toBe(409);
+    expect(await response.json()).toMatchObject({ error: { code: 'RESOURCE_CHANGED' } });
+  }
 });

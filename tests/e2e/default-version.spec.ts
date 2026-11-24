@@ -37,7 +37,7 @@ async function grouped(page: Page): Promise<SourceTrack> {
 async function playDefault(page: Page, expected: SourceTrack) {
   const [request] = await Promise.all([
     waitControlRequest(page, request => request.url().endsWith('/playback/sessions') && request.method() === 'POST'),
-    page.getByRole('button', { name: `播放 ${expected.displayName}`, exact: true }).click(),
+    page.locator('.tracks td.track-actions-cell').getByRole('button', { name: /^播放 / }).click(),
   ]);
   expect(request.postDataJSON().sourceTrackId).toBe(expected.sourceTrackId);
   await waitPlaying(page);
@@ -49,9 +49,14 @@ test('automatic quality choice, manual override and clearing survive refresh and
   test.setTimeout(180_000);
   const fixture = await duplicateFixture(page, { audioTools: true });
   server = fixture.server;
-  writeFileSync(join(server.selectedRoot, 'selected.wav'), wave(22050, 1));
-  writeFileSync(join(server.secondSelectedRoot, 'second-selected.wav'), wave(48000, 2));
-  writeFileSync(join(server.selectedRoot, 'third.wav'), wave(48000, 2, 4096));
+  // Windows 上初次扫描的音频探测可能正在短暂持有样本文件。
+  for (const [path, data] of [
+    [join(server.selectedRoot, 'selected.wav'), wave(22050, 1)],
+    [join(server.secondSelectedRoot, 'second-selected.wav'), wave(48000, 2)],
+    [join(server.selectedRoot, 'third.wav'), wave(48000, 2, 4096)],
+  ] as const) {
+    await expect(() => writeFileSync(path, data)).toPass({ timeout: 5000 });
+  }
   await scan(page.request, server.origin);
   const tracks = (await (await page.request.get(`${server.origin}/api/v1/source-tracks`)).json()).items as SourceTrack[];
   const low = tracks.find(track => track.displayName === 'selected.wav')!;
