@@ -15,7 +15,7 @@ type SectionId = (typeof settingsSections)[number]["id"];
 export function useSettingsNavigation() {
   const [query, setQuery] = useSearchParams();
   const location = useLocation();
-  const requested = query.get("tab") === "other" ? "appearance" : query.get("tab");
+  const requested = query.get("tab");
   const target = query.has("directories") ? "sources"
     : settingsSections.find((section) => section.id === requested)?.id ?? "sources";
   const [active, setActive] = useState<SectionId>(target);

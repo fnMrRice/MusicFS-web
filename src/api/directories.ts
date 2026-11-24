@@ -23,8 +23,7 @@ export interface DirectoryPage {
 }
 export interface LocalConfiguration {
   revision: string;
-  roots: { id: string; name: string; pathConfigured: boolean; importDefaults?: ImportDefaults }[];
-  rootImportDefaultsSupported?: boolean;
+  roots: { id: string; name: string; pathConfigured: boolean; importDefaults: ImportDefaults }[];
   importOptions?: { importDefaults: ImportDefaults; schemaRevision: string };
 }
 export interface PluginOperation {

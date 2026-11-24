@@ -196,7 +196,7 @@ test("settings keep every section mounted and preserve playback preferences afte
   await navigate(page, "外观与语言");
   await expect(page.locator(".language-select select")).toBeVisible();
   for (const name of ["外观与语言", "用户", "关于"]) {
-    await expect(section(page, name).getByRole("heading", { level: 3 })).toHaveCount(0);
+    await expect(section(page, name).getByRole("heading", { level: 3, name, exact: true })).toHaveCount(0);
   }
   await expect(page.getByRole("button", { name: "退出登录", exact: true })).toBeVisible();
   expect(await section(page, "外观与语言").evaluate((element) => {
@@ -241,7 +241,7 @@ test("settings keep every section mounted and preserve playback preferences afte
 
 test("all seven anchors reach their headings on desktop and narrow screens", async ({ page }) => {
   await mock(page);
-  await page.goto(`${origin}/#/settings?tab=other`);
+  await page.goto(`${origin}/#/settings?tab=appearance`);
   await expectAnchor(page, "外观与语言");
   for (const viewport of [{ width: 1200, height: 900 }, { width: 390, height: 844 }]) {
     await page.setViewportSize(viewport);
@@ -344,11 +344,11 @@ test("effects and output share one divided card and keep unsaved effects while n
   await page.screenshot({ path: info.outputPath("settings-dsp-mobile.png") });
 });
 
-test("legacy fade settings preserve disabled actions and durations survive a master switch toggle", async ({ page }) => {
+test("per-action fade durations survive a master switch toggle", async ({ page }) => {
   const requests = await mock(page);
   await page.addInitScript(() => {
     const key = "musicfs:settings-test:listener:preferences";
-    if (!localStorage.getItem(key)) localStorage.setItem(key, JSON.stringify({ fadeEnabled: false, fadeDurationMs: 650 }));
+    if (!localStorage.getItem(key)) localStorage.setItem(key, JSON.stringify({ fades: { enabled: true, trackMs: 0, seekMs: 650, pauseMs: 300 } }));
   });
   await page.goto(`${origin}/#/settings?tab=playback`);
   await expectAnchor(page, "播放配置");
@@ -434,7 +434,7 @@ test("regular users retain every section and see plugin permissions without admi
   expect(requests.filter((path) => path.includes("/admin/"))).toEqual([]);
 });
 
-test("legacy directory links take priority and dismiss before navigating to another section", async ({ page }) => {
+test("directory management links take priority and dismiss before navigating to another section", async ({ page }) => {
   await mock(page);
   await page.goto(`${origin}/#/settings?tab=plugins&directories=${instanceIds.local}`);
   await expect(navigation(page).getByRole("button", { name: "音乐源", exact: true })).toHaveAttribute("aria-current", "location");

@@ -73,7 +73,7 @@ export async function taskQueueMock(page: Page) {
       supportsMultipleInstances: false, instances: [{ instanceId: instanceIds.local, name: "本地音乐", runtimeState: state.unavailable ? "disabled" : "ready" }] }] };
     if (path.endsWith("/configuration")) {
       if (method !== "GET") ++state.configWrites;
-      json = { revision: "fixture-revision", roots: taskRoots, rootImportDefaultsSupported: true,
+      json = { revision: "fixture-revision", roots: taskRoots,
         importOptions: { schemaRevision: "local-import-v5", importDefaults: options } };
     }
     await route.fulfill({ json });

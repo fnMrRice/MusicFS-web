@@ -21,7 +21,6 @@ export default {
   "删除已添加的目录“{0}”？": ["Delete the added folder “{0}”?", "刪除已新增的目錄「{0}」？", "追加済みフォルダー「{0}」を削除しますか？"],
   "仅移除此音乐导入目录，磁盘文件和已有曲库记录会保留，允许访问的目录不受影响。": ["Only this import folder is removed. Files and existing library records are kept, and allowed folders are unchanged.", "僅移除此音樂匯入目錄，磁碟檔案和現有曲庫記錄會保留，允許存取的目錄不受影響。", "取り込み対象からのみ削除します。ファイルと既存のライブラリ記録は保持され、アクセスが許可されたフォルダーは変更されません。"],
   "此目录已被删除，请关闭后重新选择。": ["This folder has been deleted. Close and choose again.", "此目錄已被刪除，請關閉後重新選擇。", "このフォルダーは削除されています。閉じて選択し直してください。"],
-  "此服务端暂不支持单独配置目录查找设置。": ["This server does not support separate search settings for each folder yet.", "此伺服器暫不支援單獨設定目錄查找設定。", "このサーバーはフォルダーごとの検索設定にまだ対応していません。"],
   "查找设置仅应用于本次添加的目录。保存后将自动扫描音乐。": ["Search settings apply only to the folders added here. Music is scanned automatically after saving.", "查找設定僅套用於本次新增的目錄。儲存後將自動掃描音樂。", "検索設定は今回追加するフォルダーにのみ適用されます。保存後に音楽を自動スキャンします。"],
   "查找设置仅应用于此目录，不会修改其他目录。保存后将自动扫描音乐。": ["Search settings apply only to this folder. Other folders are unchanged. Music is scanned automatically after saving.", "查找設定僅套用於此目錄，不會修改其他目錄。儲存後將自動掃描音樂。", "検索設定はこのフォルダーにのみ適用されます。他のフォルダーは変更されません。保存後に音楽を自動スキャンします。"],
   "管理目录": ["Manage folders", "管理目錄", "フォルダーの管理"],

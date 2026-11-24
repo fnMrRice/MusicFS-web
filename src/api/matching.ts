@@ -16,7 +16,7 @@ export interface CandidatePage { items: MatchCandidate[]; revision: number; next
 export interface MatchingMutation { revision: number; operationId: string; recordingId: string | null }
 export interface BulkMergeMutation extends MatchingMutation { mergedGroups: number; mergedSources: number; skippedGroups: number }
 export type BulkMergeMode = "score" | "title_artist";
-export interface MatchingRevision { revision: number; bulkMergeAvailable?: boolean }
+export interface MatchingRevision { revision: number }
 export type MatchingRequest =
   | { kind: "bulk-merge"; expectedRevision: number; mode: BulkMergeMode; minimumScore?: number }
   | ({ kind: "links"; expectedRevision: number; targetRecordingId: string | null } &
@@ -55,8 +55,7 @@ export class MatchingApi {
   constructor(private client: ApiClient) {}
   async revision(signal?: AbortSignal): Promise<MatchingRevision> {
     const result = await this.client.request<MatchingRevision>("/matching/revision", { signal });
-    if (!result || !Number.isSafeInteger(result.revision) || result.revision < 0 ||
-      (result.bulkMergeAvailable !== undefined && typeof result.bulkMergeAvailable !== "boolean"))
+    if (!result || !Number.isSafeInteger(result.revision) || result.revision < 0)
       throw new ApiError("INVALID_RESPONSE", "Invalid matching revision");
     return result;
   }

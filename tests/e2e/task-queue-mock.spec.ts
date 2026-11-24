@@ -60,7 +60,7 @@ test("bulk merge can be queued with the selected rule and reports the final resu
     result: { mergedGroups: 0, mergedSources: 0, skippedGroups: 0 } };
   await page.route("**/api/v1/library/tracks?**", route => route.fulfill({ json: musicPage([{ ...track,
     title: task.status === "succeeded" ? "Merged track" : "Before merge" }]) }));
-  await page.route("**/api/v1/matching/revision", route => route.fulfill({ json: { revision: 1, bulkMergeAvailable: true } }));
+  await page.route("**/api/v1/matching/revision", route => route.fulfill({ json: { revision: 1 } }));
   await page.route("**/api/v1/tasks/bulk-merge", route => {
     expect(route.request().postDataJSON()).toEqual({ mode: "title_artist", expectedRevision: 1 });
     expect(route.request().headers()["idempotency-key"]).toBeTruthy();

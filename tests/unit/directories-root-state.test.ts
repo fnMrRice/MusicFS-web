@@ -8,7 +8,7 @@ const first = { id: "first", name: "First", pathConfigured: true, importDefaults
 const second = { id: "second", name: "Second", pathConfigured: true, importDefaults: { ...defaults, maxDepth: 2 } };
 const candidate = { name: "New", path: "/music/new", available: true, configuredRootId: null };
 function fixture() {
-  const config: LocalConfiguration = { revision: "r1", roots: [first, second], rootImportDefaultsSupported: true,
+  const config: LocalConfiguration = { revision: "r1", roots: [first, second],
     importOptions: { importDefaults: defaults, schemaRevision: "local-import-v5" } };
   const api = {
     configuration: vi.fn(async () => structuredClone(config)),
@@ -114,22 +114,6 @@ describe("Per-directory music configuration", () => {
     expect(state.value.conflict).toBe(false);
     expect(state.value.roots[0].importDefaults).toEqual(first.importDefaults);
     expect(state.dirty).toBe(false);
-  });
-
-  it("allows legacy servers to rename and add directories without sending per-directory options", async () => {
-    const { state, api, config } = fixture();
-    config.rootImportDefaultsSupported = false;
-    config.roots = config.roots.map(({ id, name, pathConfigured }) => ({ id, name, pathConfigured }));
-    await state.start();
-    const saved = structuredClone(state.value.roots);
-    state.editRoot("first", { importDefaults: { ...defaults, maxDepth: 1 } });
-    state.editAdditions({ ...defaults, recursive: false });
-    expect(state.value.roots).toEqual(saved);
-    state.editRoot("first", { name: "Renamed" });
-    state.toggleAddition(candidate);
-    expect(state.additions[0]).not.toHaveProperty("importDefaults");
-    await state.save();
-    expect(api.save).toHaveBeenCalledWith([{ id: "first", name: "Renamed" }, { id: "second", name: "Second" }, ...state.additions], defaults, "r1", expect.any(String), undefined);
   });
 
   it("does not freeze inherited options when only a directory name changes", async () => {

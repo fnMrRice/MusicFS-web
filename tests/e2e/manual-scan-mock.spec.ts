@@ -29,7 +29,7 @@ async function mockApi(page: Page, scan: (route: Route, path: string) => Promise
     if (path.endsWith('/admin/plugins')) json = { items: [{ pluginId: localPlugin.id, plugin: localPlugin, version: '0.3.0',
       supportsMultipleInstances: false, instances: [{ instanceId: instanceIds.local, name: '本地音乐', runtimeState: state }] }] };
     if (path.endsWith('/configuration')) json = { revision: 'fixture-revision', roots: [{ id: 'music', name: 'Music', pathConfigured: true }],
-      rootImportDefaultsSupported: true, importOptions: { schemaRevision: 'local-import-v5', importDefaults: options } };
+      importOptions: { schemaRevision: 'local-import-v5', importDefaults: options } };
     if (path.endsWith('/library/tracks')) json = musicPage(published() ? [track] : [], published() ? '2' : '1');
     await route.fulfill({ json });
   });
@@ -146,7 +146,7 @@ test('a saved folder automatically scans after applying even after back navigati
   await page.route('**/api/v1/admin/plugin-instances/*/configuration', async route => {
     if (route.request().method() === 'PUT') return route.fulfill({ status: 202,
       json: { operationId: 'fixture-config', status: 'applying', errorCode: null } });
-    return route.fulfill({ json: { revision: 'fixture-revision', rootImportDefaultsSupported: true,
+    return route.fulfill({ json: { revision: 'fixture-revision',
       roots: [{ id: 'music', name: 'Music', pathConfigured: true, importDefaults: options }],
       importOptions: { schemaRevision: 'local-import-v5', importDefaults: options } } });
   });

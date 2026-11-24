@@ -11,8 +11,7 @@ import type {
   Preferences,
 } from "../api/types";
 import { PlayerController } from "../player/controller";
-import { defaultFadeSettings, type FadeSettings } from "../player/playback-transitions";
-import { loadFadePreferences } from "./fade-preferences";
+import { PreferencesStore, type PreferencesState } from "./preferences";
 import { PlaybackQueue, type PlaybackMode } from "../player/playback-queue";
 import { QueuePersistence } from "../player/queue-persistence";
 import { OnlinePlaylistPlayback } from "../player/online-playlist-playback";
@@ -24,7 +23,6 @@ import { displaySource, MusicCatalogApi, playlistTrack } from "../api/music-cata
 import { CapabilityEvents } from "./capability-events";
 import { capabilityResources } from "./capability-resources";
 import { SourcePlaylistCatalog } from "./source-playlists";
-import { loadRecommendationLayout, saveRecommendationLayout, type RecommendationLayout } from "./recommendation-order";
 import { ProfileApi } from "../api/profile";
 import { PersonalProfileState } from "./personal-profile";
 import { ScansApi } from "../api/scans";
@@ -37,7 +35,6 @@ import { AudioOutputSettingsStore } from "./audio-output-settings";
 import { LocalDSPEngine } from "../player/dsp/engine";
 import { MatchingApi } from "../api/matching";
 import { MatchingDecisions } from "../library/matching-decisions";
-import { loadVolumePreferences, saveVolumePreferences, volumePreferences } from "./volume-preferences";
 import { RecordingCovers } from "./recording-covers";
 import { FavoritesApi } from "../api/favorites";
 import { FavoritesState } from "../library/favorites";
@@ -51,40 +48,6 @@ interface AuthState {
   busy: boolean;
   error: string | null;
 }
-interface PreferencesState extends RecommendationLayout {
-  theme: "dark" | "light" | "system";
-  accent: "default" | "miku" | "tianyi";
-  albumView: "cards" | "list";
-  volume: number;
-  lastVolume: number;
-  lyricsPinned: boolean;
-  queuePinned: boolean;
-  mine: boolean;
-  playlists: boolean;
-  playlistFolders: Record<string, boolean>;
-  works: boolean;
-  processing: boolean;
-  fades: FadeSettings;
-  autoVolume: boolean;
-}
-const defaults: PreferencesState = {
-  theme: "system",
-  accent: "default",
-  albumView: "cards",
-  volume: 0.8,
-  lastVolume: 0.8,
-  lyricsPinned: false,
-  queuePinned: false,
-  mine: true,
-  playlists: true,
-  playlistFolders: {},
-  collapsedRecommendations: [],
-  recommendationOrder: [],
-  works: false,
-  processing: false,
-  fades: defaultFadeSettings,
-  autoVolume: false,
-};
 export class Services {
   client = new ApiClient();
   authApi = new AuthApi(this.client);
@@ -114,7 +77,7 @@ export class Services {
     busy: true,
     error: null,
   });
-  preferences = new Store<PreferencesState>({ ...defaults });
+  preferences = new PreferencesStore();
   localDSP = new LocalDSPSettingsStore(LocalDSPEngine.supported());
   audioOutput = new AudioOutputSettingsStore(LocalDSPEngine.supported());
   private dsp = new LocalDSPEngine(this.localDSP.value.config, (message) => this.localDSP.reportError(message),
@@ -260,17 +223,13 @@ export class Services {
     };
     this.client.onUnauthorized = () => this.clear();
   }
-  private key(): string | null {
-    const { ready, session } = this.auth.value;
-    return ready && session
-      ? `musicfs:${encodeURIComponent(ready.instanceId)}:${encodeURIComponent(session.user.id)}:preferences`
-      : null;
-  }
   inspectAudioOutput(): void { this.dsp.inspectOutput(); }
   private accept(session: AuthSession): void {
     this.onlinePlaylistPlayback.cancel();
+    const serverAddress = new URL(this.client.url(""), window.location.href).href;
+    const instanceId = this.auth.value.ready!.instanceId;
     this.recordingCovers.clear();
-    this.queuePersistence.setServer(new URL(this.client.url(""), window.location.href).href, session.user.id);
+    this.queuePersistence.setServer(serverAddress, session.user.id);
     const { items, index } = this.queue.value;
     this.player.restorePaused(items[index] ?? null);
     this.dsp.dispose();
@@ -278,48 +237,21 @@ export class Services {
     this.content.clearOnlineInstances();
     this.libraryApi.clearProviderInstances();
     this.auth.set({ ...this.auth.value, session, busy: false, error: null });
-    this.scans.setSession(this.auth.value.ready!.instanceId, session.user.id);
-    this.refreshSubmissions.setSession(new URL(this.client.url(""), window.location.href).href, session.user.id);
+    this.scans.setSession(instanceId, session.user.id);
+    this.refreshSubmissions.setSession(serverAddress, session.user.id);
     this.tasks.start(session.user.role === "admin");
-    this.configurationScans.setSession(this.auth.value.ready!.instanceId, session.user.id);
-    this.matchingDecisions.setSession(this.auth.value.ready!.instanceId, session.user.id);
-    this.favorites.setSession(this.auth.value.ready!.instanceId, session.user.id);
+    this.configurationScans.setSession(instanceId, session.user.id);
+    this.matchingDecisions.setSession(instanceId, session.user.id);
+    this.favorites.setSession(instanceId, session.user.id);
     void this.favorites.load();
     this.profile.setUser(session.user.id);
-    this.localDSP.setSession(this.auth.value.ready!.instanceId, session.user.id);
+    this.localDSP.setSession(instanceId, session.user.id);
     // ready.instanceId 是每次启动的进程身份；输出偏好按稳定服务地址保存。
-    this.audioOutput.setSession(new URL(this.client.url(""), window.location.href).href, session.user.id);
+    this.audioOutput.setSession(serverAddress, session.user.id);
     this.reloadSourceNames();
     this.capabilityEvents.start(session.csrfToken);
     if (["online", "ready", "not-ready"].includes(this.controlStatus.getSnapshot().phase)) this.tasks.connection(true);
-    let saved: Partial<PreferencesState> = {};
-    try {
-      saved = JSON.parse(localStorage.getItem(this.key()!) ?? "{}");
-    } catch {
-      /* Storage may be unavailable. */
-    }
-    this.preferences.set({
-      theme:
-        saved?.theme === "dark" ||
-        saved?.theme === "light" ||
-        saved?.theme === "system"
-          ? saved.theme
-          : defaults.theme,
-      accent: saved?.accent === "miku" || saved?.accent === "tianyi" ? saved.accent : defaults.accent,
-      albumView: saved?.albumView === "list" ? "list" : defaults.albumView,
-      ...loadVolumePreferences(),
-      lyricsPinned: saved?.lyricsPinned === true,
-      queuePinned: saved?.queuePinned === true,
-      ...loadRecommendationLayout(session.user.id),
-      mine: saved?.mine !== false,
-      playlists: saved?.playlists !== false,
-      playlistFolders: saved?.playlistFolders && typeof saved.playlistFolders === "object" && !Array.isArray(saved.playlistFolders)
-        ? saved.playlistFolders : {},
-      works: saved?.works === true,
-      processing: saved?.processing === true,
-      fades: loadFadePreferences(saved),
-      autoVolume: saved?.autoVolume === true,
-    });
+    this.preferences.load(instanceId, session.user.id);
     this.player.setVolume(this.preferences.value.volume);
     this.player.setTransitions(this.preferences.value.fades);
     this.dsp.setAutoVolume(this.preferences.value.autoVolume);
@@ -417,8 +349,8 @@ export class Services {
     this.queue.clear();
     this.playlists.set([]);
     this.client.csrfToken = null;
-    this.preferences.set({ ...defaults });
-    this.player.setTransitions(defaultFadeSettings);
+    this.preferences.reset();
+    this.player.setTransitions(this.preferences.value.fades);
     this.dsp.setAutoVolume(false);
     this.localDSP.clear();
     this.audioOutput.clear();
@@ -430,26 +362,10 @@ export class Services {
     });
   }
   preference(patch: Partial<PreferencesState>): void {
-    const volume = volumePreferences({ ...this.preferences.value, ...patch });
-    if (patch.volume !== undefined && volume.volume > 0) volume.lastVolume = volume.volume;
-    this.preferences.set({ ...this.preferences.value, ...patch, ...volume });
-    if (patch.volume !== undefined || patch.lastVolume !== undefined) saveVolumePreferences(volume);
+    this.preferences.update(patch);
     this.player.setVolume(this.preferences.value.volume);
     if (patch.fades) this.player.setTransitions(patch.fades);
     this.dsp.setAutoVolume(this.preferences.value.autoVolume);
-    const key = this.key();
-    if (key) {
-      const { collapsedRecommendations, recommendationOrder, ...general } = this.preferences.value;
-      const user = this.auth.value.session?.user.id;
-      if (user && (patch.collapsedRecommendations !== undefined || patch.recommendationOrder !== undefined)) {
-        saveRecommendationLayout(user, patch);
-      }
-      try {
-        localStorage.setItem(key, JSON.stringify(general));
-      } catch {
-        /* Preferences remain in memory. */
-      }
-    }
   }
   toggleMute(): void {
     const { volume, lastVolume } = this.preferences.value;

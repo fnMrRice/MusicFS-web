@@ -39,7 +39,7 @@ async function mockApi(page: Page, directories: (route: Route, url: URL) => Prom
       pluginId: localPlugin.id, plugin: localPlugin, supportsMultipleInstances: false, instances: [{ instanceId: instanceIds.local, name: 'Fixture', runtimeState: 'pending_configuration' }],
     }] };
     if (path.endsWith('/configuration')) json = {
-      revision: 'mock-revision', roots: [], rootImportDefaultsSupported: true,
+      revision: 'mock-revision', roots: [],
       importOptions: { importDefaults: { recursive: true, maxDepth: 0, skipHidden: true, respectNoMedia: true, excludePatterns: [] } },
     };
     await route.fulfill({ json });
@@ -162,7 +162,7 @@ test('mock conflicting additions preserve saved directories and require an expli
       expect(roots[0]).toEqual({ id: 'saved', name: 'Collection' });
       return route.fulfill({ status: 412, json: { error: { code: 'REVISION_CONFLICT', message: 'Changed by another administrator' } } });
     }
-    return route.fulfill({ json: { revision: saves ? 'new-revision' : 'mock-revision', rootImportDefaultsSupported: true,
+    return route.fulfill({ json: { revision: saves ? 'new-revision' : 'mock-revision',
       roots: [{ id: 'saved', name: 'Collection', pathConfigured: true, importDefaults: options }],
       importOptions: { importDefaults: options, schemaRevision: 'local-import-v5' } } });
   });
@@ -193,7 +193,7 @@ test('mock rejected deletion preserves the target and saved list until a confirm
       expect(route.request().postDataJSON().musicRoots).toEqual([]);
       return route.fulfill({ status: 412, json: { error: { code: 'REVISION_CONFLICT', message: 'Changed by another administrator' } } });
     }
-    return route.fulfill({ json: { revision: saves ? 'new-revision' : 'mock-revision', rootImportDefaultsSupported: true,
+    return route.fulfill({ json: { revision: saves ? 'new-revision' : 'mock-revision',
       roots: [{ id: 'saved', name: 'Collection', pathConfigured: true }] } });
   });
   await page.goto(`${origin}/#/settings`);
@@ -224,7 +224,7 @@ test('mock uncertain deletion retries the identical request and only removes the
       applied = true;
       return route.fulfill({ status: 202, json: { operationId: 'delete-op', status: 'succeeded', errorCode: null } });
     }
-    return route.fulfill({ json: { revision: applied ? 'new-revision' : 'mock-revision', rootImportDefaultsSupported: true,
+    return route.fulfill({ json: { revision: applied ? 'new-revision' : 'mock-revision',
       roots: applied ? [] : [{ id: 'saved', name: 'Collection', pathConfigured: true }] } });
   });
   await page.goto(`${origin}/#/settings`);
@@ -254,7 +254,7 @@ for (const initial of [true, false, undefined]) {
         saved = route.request().postDataJSON();
         return route.fulfill({ status: 412, json: { error: { code: 'REVISION_CONFLICT' } } });
       }
-      return route.fulfill({ json: { revision: 'artwork-revision', roots: [], rootImportDefaultsSupported: true,
+      return route.fulfill({ json: { revision: 'artwork-revision', roots: [],
         importOptions: { importDefaults: options, schemaRevision: 'local-import-v6' } } });
     });
     const dialog = await openDirectories(page);
@@ -283,7 +283,7 @@ for (const action of ['add', 'edit'] as const) {
           saved = route.request().postDataJSON();
           return route.fulfill({ status: 412, json: { error: { code: 'REVISION_CONFLICT' } } });
         }
-        return route.fulfill({ json: { revision: 'lyrics-revision', rootImportDefaultsSupported: true,
+        return route.fulfill({ json: { revision: 'lyrics-revision',
           roots: [{ id: 'saved', name: 'Collection', pathConfigured: true, importDefaults: options },
             { id: 'untouched', name: 'Other', pathConfigured: true, importDefaults: options }],
           importOptions: { importDefaults: options, schemaRevision: 'local-import-v7' } } });

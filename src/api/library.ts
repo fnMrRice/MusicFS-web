@@ -78,11 +78,8 @@ export class LibraryApi {
     providerId: string,
     cursor: string | null,
     signal?: AbortSignal,
-    grouped = false,
   ): Promise<TrackPage> {
-    const query = new URLSearchParams({ limit: "100" });
-    if (grouped) query.set("groupBy", "recording");
-    if (providerId !== "all") query.set("providerInstanceId", providerId);
+    const query = new URLSearchParams({ limit: "100", providerInstanceId: providerId });
     if (cursor) query.set("cursor", cursor);
     const response = await this.client.request<TrackPage>(
       `/source-tracks?${query}`,
@@ -92,12 +89,6 @@ export class LibraryApi {
       !response ||
       !Array.isArray(response.items) ||
       !response.items.every(isTrack) ||
-      (grouped && response.matchingRevision !== undefined && (
-        !Number.isSafeInteger(response.matchingRevision) || response.matchingRevision < 0 ||
-        response.items.some((track) => !Array.isArray(track.versions) || !track.versions.length ||
-          !track.versions.every(isTrack) || !track.versions.some((version) => version.sourceTrackId === track.sourceTrackId) ||
-          new Set(track.versions.map((version) => version.sourceTrackId)).size !== track.versions.length)
-      )) ||
       typeof response.libraryRevision !== "string" ||
       (response.nextCursor !== null && typeof response.nextCursor !== "string")
     )

@@ -49,7 +49,7 @@ async function mock(page: Page, remote: Remote) {
       supportsMultipleInstances: false, instances: [{ instanceId: instanceIds.local, name: '本地音乐', runtimeState: 'ready' }] }] };
     if (path.endsWith('/configuration')) json = { revision: 'fixture-revision', roots: [
       { id: 'music', name: 'Music', pathConfigured: true }, { id: 'empty', name: 'Empty', pathConfigured: true }],
-      rootImportDefaultsSupported: true, importOptions: { schemaRevision: 'local-import-v5', importDefaults: options } };
+      importOptions: { schemaRevision: 'local-import-v5', importDefaults: options } };
     if (path.endsWith('/library/tracks')) json = musicPage(remote.published ? [track] : [], remote.published ? '2' : '1');
     await route.fulfill({ json });
   });

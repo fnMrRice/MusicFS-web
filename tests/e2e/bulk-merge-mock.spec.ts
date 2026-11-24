@@ -21,7 +21,7 @@ const entry = (page: Page) => page.getByRole("button", { name: "一键合并重�
 const dialog = (page: Page) => page.getByRole("dialog", { name: "一键合并重复音乐", exact: true });
 const submit = (page: Page) => dialog(page).getByRole("button", { name: "开始合并", exact: true });
 
-async function mockApi(page: Page, special: (route: Route, path: string) => Promise<boolean>, capability = true) {
+async function mockApi(page: Page, special: (route: Route, path: string) => Promise<boolean>) {
   await page.route("**/api/v1/**", async (route) => {
     const path = new URL(route.request().url()).pathname;
     if (await special(route, path)) return;
@@ -29,7 +29,7 @@ async function mockApi(page: Page, special: (route: Route, path: string) => Prom
     if (path.endsWith("/health/ready")) json = { product: "MusicFS", apiVersion: "1", ready: true, instanceId: "bulk-mock" };
     if (path.endsWith("/auth/session")) json = { csrfToken: "fixture", user: { id: "user", role: "admin" } };
     if (path.endsWith("/library/tracks")) json = musicPage(tracks.map((track) => ({ ...track, versions: [track] })));
-    if (path.endsWith("/matching/revision")) json = { revision: 0, ...(capability ? { bulkMergeAvailable: true } : {}) };
+    if (path.endsWith("/matching/revision")) json = { revision: 0 };
     if (path.endsWith("/matching/candidates")) json = { items: [], revision: 0, nextAfter: null };
     await route.fulfill({ json });
   });
@@ -105,7 +105,7 @@ test("uncertain results lock parameters and other decisions and survive reload w
 test("a revision conflict requires review before submitting against a new revision", async ({ page }) => {
   let revision = 0; const submissions: { body: { expectedRevision: number }; key?: string }[] = [];
   await mockApi(page, async (route, path) => {
-    if (path.endsWith("/matching/revision")) { await route.fulfill({ json: { revision, bulkMergeAvailable: true } }); return true; }
+    if (path.endsWith("/matching/revision")) { await route.fulfill({ json: { revision } }); return true; }
     if (!path.endsWith("/matching/bulk-merge")) return false;
     submissions.push({ body: route.request().postDataJSON(), key: route.request().headers()["idempotency-key"] });
     if (submissions.length === 1) {
@@ -154,23 +154,21 @@ test("bulk merging continues across navigation and updates every cached library"
   await expect(page.getByRole("checkbox", { name: "选择 Beta", exact: true })).toHaveCount(0);
 });
 
-test("legacy matching servers do not advertise unsupported bulk merging", async ({ page }) => {
-  await mockApi(page, async () => false, false);
-  await page.goto(`${origin}/#/library`);
-  await expect(page.getByRole("button", { name: "重复识别", exact: true })).toBeVisible();
-  await expect(entry(page)).toHaveCount(0);
-});
-
-test("the bulk merge capability can be retried after a transient connection failure", async ({ page }) => {
+test("reads the revision on opening the dialog and retries a transient failure", async ({ page }) => {
   let requests = 0;
   await mockApi(page, async (route, path) => {
     if (!path.endsWith("/matching/revision")) return false;
     requests++;
     if (requests === 1) await route.abort("failed");
-    else await route.fulfill({ json: { revision: 0, bulkMergeAvailable: true } });
+    else await route.fulfill({ json: { revision: 0 } });
     return true;
   });
   await page.goto(`${origin}/#/library`);
-  await page.getByRole("button", { name: "重新检查一键合并功能", exact: true }).click();
   await expect(entry(page)).toBeEnabled();
+  expect(requests).toBe(0);
+  await entry(page).click();
+  await expect(submit(page)).toBeDisabled();
+  await dialog(page).getByRole("button", { name: "重试", exact: true }).click();
+  await expect(submit(page)).toBeEnabled();
+  expect(requests).toBe(2);
 });

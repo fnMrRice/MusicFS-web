@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { ApiClient } from "../../src/api/client";
 import { MatchingApi, mergeRequest, selectedVersions } from "../../src/api/matching";
-import { LibraryApi } from "../../src/api/library";
 import { musicPage } from "../fixtures/music-catalog";
 import { LibraryState } from "../../src/library/state";
 import type { SourceTrack } from "../../src/api/types";
@@ -70,21 +69,6 @@ describe("Manual recording decisions", () => {
 });
 
 describe("Grouped library snapshots", () => {
-  it("requests grouping only for the main library and supports an older server response", async () => {
-    const fetcher = vi.fn<typeof fetch>(async () => Response.json({ items: [track("a")], libraryRevision: "1", nextCursor: null }));
-    const api = new LibraryApi(new ApiClient(fetcher));
-    const legacy = await api.page("all", null, undefined, true);
-    expect(legacy.matchingRevision).toBeUndefined();
-    expect(fetcher.mock.calls[0][0]).toContain("groupBy=recording");
-    await api.page("all", null);
-    expect(fetcher.mock.calls[1][0]).not.toContain("groupBy");
-  });
-  it("rejects a grouped result that omits versions or the representative", async () => {
-    for (const versions of [undefined, [], [track("b")], [track("a"), track("a")]]) {
-      const fetcher = vi.fn<typeof fetch>(async () => Response.json({ items: [{ ...track("a"), versions }], matchingRevision: 1, libraryRevision: "1", nextCursor: null }));
-      await expect(new LibraryApi(new ApiClient(fetcher)).page("all", null, undefined, true)).rejects.toMatchObject({ code: "INVALID_RESPONSE" });
-    }
-  });
   it("does not append pages from a different matching revision even if music scanning is unchanged", async () => {
     const load = vi.fn().mockResolvedValueOnce(musicPage([track("a")], "1", 3, "next"))
       .mockResolvedValueOnce(musicPage([track("b")], "1", 4));

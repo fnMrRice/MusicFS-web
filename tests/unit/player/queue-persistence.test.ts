@@ -30,7 +30,7 @@ function connected() {
   return { queue, persistence };
 }
 function cache(queue: unknown) {
-  saved.set(key, JSON.stringify({ serverAddress: server, queue }));
+  saved.set(key, JSON.stringify({ serverAddress: server, userId: user, queue }));
 }
 
 describe("queue persistence", () => {
@@ -69,11 +69,13 @@ describe("queue persistence", () => {
     expect(queue.value).toEqual(empty);
   });
 
-  it("restores a legacy queue for the current account and clears it when the account changes", () => {
-    cache({ items: [first], index: 0, mode: "sequence" });
+  it("clears unowned queues and only restores entries for the same account", () => {
+    saved.set(key, JSON.stringify({ serverAddress: server, queue: { items: [first], index: 0, mode: "sequence" } }));
     const { queue, persistence } = connected();
-    expect(queue.value.items[queue.value.index]).toMatchObject(first);
-    expect(JSON.parse(saved.get(key)!)).toMatchObject({ serverAddress: server, userId: user });
+    expect(queue.value).toEqual(empty);
+    expect(saved.has(key)).toBe(false);
+    queue.enqueue([first]);
+    expect(connected().queue.value.items).toMatchObject([first]);
     persistence.setServer(server, "another-user");
     expect(queue.value).toEqual(empty);
     expect(saved.has(key)).toBe(false);
@@ -97,11 +99,11 @@ describe("queue persistence", () => {
   it.each([
     "{broken",
     "null",
-    JSON.stringify({ serverAddress: server, queue: { items: "invalid", mode: "sequence" } }),
-    JSON.stringify({ serverAddress: server, queue: { items: [first], mode: "invalid" } }),
-    JSON.stringify({ serverAddress: server, queue: { items: [null], mode: "sequence" } }),
-    JSON.stringify({ serverAddress: server, queue: { items: [{ ...first, sourceTrackId: "" }], mode: "sequence" } }),
-    JSON.stringify({ serverAddress: server, queue: { items: [{ ...first, availability: "unavailable" }], mode: "sequence" } }),
+    JSON.stringify({ serverAddress: server, userId: user, queue: { items: "invalid", mode: "sequence" } }),
+    JSON.stringify({ serverAddress: server, userId: user, queue: { items: [first], mode: "invalid" } }),
+    JSON.stringify({ serverAddress: server, userId: user, queue: { items: [null], mode: "sequence" } }),
+    JSON.stringify({ serverAddress: server, userId: user, queue: { items: [{ ...first, sourceTrackId: "" }], mode: "sequence" } }),
+    JSON.stringify({ serverAddress: server, userId: user, queue: { items: [{ ...first, availability: "unavailable" }], mode: "sequence" } }),
   ])("ignores corrupt or invalid cached data: %s", (value) => {
     saved.set(key, value);
     const { queue } = connected();

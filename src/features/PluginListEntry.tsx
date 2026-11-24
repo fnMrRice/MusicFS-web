@@ -48,7 +48,7 @@ export function PluginListEntry({ plugin, locale, onlineInstances, expanded, onT
             <strong className="plugin-name">{name}</strong>
             <PluginCount count={plugin.displayCount} locale={locale} />
           </span>
-          <span className="plugin-version">{version ? tr("版本：{0}", { 0: version }) : tr("未知版本")}</span>
+          {version && <span className="plugin-version">{tr("版本：{0}", { 0: version })}</span>}
         </span>
       </button>
       {plugin.settingsAvailable && <button type="button" className="plugin-configure"

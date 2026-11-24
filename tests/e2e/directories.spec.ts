@@ -1,7 +1,7 @@
 import { test, expect, type APIRequestContext, type Locator, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { basename, normalize } from 'node:path';
-import { login } from './helpers';
+import { login, scan } from './helpers';
 import { startDirectoryServer, type DirectoryTestServer } from './directory-server';
 import { instanceIds } from '../fixtures/plugins';
 
@@ -96,7 +96,6 @@ test('administrator tree exposes allowed directories independently of configured
   await login(page, server);
   const defaults = await configuration(page.request);
   expect(defaults.roots).toEqual([]);
-  expect(defaults.rootImportDefaultsSupported).toBe(true);
   expect(defaults.importOptions.importDefaults).toMatchObject({ recursive: true, maxDepth: 0, skipHidden: true, respectNoMedia: true });
   expect(await runtimeState(page.request)).toBe('pending_configuration');
   expect((await localPlugin(page.request)).displayCount.value).toBe(2);
@@ -181,6 +180,10 @@ test('added directories support isolated configuration, cancellation, deletion a
   })));
   expect(added.importDefaults).toMatchObject({ recursive: true, maxDepth: 0 });
   await expect.poll(() => runtimeState(page.request)).toBe('ready');
+  const configured = await configuration(page.request);
+  expect(configured.roots).toEqual(added.musicRoots.map((root: { id: string; name: string; importDefaults: unknown }) =>
+    expect.objectContaining({ id: root.id, name: root.name, importDefaults: root.importDefaults })));
+  expect(configured.importOptions.importDefaults).toMatchObject({ recursive: true, maxDepth: 0 });
   const selected = page.getByRole('list', { name: '已添加的目录', exact: true });
   await expect(selected.getByRole('listitem')).toHaveCount(2);
   const firstName = basename(server.selectedRoot);
@@ -239,8 +242,8 @@ test('added directories support isolated configuration, cancellation, deletion a
   const persisted = await configuration(page.request);
   expect(persisted.roots[0].importDefaults).toEqual(unlimited.musicRoots[0].importDefaults);
   expect(persisted.roots[1].importDefaults).toEqual(added.musicRoots[1].importDefaults);
-  await page.getByRole('button', { name: '扫描音乐', exact: true }).click();
-  await expect(page.getByRole('status').filter({ hasText: '扫描完成' })).toContainText('7');
+  // 本用例只启用本地文件插件，按重启后的目录配置重新扫描文件。
+  await scan(page.request, server.origin);
   expect(await importedNames(page.request)).toEqual(['.hidden.wav', 'depth-one.wav', 'depth-two.wav', 'hidden-child.wav', 'nomedia.wav', 'second-selected.wav', 'selected.wav']);
   dialog = await openDelete(page, firstName);
   await dialog.getByRole('button', { name: '取消', exact: true }).click();

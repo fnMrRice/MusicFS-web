@@ -106,13 +106,12 @@ export function LocalDirectories({ instance, action = { type: "add" }, close }: 
         <p className="muted">{tr("仅移除此音乐导入目录，磁盘文件和已有曲库记录会保留，允许访问的目录不受影响。")}</p>
       </>}
       {value.loaded && action.type !== "remove" && (action.type === "add" || root) && <>
-        {value.rootImportDefaultsSupported ? <RecursionSettings key={value.revision} value={options} disabled={disabled}
+        <RecursionSettings key={value.revision} value={options} disabled={disabled}
           change={(recursive, maxDepth) => changeOptions({ ...options, recursive, maxDepth: recursive ? maxDepth : 0 })}
           advanced={(advanced) => changeOptions({ ...options, ...advanced })} />
-          : <p className="muted">{tr("此服务端暂不支持单独配置目录查找设置。")}</p>}
-        {value.rootImportDefaultsSupported && <p className="muted">{tr(action.type === "add"
+        <p className="muted">{tr(action.type === "add"
           ? "查找设置仅应用于本次添加的目录。保存后将自动扫描音乐。"
-          : "查找设置仅应用于此目录，不会修改其他目录。保存后将自动扫描音乐。")}</p>}
+          : "查找设置仅应用于此目录，不会修改其他目录。保存后将自动扫描音乐。")}</p>
       </>}
       <div className="directory-actions directory-modal-actions">
         <button type="button" disabled={locked} onClick={close}>{tr("取消")}</button>

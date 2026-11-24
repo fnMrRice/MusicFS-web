@@ -35,14 +35,9 @@ describe("Bulk duplicate merging", () => {
       await expect(api.mutate(bulkMergeRequest("score", 2), "bulk-key")).rejects.toMatchObject({ code: "INVALID_RESPONSE" });
     }
   });
-  it("only advertises bulk merging with an explicit server capability", async () => {
-    const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(Response.json({ revision: 2 }))
-      .mockResolvedValueOnce(Response.json({ revision: 2, bulkMergeAvailable: true }))
-      .mockResolvedValueOnce(Response.json({ revision: 2, bulkMergeAvailable: "true" }));
-    const api = new MatchingApi(new ApiClient(fetcher));
-    expect((await api.revision()).bulkMergeAvailable).toBeUndefined();
-    expect((await api.revision()).bulkMergeAvailable).toBe(true);
-    await expect(api.revision()).rejects.toMatchObject({ code: "INVALID_RESPONSE" });
+  it.each([null, -1, 1.5, "2"])("rejects an invalid revision %j", async revision => {
+    const fetcher = vi.fn<typeof fetch>(async () => Response.json({ revision }));
+    await expect(new MatchingApi(new ApiClient(fetcher)).revision()).rejects.toMatchObject({ code: "INVALID_RESPONSE" });
   });
   it("persists uncertain bulk decisions, locks other mutations, and recovers exact parameters", async () => {
     storage();

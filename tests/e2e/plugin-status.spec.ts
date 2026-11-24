@@ -272,7 +272,7 @@ test("missing counts stay hidden and plugins can provide zero with arbitrary uni
   const card = pluginCard(page);
   const entry = pluginEntry(card, localPlugin.id);
   await expect(entry.locator(".plugin-entry-toggle").getByText("本地音乐", { exact: true })).toBeVisible();
-  await expect(entry.locator(".plugin-entry-heading").getByText("未知版本", { exact: false })).toBeVisible();
+  await expect(entry.locator(".plugin-version")).toHaveCount(0);
   await expect(entry.locator(".plugin-count")).toHaveCount(0);
   await expect(pluginEntry(card, custom.id).locator(".plugin-count")).toHaveText("0 项索引");
   await entry.locator(".plugin-entry-toggle").click();
@@ -303,14 +303,14 @@ test("malformed plugin counts never become instance-count fallbacks", async ({ p
 });
 
 for (const [locale, name, version, refresh, refreshText, count] of [
-  ["en", "Local Music", "Unknown version", "Refresh plugin list", "Refresh", "3 sources"],
-  ["zh-TW", "本地音樂", "未知版本", "重新整理外掛程式清單", "重新整理", "3 個來源"],
-  ["ja", "Local Music", "不明なバージョン", "プラグイン一覧を更新", "更新", "3 sources"],
+  ["en", "Local Music", "Version: 1.2.3", "Refresh plugin list", "Refresh", "3 sources"],
+  ["zh-TW", "本地音樂", "版本：1.2.3", "重新整理外掛程式清單", "重新整理", "3 個來源"],
+  ["ja", "Local Music", "バージョン：1.2.3", "プラグイン一覧を更新", "更新", "3 sources"],
 ] as const) {
   test(`plugin group labels and controls follow the ${locale} language preference`, async ({ page }) => {
     await page.addInitScript(language => localStorage.setItem("musicfs:language", language), locale);
     await mockPlugins(page, () => ({ items: [
-      { pluginId: localPlugin.id, plugin: localPlugin, supportsMultipleInstances: false, instances: [],
+      { pluginId: localPlugin.id, plugin: localPlugin, version: "1.2.3", supportsMultipleInstances: false, instances: [],
         displayCount: { value: 3, unit: "sources", localizedUnits: { "zh_Hant": "個來源", "zh-CN": "个来源" } } },
     ] }));
     await page.goto(`${origin}/#/settings?tab=plugins`);

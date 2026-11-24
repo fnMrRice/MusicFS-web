@@ -35,7 +35,7 @@ export interface SourceTrack {
   versions?: SourceTrack[];
   playbackSelection?: { trackId: string; forcedSourceTrackId: string | null };
 }
-export interface TrackPage { items: SourceTrack[]; nextCursor: string | null; libraryRevision: string; matchingRevision?: number }
+export interface TrackPage { items: SourceTrack[]; nextCursor: string | null; libraryRevision: string }
 export interface OutputProfile { mime: string; codec: string | null; container: string | null; transport: string; channels?: number; layout?: string; sampleRate?: number; bitrateBps?: number | null }
 export interface Playback {
   sourceTrackId: string;

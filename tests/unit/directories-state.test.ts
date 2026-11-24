@@ -4,11 +4,12 @@ import { DirectoriesApi, type LocalConfiguration, type PluginOperation } from ".
 import { DirectorySettingsState } from "../../src/features/directories/state";
 
 const operation = (status: PluginOperation["status"]): PluginOperation => ({ operationId: "operation-1", status, errorCode: null });
+const newDirectory = { name: "New", path: "/Music/New", available: true, configuredRootId: null };
 const defaultOptions = { recursive: true, maxDepth: 0, importLyrics: true, excludePatterns: [], skipHidden: true, respectNoMedia: true };
 function fixture(savedId: string | null = null, operationAccepted?: (operation: PluginOperation) => void) {
   let id = savedId;
   const api = {
-    configuration: vi.fn(async (): Promise<LocalConfiguration> => ({ revision: "r1", roots: [{ id: "existing", name: "Saved", pathConfigured: true }] })),
+    configuration: vi.fn(async (): Promise<LocalConfiguration> => ({ revision: "r1", roots: [{ id: "existing", name: "Saved", pathConfigured: true, importDefaults: defaultOptions }] })),
     save: vi.fn(async () => operation("applying")),
     operation: vi.fn(async () => operation("succeeded")),
   };
@@ -42,48 +43,34 @@ describe("Music folder configuration state", () => {
     expect(state.value.roots).toEqual([]);
     expect(state.dirty).toBe(false);
     expect(api.save).not.toHaveBeenCalled();
-    state.select({ name: "Music", path: "/Music", available: false, configuredRootId: null });
+    state.toggleAddition({ name: "Music", path: "/Music", available: false, configuredRootId: null });
     expect(state.value.roots).toEqual([]);
-    state.select({ name: "Selected", path: "/Music/Selected", available: true, configuredRootId: null });
-    expect(state.value.roots).toEqual([{ id: expect.any(String), name: "Selected", path: "/Music/Selected" }]);
+    state.toggleAddition({ name: "Selected", path: "/Music/Selected", available: true, configuredRootId: null });
+    expect(state.value.roots).toEqual([{ id: expect.any(String), name: "Selected", path: "/Music/Selected", importDefaults: defaultOptions }]);
     expect(state.dirty).toBe(true);
     expect(api.save).not.toHaveBeenCalled();
-  });
-  it("recognizes saved directories after reload and restores their original identity when reselected", async () => {
-    const { state } = fixture();
-    await state.start();
-    const item = { name: "Directory basename", path: "/Music/Collection", available: true, configuredRootId: "existing" };
-    state.select(item);
-    expect(state.value.roots).toEqual([{ id: "existing", name: "Saved" }]);
-    state.edit([]);
-    state.select(item);
-    expect(state.value.roots).toEqual([{ id: "existing", name: "Saved" }]);
-    expect(state.dirty).toBe(false);
-    state.select({ name: "New", path: "/Music/New", available: true, configuredRootId: null });
-    state.select({ name: "New", path: "/Music/New", available: true, configuredRootId: null });
-    expect(state.value.roots).toHaveLength(2);
   });
   it("preserves existing root identity without rebinding its path and does not mutate until explicitly saved", async () => {
     const { state, api, storage } = fixture();
     await state.start();
-    expect(state.value.roots).toEqual([{ id: "existing", name: "Saved" }]);
-    state.edit([...state.value.roots, { id: "new", name: "New", path: "/Music/New" }]);
+    expect(state.value.roots).toEqual([{ id: "existing", name: "Saved", importDefaults: defaultOptions }]);
+    state.toggleAddition(newDirectory);
     expect(api.save).not.toHaveBeenCalled();
     await state.save();
     expect(api.save).toHaveBeenCalledWith([
-      { id: "existing", name: "Saved" }, { id: "new", name: "New", path: "/Music/New" },
+      { id: "existing", name: "Saved" }, { id: expect.any(String), name: "New", path: "/Music/New", importDefaults: defaultOptions },
     ], defaultOptions, "r1", expect.any(String), undefined);
     expect(storage.get()).toBe("operation-1");
     expect(state.value.saved).toBe(false);
     expect(state.locked).toBe(true);
-    state.edit([]);
+    state.removeRoot("existing");
     expect(state.value.roots).toHaveLength(2);
   });
 
   it("retries an uncertain save with identical body, revision and idempotency key", async () => {
     const { state, api } = fixture();
     await state.start();
-    state.edit([]);
+    state.removeRoot("existing");
     api.save.mockRejectedValueOnce(new ApiError("NETWORK_ERROR", "Lost response"));
     await state.save();
     expect(state.locked).toBe(true);
@@ -96,7 +83,7 @@ describe("Music folder configuration state", () => {
   it("keeps a conflicting draft and requires an explicit reload before another save", async () => {
     const { state, api } = fixture();
     await state.start();
-    state.edit([]);
+    state.removeRoot("existing");
     api.save.mockRejectedValueOnce(new ApiError("REVISION_CONFLICT", "Changed", 412));
     await state.save();
     expect(state.value.conflict).toBe(true);
@@ -106,7 +93,7 @@ describe("Music folder configuration state", () => {
     api.configuration.mockResolvedValueOnce({ revision: "r2", roots: [] });
     await state.reload();
     expect(state.value.conflict).toBe(false);
-    state.edit([{ id: "new", name: "New", path: "/Music/New" }]);
+    state.toggleAddition(newDirectory);
     await state.save();
     expect(api.save).toHaveBeenLastCalledWith(expect.any(Array), defaultOptions, "r2", expect.any(String), undefined);
   });
@@ -122,13 +109,13 @@ describe("Music folder configuration state", () => {
     expect(state.value.saved).toBe(true);
     expect(state.locked).toBe(false);
     expect(storage.get()).toBeNull();
-    expect(state.value.roots).toEqual([{ id: "existing", name: "Saved" }]);
+    expect(state.value.roots).toEqual([{ id: "existing", name: "Saved", importDefaults: defaultOptions }]);
   });
 
   it("allows clearing all roots and never treats a failed application as success", async () => {
     const { state, api } = fixture();
     await state.start();
-    state.edit([]);
+    state.removeRoot("existing");
     await state.save();
     expect(api.save).toHaveBeenCalledWith([], defaultOptions, "r1", expect.any(String), undefined);
     api.operation.mockResolvedValueOnce(operation("failed"));
@@ -152,71 +139,23 @@ describe("Music folder configuration state", () => {
     expect(state.value.loaded).toBe(true);
     expect(state.value.conflict).toBe(false);
   });
-  it("saves recursive limits with roots while retaining lyric and exclusion settings", async () => {
+  it("uses instance defaults for additions and saves overrides only on selected roots", async () => {
     const { state, api } = fixture();
-    const options = { ...defaultOptions, recursive: true, maxDepth: 3, importLyrics: true, excludePatterns: ["private/**"] };
-    api.configuration.mockResolvedValueOnce({ revision: "r1", roots: [], importOptions: { importDefaults: options, schemaRevision: "local-import-v5" } });
-    await state.start();
-    expect(state.value.importDefaults).toEqual(options);
-    expect(state.dirty).toBe(false);
-    state.editRecursion(true, 0);
-    expect(state.dirty).toBe(true);
-    await state.save();
-    expect(api.save).toHaveBeenCalledWith([], { ...options, maxDepth: 0 }, "r1", expect.any(String), undefined);
-  });
-  it("normalizes non-recursive scans to zero and rejects invalid finite depths", async () => {
-    const { state, api } = fixture();
-    await state.start();
-    for (const invalid of [-1, 65, 1.5, NaN]) state.editRecursion(true, invalid);
-    expect(state.dirty).toBe(false);
-    state.editRecursion(true, 2);
-    state.editRecursion(false, 2);
-    expect(state.value.importDefaults).toEqual({ ...defaultOptions, recursive: false, maxDepth: 0 });
-    await state.save();
-    expect(api.save).toHaveBeenCalledWith([{ id: "existing", name: "Saved" }], { ...defaultOptions, recursive: false }, "r1", expect.any(String), undefined);
-  });
-  it("toggles selected folders independently and treats reselected saved roots as unchanged", async () => {
-    const { state, api } = fixture();
-    api.configuration.mockResolvedValueOnce({ revision: "r1", roots: [
-      { id: "first", name: "First", pathConfigured: true }, { id: "second", name: "Second", pathConfigured: true },
-    ] });
-    await state.start();
-    const first = { name: "Renamed basename", path: "/music/first", available: true, configuredRootId: "first" };
-    state.toggle(first);
-    expect(state.value.roots.map((root) => root.id)).toEqual(["second"]);
-    state.toggle(first);
-    expect(state.value.roots.find((root) => root.id === "first")).toEqual({ id: "first", name: "First" });
-    expect(state.dirty).toBe(false);
-    const child = { name: "Child", path: "/music/first/child", available: true, configuredRootId: null };
-    state.toggle(child);
-    expect(state.value.roots).toHaveLength(3);
-    state.toggle(child);
-    expect(state.dirty).toBe(false);
-  });
-  it("persists hidden and nomedia choices without changing recursion or other import options", async () => {
-    const { state, api } = fixture();
-    await state.start();
-    expect(state.value.importDefaults).toEqual(defaultOptions);
-    state.editRecursion(true, 4);
-    state.editAdvanced({ skipHidden: false, respectNoMedia: false });
-    await state.save();
-    expect(api.save).toHaveBeenCalledWith([{ id: "existing", name: "Saved" }],
-      { ...defaultOptions, maxDepth: 4, skipHidden: false, respectNoMedia: false }, "r1", expect.any(String), undefined);
-  });
-  it("preserves explicit false advanced settings when reloading the server configuration", async () => {
-    const { state, api } = fixture();
-    const options = { ...defaultOptions, skipHidden: false, respectNoMedia: false };
+    const options = { ...defaultOptions, maxDepth: 3, skipHidden: false, respectNoMedia: false, excludePatterns: ["private/**"] };
     api.configuration.mockResolvedValue({ revision: "r1", roots: [], importOptions: {
       importDefaults: options, schemaRevision: "local-import-v5",
     } });
     await state.start();
-    expect(state.value.importDefaults).toEqual(options);
-    expect(state.dirty).toBe(false);
-    state.editRecursion(true, 2);
+    expect(state.value.additionOptions).toEqual(options);
+    for (const invalid of [-1, 65, 1.5, NaN]) state.editAdditions({ ...options, maxDepth: invalid });
+    expect(state.value.additionOptions).toEqual(options);
+    state.toggleAddition(newDirectory);
+    state.editAdditions({ ...options, recursive: false, maxDepth: 0 });
     await state.save();
-    expect(api.save).toHaveBeenCalledWith([], { ...options, maxDepth: 2 }, "r1", expect.any(String), undefined);
+    expect(api.save).toHaveBeenCalledWith([{
+      id: expect.any(String), name: "New", path: "/Music/New", importDefaults: { ...options, recursive: false, maxDepth: 0 },
+    }], options, "r1", expect.any(String), undefined);
     await state.resume();
-    expect(state.value.importDefaults.skipHidden).toBe(false);
-    expect(state.value.importDefaults.respectNoMedia).toBe(false);
+    expect(state.value.importDefaults).toEqual(options);
   });
 });

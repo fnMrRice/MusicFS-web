@@ -34,35 +34,31 @@ async function connect(user = "user:b", server = "server:a") {
   return services;
 }
 
-describe("persisted lyrics pinning", () => {
-  it("defaults to an unpinned lyrics panel without saved preferences", async () => {
-    const services = await connect();
-    expect(services.preferences.value.lyricsPinned).toBe(false);
+describe.each(["lyricsPinned", "queuePinned"] as const)("persisted %s preference", (field) => {
+  it.each([undefined, "true", 1, null])("uses an unpinned panel for %j", async value => {
+    saved.set(key, JSON.stringify({ [field]: value }));
+    expect((await connect()).preferences.value[field]).toBe(false);
   });
 
-  it("saves and restores both pin states alongside volume and other preferences", async () => {
+  it("retains the other panel, mute state and display options across reconnects", async () => {
+    const other = field === "lyricsPinned" ? "queuePinned" : "lyricsPinned";
     const first = await connect();
-    first.preference({ volume: 0.32, mine: false });
-    first.preference({ lyricsPinned: true });
-    expect(JSON.parse(saved.get(key)!)).toMatchObject({ lyricsPinned: true, volume: 0.32, lastVolume: 0.32, mine: false });
-    const restored = await connect();
-    expect(restored.preferences.value).toMatchObject({ lyricsPinned: true, volume: 0.32, lastVolume: 0.32, mine: false });
-    restored.preference({ lyricsPinned: false });
-    const unpinned = await connect();
-    expect(unpinned.preferences.value).toMatchObject({ lyricsPinned: false, volume: 0.32, lastVolume: 0.32, mine: false });
+    first.preference({ volume: 0.32, [other]: true, mine: false, theme: "light", accent: "tianyi" });
+    first.toggleMute();
+    const preserved = { [other]: true, mine: false, theme: "light", accent: "tianyi" };
+    for (const pinned of [true, false]) {
+      first.preference({ [field]: pinned });
+      expect(JSON.parse(saved.get(key)!)).toMatchObject({ ...preserved, [field]: pinned });
+      expect((await connect()).preferences.value).toMatchObject({
+        ...preserved, [field]: pinned, volume: 0, lastVolume: 0.32,
+      });
+    }
   });
 
-  it.each(["true", 1, null])("does not treat invalid saved pin value %j as enabled", async (lyricsPinned) => {
-    saved.set(key, JSON.stringify({ lyricsPinned }));
-    const services = await connect();
-    expect(services.preferences.value.lyricsPinned).toBe(false);
-  });
-
-  it("keeps the pinned preference scoped to its server and account", async () => {
-    const first = await connect();
-    first.preference({ lyricsPinned: true });
-    expect((await connect("user:c")).preferences.value.lyricsPinned).toBe(false);
-    expect((await connect("user:b", "server:c")).preferences.value.lyricsPinned).toBe(false);
-    expect((await connect()).preferences.value.lyricsPinned).toBe(true);
+  it("scopes the panel to the server and account", async () => {
+    (await connect()).preference({ [field]: true });
+    expect((await connect("user:c")).preferences.value[field]).toBe(false);
+    expect((await connect("user:b", "server:c")).preferences.value[field]).toBe(false);
+    expect((await connect()).preferences.value[field]).toBe(true);
   });
 });

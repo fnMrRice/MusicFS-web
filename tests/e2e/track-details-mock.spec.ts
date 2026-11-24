@@ -37,7 +37,7 @@ async function mockApi(page: Page, special: (route: Route, path: string) => Prom
     if (path.endsWith("/provider-instances")) json = { items: tracks.map((track) => ({ id: track.providerInstanceId,
       name: `${track.sourceTrackId} 来源插件`, capabilities: [], availability: "available",
       plugin: { id: `plugin-${track.sourceTrackId}`, name: `${track.sourceTrackId} 来源插件`, localizedNames: {}, features: ["music-source"] } })) };
-    if (path.endsWith("/matching/revision")) json = { revision: 0, bulkMergeAvailable: true };
+    if (path.endsWith("/matching/revision")) json = { revision: 0 };
     await route.fulfill({ json });
   });
   await page.goto(`${origin}/#/library`);

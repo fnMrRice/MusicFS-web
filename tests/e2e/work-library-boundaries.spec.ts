@@ -89,6 +89,10 @@ test("a playlist resolves hidden source references directly and still plays them
         { entryId: "remote-entry", source: { sourceTrackId: null, remoteSourceId: "remote-one" }, provenance: [] },
       ],
     } });
+    if (path === "/api/v1/source-refs/lookup") return route.fulfill({ json: { items: [{
+      source: { sourceTrackId: null, remoteSourceId: "remote-one" },
+      remoteTrack: null, errorCode: "NOT_FOUND",
+    }] } });
     if (path.startsWith("/api/v1/source-tracks")) {
       reads.push(path);
       if (decodeURIComponent(path) === `/api/v1/source-tracks/${hidden.sourceTrackId}`) return route.fulfill({ json: hidden });
@@ -98,14 +102,14 @@ test("a playlist resolves hidden source references directly and still plays them
   });
   await page.goto(`${origin}/#/playlists/saved`);
   await expect(playRow(page, hidden.displayName)).toBeVisible();
-  await expect(page.getByText(/此快照另有 1 个远程或暂不可读取的来源引用/)).toBeVisible();
+  await expect(page.getByRole("cell", { name: "内容已失效或不可用（NOT_FOUND）" })).toBeVisible();
   await playRow(page, hidden.displayName).click();
   await expect.poll(() => page.locator("audio").evaluate((element: HTMLAudioElement) => element.currentTime)).toBeGreaterThan(0.1);
   expect(player.writes).toEqual([expect.objectContaining({ sourceTrackId: hidden.sourceTrackId })]);
   expect(reads).toEqual(["/api/v1/source-tracks/asmr%2Fone"]);
 });
 
-test("legacy mixed album detail counts only visible music and enables play all", async ({ page }) => {
+test("mixed source album detail counts only visible music and enables play all", async ({ page }) => {
   await mockPackages(page);
   await page.route("**/api/v1/source-albums/*", (route) => route.fulfill({ json: {
     sourceAlbumId: "mixed", providerInstanceId: "local", name: "混合来源专辑", revision: 1,

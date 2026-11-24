@@ -37,7 +37,7 @@ async function setup(page: Page, count = 2) {
     let json: unknown = { items: [], nextCursor: null, nextAfter: null, libraryRevision: '1' };
     if (path.endsWith('/health/ready')) json = { product: 'MusicFS', ready: true, apiVersion: '1', instanceId: 'queue-panel' };
     if (path.endsWith('/auth/session')) json = { csrfToken: 'fixture', user: { id: 'listener', role: 'user' } };
-    if (path.endsWith('/matching/revision')) json = { revision: 0, bulkMergeAvailable: true };
+    if (path.endsWith('/matching/revision')) json = { revision: 0 };
     if (path.endsWith('/library/tracks')) json = musicPage(names.map((name) => ({
       ...track, sourceTrackId: name, assetId: name, displayName: `${name}.wav`, durationMs: 60000,
     })));

@@ -64,9 +64,8 @@ export class QueuePersistence {
     this.userId = userId;
     try {
       const saved: unknown = JSON.parse(localStorage.getItem(storageKey) ?? "null");
-      // 旧缓存只有地址，首次恢复后按当前账号重新保存。
       const snapshot = record(saved) && saved.serverAddress === serverAddress &&
-        (saved.userId === undefined || saved.userId === userId) ? readSnapshot(saved.queue) : null;
+        saved.userId === userId ? readSnapshot(saved.queue) : null;
       if (snapshot) this.queue.restore(snapshot);
       else localStorage.removeItem(storageKey);
     } catch {
