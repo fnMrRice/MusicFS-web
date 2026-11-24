@@ -74,7 +74,7 @@ test("a playlist can pin a non-default source and later follow the current defau
   }
   await page.getByRole("button", { name: "合并歌曲", exact: true }).click();
   await page.getByRole("dialog").getByRole("button", { name: "确认合并", exact: true }).click();
-  const expand = page.getByRole("button", { name: /^展开 .* 的来源版本$/ });
+  const expand = page.getByRole("button", { name: /^展开 .* 的来源版本$/ }).filter({ hasText: "2 个来源版本" });
   await expect(expand).toHaveCount(1);
   const catalog = await (await page.request.get(`${server.origin}/api/v1/library/tracks`)).json();
   const music: MusicTrack = catalog.items.find((item: MusicTrack) => item.selectedSource?.versions?.length === 2);

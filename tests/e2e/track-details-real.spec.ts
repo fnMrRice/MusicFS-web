@@ -20,7 +20,7 @@ test('expanded versions display details from the selected source plugin and reje
   await page.getByRole('dialog', { name: '合并歌曲', exact: true })
     .getByRole('button', { name: '确认合并', exact: true }).click();
   await expect.poll(async () => (await groupedTracks(page, server!.origin)).length).toBe(2);
-  await page.getByRole('button', { name: /^展开 .* 的来源版本$/ }).click();
+  await page.getByRole('button', { name: /^展开 .* 的来源版本$/ }).filter({ hasText: '2 个来源版本' }).click();
   const versions = page.getByLabel('来源版本', { exact: true });
   await expect(versions.getByRole('button', { name: /^查看 .* 的详情$/ })).toHaveCount(2);
 

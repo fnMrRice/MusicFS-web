@@ -277,12 +277,24 @@ test("all tracks links each artist and album by catalog ID and shows providers i
   await page.goto(`${origin}/#/library?source=local`);
   const row = page.getByRole("row").filter({ has: page.getByRole("checkbox", { name: "选择 Alpha", exact: true }) });
   await expect(row.getByRole("link", { name: albumA.name, exact: true })).toBeVisible();
-  await expect(page.getByRole("row").filter({ has: page.getByRole("checkbox", { name: "选择 Beta", exact: true }) })
-    .getByRole("link")).toHaveCount(0);
+  const soloRow = page.getByRole("row").filter({ has: page.getByRole("checkbox", { name: "选择 Beta", exact: true }) });
+  await expect(soloRow.getByRole("link")).toHaveCount(0);
+  const soloToggle = soloRow.getByRole("button", { name: /Beta 的来源版本$/ });
+  const versions = page.getByLabel("来源版本", { exact: true });
+  await expect(soloToggle).toHaveText("1 个来源版本");
+  await expect(soloToggle).toHaveAttribute("aria-expanded", "false");
+  await soloToggle.click();
+  await expect(soloToggle).toHaveAttribute("aria-expanded", "true");
+  await expect(versions.getByText("本地来源", { exact: true })).toBeVisible();
+  await expect(versions.getByRole("button", { name: "播放来源版本 Beta.flac" })).toBeVisible();
+  await soloToggle.click();
+  await expect(soloToggle).toHaveAttribute("aria-expanded", "false");
+  await expect(versions).toHaveCount(0);
   await expect(page.getByRole("columnheader", { name: "来源", exact: true })).toHaveCount(0);
   await expect(row.getByText("本地来源", { exact: true })).toHaveCount(0);
-  await row.getByRole("button", { name: "展开 Alpha 的来源版本" }).click();
-  const versions = page.getByLabel("来源版本", { exact: true });
+  const groupToggle = row.getByRole("button", { name: "展开 Alpha 的来源版本" });
+  await expect(groupToggle).toHaveText("2 个来源版本");
+  await groupToggle.click();
   await expect(versions.getByText("本地来源", { exact: true })).toBeVisible();
   await expect(versions.getByText("另一来源", { exact: true })).toBeVisible();
   for (const credit of [artistA, guestArtist, albumA, liveAlbum]) {

@@ -9,7 +9,6 @@ import { trackAvailabilityMessage } from "../../library/track-availability";
 import { TrackPlaybackIndicator } from "../TrackPlaybackIndicator";
 import type { LocalizedTitle } from "../../api/localized-titles";
 import { OtherTrackTitles } from "./OtherTrackTitles";
-import { SourceDownloads } from "./SourceDownloads";
 
 export function TrackRow({
   track: t,
@@ -94,11 +93,10 @@ export function TrackRow({
               <span>{t.title || t.displayName}</span>
             </button>
             <OtherTrackTitles title={title} names={localizedTitles} />
-            {versions.length === 1 && <SourceDownloads key={versions[0].sourceTrackId} track={versions[0]} />}
-            {versions.length > 1 && <button className="text-button track-expand" aria-expanded={expanded}
-              aria-label={tr("展开 {0} 的来源版本", { 0: t.title || t.displayName })}
+            {versions.length > 0 && <button className="text-button track-expand" aria-expanded={expanded}
+              aria-label={tr(expanded ? "收起 {0} 的来源版本" : "展开 {0} 的来源版本", { 0: title })}
               onClick={() => setExpanded(!expanded)}>
-              <Icon name="chevron" size={14} />{tr("{0} 个来源版本", { 0: versions.length })}
+              <Icon name="chevron" size={14} />{versions.length === 1 ? tr("1 个来源版本") : tr("{0} 个来源版本", { 0: versions.length })}
             </button>}
             {t.availability !== "available" && (
               <small className="availability">
@@ -132,8 +130,8 @@ export function TrackRow({
         </div>
       </td>
     </tr>
-    {expanded && versions.length > 1 && <tr className="track-versions"><td colSpan={provider === undefined ? 8 : 9}>
-      <TrackVersions tracks={versions} revision={matchingRevision} refresh={onMatchingChange}
+    {expanded && versions.length > 0 && <tr className="track-versions"><td colSpan={provider === undefined ? 8 : 9}>
+      <TrackVersions tracks={versions} revision={matchingRevision} refresh={versions.length > 1 ? onMatchingChange : undefined}
         openActions={openVersionMenu}
         recordingId={t.recordingId} defaultSourceTrackId={t.sourceTrackId} manualSourceTrackId={t.manualSourceTrackId} />
     </td></tr>}

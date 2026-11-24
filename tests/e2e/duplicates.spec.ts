@@ -43,8 +43,8 @@ test('manual merge, source playback and unlink survive restart without automatic
   ]);
   expect(response.status()).toBe(200);
   await expect.poll(async () => (await groupedTracks(page, server!.origin)).length).toBe(2);
-  await expect(page.getByRole('button', { name: /^展开 .* 的来源版本$/ })).toHaveCount(1);
-  await page.getByRole('button', { name: /^展开 .* 的来源版本$/ }).click();
+  const expandMerged = page.getByRole('button', { name: /^展开 .* 的来源版本$/ }).filter({ hasText: '2 个来源版本' });
+  await expandMerged.click();
   const versions = page.getByLabel('来源版本', { exact: true });
   await expect(versions.getByRole('button', { name: /^播放来源版本 / })).toHaveCount(2);
   await versions.getByRole('button', { name: '播放来源版本 second-selected.wav', exact: true }).click();
@@ -52,13 +52,14 @@ test('manual merge, source playback and unlink survive restart without automatic
   await page.screenshot({ path: info.outputPath('merged-source-versions.png') });
   await server.restart();
   await page.reload();
-  await expect(page.getByRole('button', { name: /^展开 .* 的来源版本$/ })).toHaveCount(1);
+  await expect(expandMerged).toBeVisible();
   expect((await settings(page, server.origin)).values.automatic).toBe(false);
-  await page.getByRole('button', { name: /^展开 .* 的来源版本$/ }).click();
+  await expandMerged.click();
   await page.getByRole('button', { name: '解除 second-selected.wav 的关联', exact: true }).click();
   await page.getByRole('dialog', { name: '解除关联', exact: true }).getByRole('button', { name: '确认解除', exact: true }).click();
   await expect.poll(async () => (await groupedTracks(page, server!.origin)).length).toBe(3);
-  await expect(page.getByRole('button', { name: /^展开 .* 的来源版本$/ })).toHaveCount(0);
+  await expect(expandMerged).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /^(展开|收起) .* 的来源版本$/ }).filter({ hasText: '1 个来源版本' })).toHaveCount(3);
   expect(readFileSync(join(server.selectedRoot, 'selected.wav')).equals(original)).toBe(true);
   expect(readFileSync(join(server.secondSelectedRoot, 'second-selected.wav')).equals(original)).toBe(true);
 });

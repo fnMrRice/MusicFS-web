@@ -69,6 +69,8 @@ export default {
   "上次默认版本设置的结果尚未确认，请继续确认。": ["The last default-version change has not been confirmed. Check its result.", "上次預設版本設定的結果尚未確認，請繼續確認。", "前回の既定バージョンの変更結果を確認できていません。確認を続けてください。"],
   "继续确认默认版本": ["Check default version", "繼續確認預設版本", "既定のバージョンを確認"],
   "展开 {0} 的来源版本": ["Show source versions for {0}", "展開 {0} 的來源版本", "{0} のソースを表示"],
+  "收起 {0} 的来源版本": ["Hide source versions for {0}", "收合 {0} 的來源版本", "{0} のソースを折りたたむ"],
+  "1 个来源版本": ["1 source version", "1 個來源版本", "1 個のソース"],
   "{0} 个来源版本": ["{0} source versions", "{0} 個來源版本", "{0} 個のソース"],
   "播放来源版本 {0}": ["Play source version {0}", "播放來源版本 {0}", "ソース {0} を再生"],
   "解除 {0} 的关联": ["Unlink {0}", "解除 {0} 的關聯", "{0} の関連付けを解除"],

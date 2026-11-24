@@ -16,6 +16,7 @@
 .track-version-default { font-size: 12px; color: var(--accent); border: 1px solid currentColor; border-radius: 4px; padding: 2px 6px; white-space: nowrap; }
 .track-version-quality { font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--muted); }
 .track-expand { display: inline-flex; gap: 4px; align-items: center; padding: 4px 0; }
+.track-expand[aria-expanded="true"] svg { transform: rotate(180deg); }
 .bulk-merge-options { display: grid; gap: 12px; border: 1px solid var(--line); border-radius: 8px; padding: 16px; min-width: 0; }
 .bulk-merge-options p, .bulk-merge-summary p { margin: 0; }
 .bulk-merge-options .check-label { white-space: normal; }

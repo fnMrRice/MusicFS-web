@@ -468,9 +468,11 @@ test("NetEase playlists appear in management and navigation, link once, accept t
   await expect(group.getByRole("status")).toContainText("已完成");
   await favoritesLink.click();
   await expect(page.getByRole("button", { name: "播放 序曲", exact: true })).toBeVisible();
-  await page.getByText("已下载 · 2 个版本").click();
-  await expect(page.locator(".source-downloads li")).toHaveCount(2);
-  await expect(page.locator(".source-downloads").getByText(/无损 · FLAC/)).toBeVisible();
+  await page.getByRole("button", { name: "展开 序曲 的来源版本", exact: true }).click();
+  const downloads = page.getByLabel("来源版本", { exact: true }).locator(".source-downloads");
+  await downloads.getByText("已下载 · 2 个版本").click();
+  await expect(downloads.locator("li")).toHaveCount(2);
+  await expect(downloads.getByText(/无损 · FLAC/)).toBeVisible();
   await page.goBack();
   await group.getByRole("button", { name: "解除关联" }).click();
   await expect(dialog.getByText(/解除与「我的收藏」的关联/)).toBeVisible();

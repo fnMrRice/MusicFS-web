@@ -63,7 +63,10 @@ test("saved qualities and version deletion follow the server for standalone and 
   });
   await page.goto(`${origin}/#/library`);
   const row = page.getByRole("row").filter({ has: page.getByRole("button", { name: "播放 独立曲目", exact: true }) });
-  const details = row.locator(".source-downloads");
+  await expect(row.locator(".source-downloads")).toHaveCount(0);
+  await row.getByRole("button", { name: "展开 独立曲目 的来源版本" }).click();
+  const soloVersion = page.locator(".track-version").filter({ has: page.getByRole("button", { name: "播放来源版本 独立曲目" }) });
+  const details = soloVersion.locator(".source-downloads");
   await expect(details.locator("summary")).toHaveText("已下载 · 3 个版本 · 无损 / 极高");
   await details.locator("summary").click();
   const target = details.getByRole("button", { name: /删除下载版本 .*#copy-001/ });
@@ -81,7 +84,7 @@ test("saved qualities and version deletion follow the server for standalone and 
   await expect(submit).toBeDisabled();
   expect(deletes).toBe(2);
   release();
-  await row.getByRole("button", { name: "重试" }).click();
+  await soloVersion.getByRole("button", { name: "重试" }).click();
   await expect(details.locator("summary")).toHaveText("已下载 · 3 个版本 · 无损 / 极高 / 高解析度无损");
   await details.locator("summary").click();
   await expect(details.locator("li")).toHaveCount(3);
