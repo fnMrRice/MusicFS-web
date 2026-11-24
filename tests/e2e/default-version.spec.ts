@@ -72,9 +72,10 @@ test('automatic quality choice, manual override and clearing survive refresh and
   const versions = page.getByLabel('来源版本', { exact: true });
   await expect(versions).toContainText('自动默认');
   await expect(versions).toContainText('1536 kbps');
+  await versions.getByRole('button', { name: 'selected.wav 的更多操作', exact: true }).click();
   const [saved] = await Promise.all([
     page.waitForResponse(response => response.url().endsWith('/matching/default-source') && response.request().method() === 'POST'),
-    versions.getByRole('button', { name: '将 selected.wav 设为默认版本', exact: true }).click(),
+    page.getByRole('menuitem', { name: '设为默认', exact: true }).click(),
   ]);
   expect(saved.ok()).toBe(true);
   expect(saved.request().postDataJSON().sourceTrackId).toBe(low.sourceTrackId);
@@ -87,9 +88,10 @@ test('automatic quality choice, manual override and clearing survive refresh and
   expect(await grouped(page)).toMatchObject({ sourceTrackId: low.sourceTrackId, manualSourceTrackId: low.sourceTrackId });
   await page.getByRole('button', { name: /^展开 .* 的来源版本$/ }).click();
   await expect(versions).toContainText('手动默认');
+  await versions.getByRole('button', { name: 'selected.wav 的更多操作', exact: true }).click();
   const [cleared] = await Promise.all([
     page.waitForResponse(response => response.url().endsWith('/matching/default-source') && response.request().method() === 'POST'),
-    versions.getByRole('button', { name: '取消默认版本', exact: true }).click(),
+    page.getByRole('menuitem', { name: '取消默认', exact: true }).click(),
   ]);
   expect(cleared.ok()).toBe(true); expect(cleared.request().postDataJSON().sourceTrackId).toBeNull();
   await expect(versions).toBeVisible(); await expect(versions).toContainText('自动默认');

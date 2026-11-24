@@ -3,7 +3,9 @@ import type { SourceTrack } from "../../api/types";
 import { MatchingApi } from "../../api/matching";
 import { useServices, useStore } from "../../app/services";
 import { useSourceName } from "../../components/use-source-name";
-import { duration, ErrorNotice, Icon, IconButton } from "../../components/ui";
+import { duration, ErrorNotice } from "../../components/ui";
+import { ContextMenu, type MenuAction } from "../../components/ContextMenu";
+import { TrackRowActions } from "../../components/TrackRowActions";
 import { TrackCover } from "../../components/TrackCover";
 import { Modal } from "../../components/Modal";
 import { useResource } from "../../components/query";
@@ -13,10 +15,11 @@ import { TrackDetails } from "./TrackDetails";
 import { SourceDownloads } from "../library/SourceDownloads";
 import { trackAvailabilityMessage } from "../../library/track-availability";
 
-export function TrackVersions({ tracks, revision, refresh, recordingId, defaultSourceTrackId, manualSourceTrackId, openActions }: {
+export function TrackVersions({ tracks, revision, refresh, recordingId, defaultSourceTrackId, manualSourceTrackId, menuActions, isFavorite, favoriteDisabled, toggleFavorite }: {
   tracks: SourceTrack[]; revision?: number; refresh?: () => void;
   recordingId?: string | null; defaultSourceTrackId: string; manualSourceTrackId?: string | null;
-  openActions?: (track: SourceTrack, x: number, y: number, origin: HTMLElement) => void;
+  menuActions: (track: SourceTrack) => MenuAction[];
+  isFavorite: boolean; favoriteDisabled: boolean; toggleFavorite: (sourceTrackId: string) => void;
 }) {
   useLocale();
   const services = useServices();
@@ -24,6 +27,7 @@ export function TrackVersions({ tracks, revision, refresh, recordingId, defaultS
   const sourceName = useSourceName();
   const [unlink, setUnlink] = useState<{ track: SourceTrack; revision?: number } | null>(null);
   const [details, setDetails] = useState<SourceTrack | null>(null);
+  const [menu, setMenu] = useState<{ track: SourceTrack; x: number; y: number; origin: HTMLElement } | null>(null);
   const canChooseDefault = !!recordingId && !!refresh;
   const current = useResource(`default-source-revision-${recordingId}-${revision}`, (signal) =>
     revision === undefined && canChooseDefault ? new MatchingApi(services.client).revision(signal) : Promise.resolve({ revision }));
@@ -38,20 +42,31 @@ export function TrackVersions({ tracks, revision, refresh, recordingId, defaultS
       kind: "default-source", recordingId, sourceTrackId, expectedRevision: current.data.revision,
     });
   }
+  function versionActions(track: SourceTrack): MenuAction[] {
+    const manualDefault = manualSourceTrackId === track.sourceTrackId;
+    return [
+      { label: tr("详情"), icon: "search", run: () => setDetails(track) },
+      ...menuActions(track),
+      ...(canChooseDefault ? [{ label: tr(manualDefault ? "取消默认" : "设为默认"), icon: "pin", disabled: blocked,
+        run: () => chooseDefault(manualDefault ? null : track.sourceTrackId) }] : []),
+      ...(refresh ? [{ label: tr("解除关联"), icon: "close", disabled: matchingPending.length > 0,
+        run: () => setUnlink({ track, revision }) }] : []),
+    ];
+  }
   return <div className="track-versions-list" aria-label={tr("来源版本")} aria-busy={decision.busy}>
-    {tracks.map((track) => <div className="track-version" key={track.sourceTrackId} tabIndex={openActions ? -1 : undefined}
-      onContextMenu={openActions ? (event) => {
+    {tracks.map((track) => <div className="track-version" key={track.sourceTrackId} tabIndex={-1}
+      onContextMenu={(event) => {
         event.preventDefault(); event.stopPropagation();
-        openActions(track, event.clientX, event.clientY, event.currentTarget);
-      } : undefined}
-      onKeyDown={openActions ? (event) => {
+        setMenu({ track, x: event.clientX, y: event.clientY, origin: event.currentTarget });
+      }}
+      onKeyDown={(event) => {
         if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) {
           event.preventDefault(); event.stopPropagation();
           const origin = event.target as HTMLElement;
           const rect = origin.getBoundingClientRect();
-          openActions(track, rect.left, rect.bottom, origin);
+          setMenu({ track, x: rect.left, y: rect.bottom, origin });
         }
-      } : undefined}>
+      }}>
       <TrackCover track={track} />
       <div className="track-version-name">{track.displayName}
         {track.availability !== "available" && <small className="availability">{tr(trackAvailabilityMessage(track.availability))}</small>}
@@ -66,22 +81,12 @@ export function TrackVersions({ tracks, revision, refresh, recordingId, defaultS
         {sampleRate(track.sampleRateHz)} · {bitrate(track.bitrateBps)} · {fileSize(track.asset?.fileSizeBytes)}
       </span>
       <span>{duration(track.durationMs)}</span>
-      <div className="track-version-actions">
-        <button onClick={() => setDetails(track)} aria-label={tr("查看 {0} 的详情", { 0: track.displayName })}>{tr("详情")}</button>
-        {canChooseDefault && (manualSourceTrackId === track.sourceTrackId ?
-          <button disabled={blocked} onClick={() => chooseDefault(null)} aria-label={tr("取消默认版本")}>{tr("取消默认")}</button> :
-          <button disabled={blocked} onClick={() => chooseDefault(track.sourceTrackId)}
-            aria-label={tr("将 {0} 设为默认版本", { 0: track.displayName })}>{tr("设为默认")}</button>)}
-        <button disabled={track.availability !== "available"} onClick={() => services.play(track)}
-          aria-label={tr("播放来源版本 {0}", { 0: track.displayName })}><Icon name="play" size={14} /> {tr("播放")}</button>
-        {openActions && <IconButton icon="more" label={tr("{0} 的更多操作", { 0: track.displayName })} aria-haspopup="menu"
-          onClick={(event) => {
-            const rect = event.currentTarget.getBoundingClientRect();
-            openActions(track, rect.left, rect.bottom, event.currentTarget);
-          }} />}
-        {refresh && <button disabled={matchingPending.length > 0} onClick={() => setUnlink({ track, revision })} aria-label={tr("解除 {0} 的关联", { 0: track.displayName })}>{tr("解除关联")}</button>}
-      </div>
+      <TrackRowActions title={track.displayName} playLabel={tr("播放来源版本 {0}", { 0: track.displayName })}
+        play={() => services.play(track)} enqueue={() => services.enqueue([track])} playbackDisabled={track.availability !== "available"}
+        favorite={{ active: isFavorite, disabled: favoriteDisabled, toggle: () => toggleFavorite(track.sourceTrackId) }}
+        menuExpanded={menu?.track.sourceTrackId === track.sourceTrackId} openMenu={(x, y, origin) => setMenu({ track, x, y, origin })} />
     </div>)}
+    {menu && <ContextMenu {...menu} label={menu.track.displayName} actions={versionActions(menu.track)} close={() => setMenu(null)} />}
     {canChooseDefault && <ErrorNotice error={current.error} retry={current.reload} />}
     <ErrorNotice error={decision.error} />
     {decision.retryable && <button className="text-button" disabled={decision.busy} onClick={() => void decision.run()}>{tr("重试")}</button>}

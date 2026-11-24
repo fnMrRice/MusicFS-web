@@ -55,7 +55,8 @@ test('manual merge, source playback and unlink survive restart without automatic
   await expect(expandMerged).toBeVisible();
   expect((await settings(page, server.origin)).values.automatic).toBe(false);
   await expandMerged.click();
-  await page.getByRole('button', { name: '解除 second-selected.wav 的关联', exact: true }).click();
+  await versions.getByRole('button', { name: 'second-selected.wav 的更多操作', exact: true }).click();
+  await page.getByRole('menuitem', { name: '解除关联', exact: true }).click();
   await page.getByRole('dialog', { name: '解除关联', exact: true }).getByRole('button', { name: '确认解除', exact: true }).click();
   await expect.poll(async () => (await groupedTracks(page, server!.origin)).length).toBe(3);
   await expect(expandMerged).toHaveCount(0);

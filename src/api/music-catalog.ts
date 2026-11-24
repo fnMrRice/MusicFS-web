@@ -23,6 +23,7 @@ export interface MusicTrack {
   localizedTitles?: LocalizedTitle[];
   artists: CatalogArtist[];
   albums: CatalogAlbum[];
+  sources?: { providerInstanceId: string; sourceId: string }[];
   genre: string | null;
   year: number | null;
   rating: number | null;
@@ -69,6 +70,8 @@ const source = (value: unknown): value is SourceTrack => record(value) && id(val
 
 export function musicTrack(value: unknown): value is MusicTrack {
   if (!record(value) || !id(value.trackId) || !id(value.title) || !nullableText(value.coverPath) ||
+    (value.sources !== undefined && !(Array.isArray(value.sources) &&
+      value.sources.every(item => record(item) && id(item.providerInstanceId) && text(item.sourceId)))) ||
     (value.localizedTitles !== undefined && !(Array.isArray(value.localizedTitles) && value.localizedTitles.every(isLocalizedTitle))) ||
     !nullableText(value.genre) || !(value.year === null || Number.isSafeInteger(value.year)) ||
     !(value.rating === null || Number.isSafeInteger(value.rating)) ||

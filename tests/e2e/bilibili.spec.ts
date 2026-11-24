@@ -26,6 +26,7 @@ async function mock(page: Page, playback?: Playback) {
     if (playback && path === playback.streamUrl)
       return route.fulfill({ status: 200, contentType: "audio/wav", headers: { "Cache-Control": "no-store" }, body: audioFixture() });
     let json: unknown = { items: [], nextCursor: null, nextAfter: null };
+    if (path.endsWith("/me/favorites")) json = { items: [], nextCursor: null, revision: "1" };
     if (path.endsWith("/health/ready")) json = { product: "MusicFS", apiVersion: "1", ready: true, instanceId: "bilibili-test" };
     if (path.endsWith("/auth/session")) json = { csrfToken: "test", user: { id: "admin", role: "admin" } };
     if (path.endsWith("/online-instances")) json = { items: [source] };
@@ -49,7 +50,7 @@ test("anonymous link lookup offers queue actions without requesting a platform a
   await expect(page.getByText(track.title, { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "播放 Public video · P1", exact: true })).toBeEnabled();
   expect(calls.some((path) => path.endsWith("/resolve"))).toBe(false);
-  await page.getByRole("button", { name: "加入队列", exact: true }).click();
+  await page.getByRole("button", { name: "将 Public video · P1 加入队列", exact: true }).click();
   await expect.poll(() => calls.filter((path) => path.endsWith("/resolve")).length).toBe(1);
   expect(calls.some((path) => path.endsWith("/account"))).toBe(false);
   expect(calls.some((path) => path.includes("/stream"))).toBe(false);

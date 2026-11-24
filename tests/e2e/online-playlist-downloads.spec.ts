@@ -36,6 +36,7 @@ async function fixture(page: Page) {
     const req = route.request();
     const { pathname, searchParams } = new URL(req.url());
     let json: unknown = { items: [], nextCursor: null, nextAfter: null };
+    if (pathname.endsWith("/me/favorites")) json = { items: [], nextCursor: null, revision: "1" };
     if (pathname.endsWith("/health/ready")) json = { product: "MusicFS", ready: true, apiVersion: "1", instanceId: "download-test" };
     if (pathname.endsWith("/auth/session")) json = { csrfToken: "test-csrf", user: { id: "listener", role: "user" } };
     if (pathname.endsWith("/online-instances")) json = { items: [{
@@ -157,7 +158,8 @@ test("batch downloads preserve cross-page selection, deduplicate tracks and rest
     await expect.poll(() => reads.length).toBeGreaterThan(readCount);
     await expect(history).toHaveCount(0);
     await page.reload();
-    await expect(page.getByRole("button", { name: "下载 海潮" })).toBeVisible();
+    await page.getByRole("button", { name: "海潮 的更多操作", exact: true }).click();
+    await expect(page.getByRole("menuitem", { name: "下载", exact: true })).toBeVisible();
     expect(reads).toHaveLength(readCount + 1);
     expect(sideEffects).toEqual([]);
   } finally {
@@ -171,7 +173,10 @@ test("a single-song download honors the source default and stays separate from p
   state.qualities = [""];
   state.qualityError = true;
   await page.goto(locationOf("mix"));
-  await page.getByRole("button", { name: "下载 海潮", exact: true }).click();
+  const moreActions = page.getByRole("button", { name: "海潮 的更多操作", exact: true });
+  const download = page.getByRole("menuitem", { name: "下载", exact: true });
+  await moreActions.click();
+  await download.click();
   const dialog = page.getByRole("dialog", { name: "选择下载音质" });
   await expect(dialog.getByRole("alert")).toBeVisible();
   await expect(dialog.getByRole("button", { name: "开始下载" })).toBeDisabled();
@@ -181,7 +186,8 @@ test("a single-song download honors the source default and stays separate from p
   await expect(dialog.getByRole("option", { name: "来源默认" })).toHaveCount(1);
   await dialog.getByRole("button", { name: "取消", exact: true }).click();
   expect(created).toEqual([]);
-  await page.getByRole("button", { name: "下载 海潮", exact: true }).click();
+  await moreActions.click();
+  await download.click();
   await page.evaluate(() => {
     // 局域网 HTTP 页面没有 randomUUID；首次取随机数失败时也应允许再次提交。
     Object.defineProperty(crypto, "randomUUID", { configurable: true, value: undefined });
@@ -202,13 +208,14 @@ test("a single-song download honors the source default and stays separate from p
   state.account = "another-account";
   const history = page.getByRole("region", { name: "歌单下载任务" });
   await page.reload();
-  await expect(page.getByRole("button", { name: "下载 海潮", exact: true })).toBeVisible();
+  await moreActions.click();
+  await expect(download).toBeVisible();
   await expect(history).toHaveCount(0);
   state.playable = false;
   await page.reload();
   await expect(page.getByRole("cell", { name: "海潮", exact: true })).toBeVisible();
   await expect(page.getByRole("checkbox", { name: /已加载的可下载/ })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "下载 海潮", exact: true })).toHaveCount(0);
+  await expect(moreActions).toHaveCount(0);
   expect(sideEffects).toEqual([]);
 });
 

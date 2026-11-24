@@ -336,11 +336,13 @@ test("all tracks requests source records while artist and album views keep gray 
     const play = missingRow.getByRole("button", { name: `播放 ${missing.title}`, exact: true });
     await expect(play).toBeDisabled();
     const gray = await missingRow.evaluate((element) => getComputedStyle(element).color);
-    await expect(play).toHaveCSS("color", gray);
+    await expect(missingRow.locator(".track-play")).toHaveCSS("color", gray);
     expect(gray).not.toBe(await page.getByRole("button", { name: "播放 Alpha", exact: true })
       .evaluate((element) => getComputedStyle(element).color));
     await expect(missingRow.getByRole("checkbox")).toBeEnabled();
-    await expect(missingRow.getByRole("button", { name: `将 ${missing.title} 添加到歌单`, exact: true })).toBeEnabled();
+    await missingRow.getByRole("button", { name: `${missing.title} 的更多操作`, exact: true }).click();
+    await expect(page.getByRole("menuitem", { name: "添加到歌单", exact: true })).toBeEnabled();
+    await page.keyboard.press("Escape");
     expect(queries.at(-1)?.has("sourceOnly")).toBe(false);
   }
   await tab(page, "全部曲目").click();

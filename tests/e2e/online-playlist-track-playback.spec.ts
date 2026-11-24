@@ -55,6 +55,7 @@ async function openPlaylist(page: Page) {
     const request = route.request();
     const { pathname } = new URL(request.url());
     let json: unknown = { items: [], nextAfter: null };
+    if (pathname.endsWith("/me/favorites")) json = { items: [], nextCursor: null, revision: "1" };
     if (pathname.endsWith("/health/ready")) json = { product: "MusicFS", ready: true, apiVersion: "1", instanceId: "fixture" };
     if (pathname.endsWith("/auth/session")) json = { csrfToken: "test", user: { id: "listener", role: "user" } };
     if (pathname.endsWith("/online-instances")) json = { items: [{
@@ -166,7 +167,7 @@ test("online playlist rows show their own artwork and play the chosen track with
   await page.screenshot({ path: screenshot });
   await testInfo.attach("online-playlist-detail", { path: screenshot, contentType: "image/png" });
 
-  await row("留白").getByRole("button", { name: "加入队列", exact: true }).click();
+  await row("留白").getByRole("button", { name: "将 留白 加入队列", exact: true }).click();
   const queueToggle = page.getByRole("button", { name: "播放队列", exact: true });
   const queue = page.getByRole("dialog", { name: "播放队列", exact: true });
   const queued = queue.getByRole("listitem").getByRole("button");

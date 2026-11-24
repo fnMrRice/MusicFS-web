@@ -99,8 +99,6 @@
   padding-inline-start: 22px;
   margin-block: 8px;
 }
-.tracks td.online-track-actions { white-space: normal; }
-.online-track-actions > button { margin-block: 2px; white-space: nowrap; }
 .list-actions-end {
   display: flex;
   align-items: center;
@@ -303,6 +301,10 @@
 }
 .source-missing .track-play {
   color: inherit;
+}
+.tracks td.track-actions-cell {
+  width: 1%;
+  white-space: normal;
 }
 .track-row-actions {
   display: flex;

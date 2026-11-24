@@ -419,9 +419,9 @@ test("NetEase playlists appear in management and navigation, link once, accept t
   await expect(mirror.getByRole("link", { name: "已关联：开车听" })).toBeVisible();
   await expect(group.getByRole("button", { name: "关联本地歌单", exact: true })).toHaveCount(0);
   await sidebarLink.click();
-  const add = page.getByRole("button", { name: "将 序曲 添加到歌单" });
   async function saveTrack() {
-    await add.click();
+    await page.getByRole("button", { name: "序曲 的更多操作", exact: true }).click();
+    await page.getByRole("menuitem", { name: "添加到歌单", exact: true }).click();
     await dialog.getByLabel("目标歌单").selectOption(local.playlistId);
     await dialog.getByRole("button", { name: "保存", exact: true }).click();
     await expect(dialog.getByRole("status")).toContainText("曲目已保存");

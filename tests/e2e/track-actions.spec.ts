@@ -257,13 +257,13 @@ test('menus support more buttons and keyboard dismissal, stay onscreen and disab
   expect(errors).toEqual([]);
 });
 
-test('row actions share one horizontal cell and directly toggle favorites and play next', async ({ page }, info) => {
+test('row actions share one horizontal cell and directly toggle favorites and enqueue', async ({ page }, info) => {
   const { favorites, creates, errors } = await setup(page, true);
   const cell = row(page, 'Alpha.wav').locator('td').last();
   const buttons = cell.getByRole('button');
   await expect(buttons).toHaveCount(4);
   const labels = await buttons.evaluateAll((elements) => elements.map((element) => element.getAttribute('aria-label')));
-  expect(labels).toEqual(['收藏 Alpha.wav', '将 Alpha.wav 设为下一首播放', '将 Alpha.wav 添加到歌单', 'Alpha.wav 的更多操作']);
+  expect(labels).toEqual(['播放 Alpha.wav', '收藏 Alpha.wav', '将 Alpha.wav 加入队列', 'Alpha.wav 的更多操作']);
   const positions = await buttons.evaluateAll((elements) => elements.map((element) => {
     const rect = element.getBoundingClientRect(); return { x: rect.x, y: rect.y };
   }));
@@ -271,18 +271,18 @@ test('row actions share one horizontal cell and directly toggle favorites and pl
     expect(positions[i].x).toBeGreaterThan(positions[i - 1].x);
     expect(positions[i].y).toBe(positions[0].y);
   }
-  await buttons.nth(0).click();
-  await expect(buttons.nth(0)).toHaveAttribute('aria-pressed', 'true');
+  await buttons.nth(1).click();
+  await expect(buttons.nth(1)).toHaveAttribute('aria-pressed', 'true');
   expect([...favorites]).toEqual(['track-1']);
-  await buttons.nth(0).click();
-  await expect(buttons.nth(0)).toHaveAttribute('aria-pressed', 'false');
+  await buttons.nth(1).click();
+  await expect(buttons.nth(1)).toHaveAttribute('aria-pressed', 'false');
   expect([...favorites]).toEqual([]);
   await page.getByRole('button', { name: '播放 Alpha.wav', exact: true }).click();
   await waitPlaying(page);
-  await page.getByRole('button', { name: '将 Beta.wav 设为下一首播放', exact: true }).click();
+  await page.getByRole('button', { name: '将 Beta.wav 加入队列', exact: true }).click();
   await queue(page, ['Alpha.wav', 'Beta.wav'], 'Alpha.wav');
   expect(creates).toEqual(['track-1']);
-  await expect(page.getByRole('button', { name: '将 Gamma.wav 设为下一首播放', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: '将 Gamma.wav 加入队列', exact: true })).toBeDisabled();
   await buttons.nth(3).click();
   await expect(menu(page)).toBeVisible();
   await page.screenshot({ path: info.outputPath('track-row-actions.png') });

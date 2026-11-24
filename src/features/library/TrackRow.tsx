@@ -2,7 +2,9 @@ import { Fragment, useState, type ReactNode } from "react";
 import { tr, useLocale } from "../../i18n";
 import type { SourceTrack } from "../../api/types";
 import { useServices, useStore } from "../../app/services";
-import { duration, Icon, IconButton } from "../../components/ui";
+import { duration, Icon } from "../../components/ui";
+import { TrackRowActions } from "../../components/TrackRowActions";
+import type { MenuAction } from "../../components/ContextMenu";
 import { TrackVersions } from "../matching/TrackVersions";
 import { TrackCover } from "../../components/TrackCover";
 import { trackAvailabilityMessage } from "../../library/track-availability";
@@ -18,13 +20,13 @@ export function TrackRow({
   provider,
   checked,
   toggle,
-  add,
+  enqueue,
   isFavorite,
   favoriteDisabled,
   toggleFavorite,
-  playNext,
+  menuExpanded,
   openMenu,
-  openVersionMenu,
+  versionMenuActions,
   matchingRevision,
   onMatchingChange,
 }: {
@@ -35,13 +37,13 @@ export function TrackRow({
   provider?: string;
   checked: boolean;
   toggle: () => void;
-  add: () => void;
+  enqueue: () => void;
   isFavorite: boolean;
   favoriteDisabled: boolean;
-  toggleFavorite: () => void;
-  playNext: () => void;
+  toggleFavorite: (sourceTrackId?: string) => void;
+  menuExpanded: boolean;
   openMenu: (x: number, y: number, origin: HTMLElement) => void;
-  openVersionMenu: (track: SourceTrack, x: number, y: number, origin: HTMLElement) => void;
+  versionMenuActions: (track: SourceTrack) => MenuAction[];
   matchingRevision?: number;
   onMatchingChange?: () => void;
 }) {
@@ -84,12 +86,10 @@ export function TrackRow({
           <div>
             <button
               className="track-play"
-              aria-label={tr("播放 {0}", { 0: title })}
               title={tr("播放 {0}", { 0: title })}
               disabled={t.availability !== "available"}
               onClick={() => s.play(t)}
             >
-              <Icon name="play" size={14} />
               <span>{t.title || t.displayName}</span>
             </button>
             <OtherTrackTitles title={title} names={localizedTitles} />
@@ -114,25 +114,17 @@ export function TrackRow({
         </span>
       </td>
       <td className="duration">{duration(t.durationMs)}</td>
-      <td>
-        <div className="track-row-actions">
-          <IconButton icon="heart" label={tr(isFavorite ? "取消收藏 {0}" : "收藏 {0}", { 0: t.title || t.displayName })}
-            aria-pressed={isFavorite} className={isFavorite ? "is-favorite" : undefined}
-            disabled={favoriteDisabled} onClick={toggleFavorite} />
-          <IconButton icon="next" label={tr("将 {0} 设为下一首播放", { 0: t.title || t.displayName })}
-            disabled={t.availability !== "available"} onClick={playNext} />
-          <IconButton icon="plus" label={tr("将 {0} 添加到歌单", { 0: title })} onClick={add} />
-          <IconButton icon="more" label={tr("{0} 的更多操作", { 0: t.title || t.displayName })} aria-haspopup="menu"
-            onClick={(event) => {
-              const rect = event.currentTarget.getBoundingClientRect();
-              openMenu(rect.left, rect.bottom, event.currentTarget);
-            }} />
-        </div>
+      <td className="track-actions-cell">
+        <TrackRowActions title={title} play={() => s.play(t)} enqueue={enqueue}
+          playbackDisabled={t.availability !== "available"}
+          favorite={{ active: isFavorite, disabled: favoriteDisabled, toggle: () => toggleFavorite() }}
+          openMenu={openMenu} menuExpanded={menuExpanded} />
       </td>
     </tr>
     {expanded && versions.length > 0 && <tr className="track-versions"><td colSpan={provider === undefined ? 8 : 9}>
       <TrackVersions tracks={versions} revision={matchingRevision} refresh={versions.length > 1 ? onMatchingChange : undefined}
-        openActions={openVersionMenu}
+        menuActions={versionMenuActions} isFavorite={isFavorite} favoriteDisabled={favoriteDisabled}
+        toggleFavorite={toggleFavorite}
         recordingId={t.recordingId} defaultSourceTrackId={t.sourceTrackId} manualSourceTrackId={t.manualSourceTrackId} />
     </td></tr>}
     </Fragment>

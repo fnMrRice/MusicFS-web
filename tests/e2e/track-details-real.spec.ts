@@ -22,13 +22,15 @@ test('expanded versions display details from the selected source plugin and reje
   await expect.poll(async () => (await groupedTracks(page, server!.origin)).length).toBe(2);
   await page.getByRole('button', { name: /^展开 .* 的来源版本$/ }).filter({ hasText: '2 个来源版本' }).click();
   const versions = page.getByLabel('来源版本', { exact: true });
-  await expect(versions.getByRole('button', { name: /^查看 .* 的详情$/ })).toHaveCount(2);
+  await expect(versions.getByRole('button', { name: /的更多操作$/ })).toHaveCount(2);
 
   for (const [name, root] of [['selected.wav', 'first-root'], ['second-selected.wav', 'second-root']]) {
     const track = fixture.tracks.find(item => item.displayName === name)!;
+    const more = versions.getByRole('button', { name: `${name} 的更多操作`, exact: true });
+    await more.click();
     const [response] = await Promise.all([
       page.waitForResponse(item => item.url().endsWith(`/source-tracks/${track.sourceTrackId}/details`)),
-      versions.getByRole('button', { name: `查看 ${name} 的详情`, exact: true }).click(),
+      page.getByRole('menuitem', { name: '详情', exact: true }).click(),
     ]);
     expect(response.status()).toBe(200);
     const details = await response.json();
@@ -47,7 +49,7 @@ test('expanded versions display details from the selected source plugin and reje
     await dialog.screenshot({ path: info.outputPath(`${root}-details.png`) });
     await page.keyboard.press('Escape');
     await expect(dialog).toHaveCount(0);
-    await expect(versions.getByRole('button', { name: `查看 ${name} 的详情`, exact: true })).toBeFocused();
+    await expect(more).toBeFocused();
   }
 
   expect(readFileSync(filePath).equals(original)).toBe(true);

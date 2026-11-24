@@ -1,16 +1,17 @@
 import type { ReactNode } from "react";
 import type { MusicTrack } from "../../api/music-catalog";
 import { catalogArtworkPath } from "../../api/artwork";
-import { Cover, Icon, IconButton } from "../../components/ui";
+import { Cover } from "../../components/ui";
+import { TrackRowActions } from "../../components/TrackRowActions";
 import { tr } from "../../i18n";
 import { OtherTrackTitles } from "./OtherTrackTitles";
 
 interface Props {
   credits: ReactNode; showSource: boolean;
-  track: MusicTrack; number: number; checked: boolean; isFavorite: boolean; favoriteDisabled: boolean;
-  toggle(): void; favorite(): void; add(): void; openMenu(x: number, y: number, origin: HTMLElement): void;
+  track: MusicTrack; number: number; checked: boolean; isFavorite: boolean; favoriteDisabled: boolean; menuExpanded: boolean;
+  toggle(): void; favorite(): void; openMenu(x: number, y: number, origin: HTMLElement): void;
 }
-export function UnavailableMusicRow({ track, credits, showSource, number, checked, toggle, isFavorite, favoriteDisabled, favorite, add, openMenu }: Props) {
+export function UnavailableMusicRow({ track, credits, showSource, number, checked, toggle, isFavorite, favoriteDisabled, favorite, menuExpanded, openMenu }: Props) {
   return <tr className={`unavailable source-missing ${checked ? "checked" : ""}`} onContextMenu={(event) => {
     event.preventDefault(); openMenu(event.clientX, event.clientY, event.currentTarget);
   }}>
@@ -18,19 +19,12 @@ export function UnavailableMusicRow({ track, credits, showSource, number, checke
     <td className="row-number">{number}</td>
     <td><div className="track-title">
       <Cover src={catalogArtworkPath(track.coverPath)} />
-      <div><button className="track-play" disabled aria-label={tr("播放 {0}", { 0: track.title })}>
-        <Icon name="play" size={14} /><span>{track.title}</span>
-      </button><OtherTrackTitles title={track.title} names={track.localizedTitles} /></div>
+      <div><span className="track-play"><span>{track.title}</span></span><OtherTrackTitles title={track.title} names={track.localizedTitles} /></div>
     </div></td>
     {credits}
     {showSource && <td>{tr(track.playbackSelection?.forcedSourceTrackId ? "指定来源不可用" : "暂无来源")}</td>}
-    <td>—</td><td className="duration">—</td><td><div className="track-row-actions">
-      <IconButton icon="heart" label={tr(isFavorite ? "取消收藏 {0}" : "收藏 {0}", { 0: track.title })}
-        aria-pressed={isFavorite} disabled={favoriteDisabled} onClick={favorite} />
-      <IconButton icon="plus" label={tr("将 {0} 添加到歌单", { 0: track.title })} onClick={add} />
-      <IconButton icon="more" label={tr("{0} 的更多操作", { 0: track.title })} aria-haspopup="menu" onClick={(event) => {
-        const rect = event.currentTarget.getBoundingClientRect(); openMenu(rect.left, rect.bottom, event.currentTarget);
-      }} />
-    </div></td>
+    <td>—</td><td className="duration">—</td><td className="track-actions-cell"><TrackRowActions title={track.title}
+      play={null} enqueue={null} favorite={{ active: isFavorite, disabled: favoriteDisabled, toggle: favorite }}
+      openMenu={openMenu} menuExpanded={menuExpanded} /></td>
   </tr>;
 }

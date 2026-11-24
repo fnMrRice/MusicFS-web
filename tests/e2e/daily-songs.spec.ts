@@ -17,6 +17,7 @@ async function mockRecommendations(page: Page) {
   await page.route("**/api/v1/**", (route) => {
     const { pathname, searchParams } = new URL(route.request().url());
     let json: unknown = { items: [], nextAfter: null };
+    if (pathname.endsWith("/me/favorites")) json = { items: [], nextCursor: null, revision: "1" };
     if (pathname.endsWith("/health/ready")) json = { product: "MusicFS", ready: true, apiVersion: "1", instanceId: "fixture" };
     if (pathname.endsWith("/auth/session")) json = { csrfToken: "fixture", user: { id: "listener", role: "user" } };
     if (pathname.endsWith("/online-instances")) {
@@ -81,7 +82,9 @@ test("only the current grid links to daily songs, and track requests start on th
   await daily.getByRole("button", { name: "刷新每日推荐歌曲" }).click();
   await expect(daily.getByRole("cell", { name: "Song A", exact: true })).toBeVisible();
   await expect(daily.getByRole("button", { name: "播放 Song A" })).toBeVisible();
-  await expect(daily.getByRole("button", { name: "将 Song A 添加到歌单" })).toBeVisible();
+  await daily.getByRole("button", { name: "Song A 的更多操作" }).click();
+  await expect(page.getByRole("menuitem", { name: "添加到歌单", exact: true })).toBeVisible();
+  await page.keyboard.press("Escape");
   const reads = state.dailyRequests.length;
   await page.getByRole("button", { name: "返回", exact: true }).click();
   await expect(page).toHaveURL(`${origin}/#/recommendations`);
@@ -96,8 +99,8 @@ test("only the current grid links to daily songs, and track requests start on th
   await card.click();
   await expect(daily.getByRole("cell", { name: "Song B", exact: true })).toBeVisible();
   await expect(page.getByText("Song A", { exact: true })).toHaveCount(0);
-  await expect(daily.getByRole("button", { name: "加入队列" })).toHaveCount(0);
-  await expect(daily.getByRole("button", { name: /添加到歌单/ })).toHaveCount(0);
+  await expect(daily.getByRole("button", { name: "将 Song B 加入队列" })).toHaveCount(0);
+  await expect(daily.getByRole("button", { name: "Song B 的更多操作" })).toHaveCount(0);
   expect(new Set(state.dailyRequests)).toEqual(new Set([`/api/v1/online-instances/${id}/daily-songs`]));
 });
 

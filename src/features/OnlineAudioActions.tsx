@@ -43,12 +43,3 @@ export function OnlineAudioFeedback({ busy, error, cancel }: ReturnType<typeof u
     <ErrorNotice error={error} />
   </>;
 }
-
-export function OnlineAudioActions({ instance, external, title }: { instance: string; external: string; title: string }) {
-  const actions = useOnlineAudioActions(instance, external);
-  return <div>
-    <button type="button" disabled={actions.busy} aria-label={tr("播放 {0}", { 0: title })} onClick={actions.play}>{tr("播放")}</button>{" "}
-    <button type="button" disabled={actions.busy} onClick={actions.enqueue}>{tr("加入队列")}</button>
-    <OnlineAudioFeedback {...actions} />
-  </div>;
-}

@@ -38,7 +38,8 @@ test("a track without sources persists in artist, favorites and playlist views",
   await expect(page.getByRole("button", { name: "播放全部", exact: true })).toBeDisabled();
   await row.getByRole("button", { name: `收藏 ${title}`, exact: true }).click();
   await expect(row.getByRole("button", { name: `取消收藏 ${title}`, exact: true })).toHaveAttribute("aria-pressed", "true");
-  await row.getByRole("button", { name: `将 ${title} 添加到歌单`, exact: true }).click();
+  await row.getByRole("button", { name: `${title} 的更多操作`, exact: true }).click();
+  await page.getByRole("menuitem", { name: "添加到歌单", exact: true }).click();
   const add = page.getByRole("dialog", { name: "添加到歌单" });
   await expect(add.getByRole("option", { name: "跟随曲目默认来源" })).toHaveCount(1);
   await add.getByLabel("歌单名称").fill("待补音频");
@@ -80,7 +81,8 @@ test("a playlist can pin a non-default source and later follow the current defau
   const music: MusicTrack = catalog.items.find((item: MusicTrack) => item.selectedSource?.versions?.length === 2);
   const current = music.selectedSource!, other = current.versions!.find((item) => item.sourceTrackId !== current.sourceTrackId)!;
   const row = page.locator(".tracks tbody tr").filter({ has: expand });
-  await row.getByRole("button", { name: /添加到歌单$/ }).click();
+  await row.getByRole("button", { name: /的更多操作$/ }).click();
+  await page.getByRole("menuitem", { name: "添加到歌单", exact: true }).click();
   const add = page.getByRole("dialog", { name: "添加到歌单" });
   await add.getByLabel("歌单名称").fill("双版本歌单");
   await add.getByRole("combobox", { name: /的歌单播放来源$/ }).selectOption(other.sourceTrackId);

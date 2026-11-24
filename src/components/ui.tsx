@@ -102,6 +102,8 @@ const paths: Record<string, ReactNode> = {
     </>
   ),
   plus: <path d="M12 4v16M4 12h16" />,
+  "queue-add": <path d="M3 5h16M3 11h11M3 17h7m8-4v8m-4-4h8" />,
+  download: <path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5" />,
   more: (
     <>
       <circle cx="4" cy="12" r="1" />

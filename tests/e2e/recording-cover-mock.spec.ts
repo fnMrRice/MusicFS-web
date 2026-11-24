@@ -203,8 +203,10 @@ test("manual and automatic artwork stay consistent in library and player without
   for (const [index, sampleRate] of ["44.1 kHz", "48 kHz", "采样率未知"].entries()) {
     const version = versions.locator(".track-version").nth(index);
     await expect(version.locator(".track-version-quality")).toContainText(sampleRate);
-    await expect(version.getByRole("button", { name: /^查看 .* 的详情$/ })).toHaveText("详情");
-    await expect(version.getByRole("button", { name: /^将 .* 设为默认版本$/ })).toHaveText("设为默认");
+    await version.getByRole("button", { name: /的更多操作$/ }).click();
+    await expect(page.getByRole("menuitem", { name: "详情", exact: true })).toBeEnabled();
+    await expect(page.getByRole("menuitem", { name: "设为默认", exact: true })).toBeEnabled();
+    await page.keyboard.press("Escape");
   }
   await versions.getByRole("button", { name: "Small.wav 的更多操作", exact: true }).click();
   await expect(page.getByRole("menu")).toBeVisible();

@@ -25,7 +25,11 @@ function pluginDetails(id: string): TrackDetails {
     ] }] };
 }
 const dialog = (page: Page) => page.getByRole("dialog", { name: "来源版本详情", exact: true });
-const detailsButton = (page: Page, name: string) => page.getByRole("button", { name: `查看 ${name}.flac 的详情`, exact: true });
+const versionMenu = (page: Page, name: string) => page.getByRole("button", { name: `${name}.flac 的更多操作`, exact: true });
+async function openDetails(page: Page, name: string) {
+  await versionMenu(page, name).click();
+  await page.getByRole("menuitem", { name: "详情", exact: true }).click();
+}
 async function mockApi(page: Page, special: (route: Route, path: string) => Promise<boolean>) {
   await page.route("**/api/v1/**", async (route) => {
     const path = new URL(route.request().url()).pathname;
@@ -208,7 +212,7 @@ test("source plugin fields render as text on mobile even for an unavailable vers
     await route.fulfill({ json: details }); return true;
   });
   await expect(page.getByRole("button", { name: "播放来源版本 Beta.flac", exact: true })).toBeDisabled();
-  await detailsButton(page, "Beta").click();
+  await openDetails(page, "Beta");
   await expect(dialog(page)).toContainText("Beta 插件标题");
   await expect(dialog(page)).toContainText("Beta 来源插件");
   await expect(dialog(page).getByRole("region", { name: "插件专有信息", exact: true })).toContainText("Beta-2026");
@@ -229,7 +233,7 @@ test("plugin failures can be retried and empty plugin details have an explicit s
     else await route.fulfill({ json: { ...pluginDetails("Alpha"), sections: [] } });
     return true;
   });
-  await detailsButton(page, "Alpha").click();
+  await openDetails(page, "Alpha");
   await expect(dialog(page).getByRole("alert")).toContainText("来源暂不可用");
   await expect(dialog(page)).not.toContainText("Library artist");
   await dialog(page).getByRole("button", { name: "重试", exact: true }).click();
@@ -255,15 +259,15 @@ test("closing cancels a pending detail request and another version cannot show i
     else await route.fulfill({ json: pluginDetails("Beta") });
     return true;
   });
-  await detailsButton(page, "Alpha").click();
+  await openDetails(page, "Alpha");
   await expect(dialog(page).getByRole("status")).toContainText("正在加载");
   await expect.poll(() => first !== null).toBe(true);
   await page.keyboard.press("Escape");
   await expect(dialog(page)).toHaveCount(0);
-  await expect(detailsButton(page, "Alpha")).toBeFocused();
+  await expect(versionMenu(page, "Alpha")).toBeFocused();
   await expect.poll(() => page.evaluate(() => (window as unknown as { detailsAborted: string[] }).detailsAborted))
     .toContain("/api/v1/source-tracks/Alpha/details");
-  await detailsButton(page, "Beta").click();
+  await openDetails(page, "Beta");
   await expect(dialog(page)).toContainText("Beta 插件标题");
   await (first as unknown as Route).fulfill({ json: pluginDetails("Alpha") }).catch(() => undefined);
   await expect(dialog(page)).not.toContainText("Alpha 插件标题");
@@ -275,7 +279,7 @@ test("changed source files ask for a new scan instead of displaying stale librar
     if (!path.endsWith("/details")) return false;
     await route.fulfill({ status: 409, json: { error: { code: "RESOURCE_CHANGED" } } }); return true;
   });
-  await detailsButton(page, "Alpha").click();
+  await openDetails(page, "Alpha");
   await expect(dialog(page).getByRole("alert")).toContainText("来源文件已发生变化，请重新扫描曲库。");
   await expect(dialog(page)).not.toContainText("Library artist");
 });
@@ -291,8 +295,8 @@ test("pending duplicate merges do not block reading source details", async ({ pa
   await merge.getByRole("button", { name: "开始合并", exact: true }).click();
   await expect(merge.getByRole("button", { name: "继续确认合并结果", exact: true })).toBeEnabled();
   await merge.getByRole("button", { name: "关闭", exact: true }).last().click();
-  await expect(page.getByRole("button", { name: "解除 Alpha.flac 的关联", exact: true })).toBeDisabled();
-  await expect(detailsButton(page, "Alpha")).toBeEnabled();
-  await detailsButton(page, "Alpha").click();
+  await versionMenu(page, "Alpha").click();
+  await expect(page.getByRole("menuitem", { name: "解除关联", exact: true })).toBeDisabled();
+  await page.getByRole("menuitem", { name: "详情", exact: true }).click();
   await expect(dialog(page)).toContainText("Alpha 插件标题");
 });

@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import type { PackageNode, WorkPackage } from "../../../api/work-packages";
 import { useServices, useStore } from "../../../app/services";
+import { TrackRowActions } from "../../../components/TrackRowActions";
 import { duration, Icon } from "../../../components/ui";
 import { tr, useLocale } from "../../../i18n";
 import { directoryTracks, fileFormat, fileSize, packageChildren } from "./tree";
@@ -19,7 +20,8 @@ export function PackageTree({ value, preview = false, attachment }: {
       {(children.get(parentId) ?? []).map((node) => {
         const isDirectory = node.kind === "directory";
         const expanded = !collapsed.has(node.nodeId);
-        const available = node.track?.availability === "available";
+        const track = node.track;
+        const available = track?.availability === "available";
         const format = fileFormat(node) ?? tr(node.kind === "audio" ? "音频" : "附件");
         const group = isDirectory && !preview ? directoryTracks(children, node.nodeId) : [];
         return <li key={node.nodeId}>
@@ -40,10 +42,10 @@ export function PackageTree({ value, preview = false, attachment }: {
             </div>}
             {!preview && node.kind === "audio" && <div className="package-node-actions">
               {!available && <span className="muted">{tr("音轨暂不可用")}</span>}
-              <button type="button" disabled={!available} aria-label={tr("播放音轨 {0}", { 0: node.name })}
-                onClick={() => { if (node.track) services.play(node.track); }}>{tr("播放")}</button>
-              <button type="button" disabled={!available} aria-label={tr("音轨 {0} 加入队列", { 0: node.name })}
-                onClick={() => { if (node.track) { services.enqueue([node.track]); setMessage(tr("已将音轨加入队列。")); } }}>{tr("加入队列")}</button>
+              <TrackRowActions title={node.name} playLabel={tr("播放音轨 {0}", { 0: node.name })}
+                play={track ? () => services.play(track) : null}
+                enqueue={track ? () => { services.enqueue([track]); setMessage(tr("已将音轨加入队列。")); } : null}
+                playbackDisabled={!available} />
             </div>}
             {!preview && node.kind === "attachment" && <button type="button" aria-label={tr("查看附件 {0}", { 0: node.name })}
               onClick={() => attachment?.(node)}>{tr(node.attachmentKind === "download" ? "下载附件" : "查看附件")}</button>}

@@ -3,14 +3,13 @@ import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useServices, useStore } from "../app/services";
 import { SearchHistory } from "./SearchHistory";
-import { OnlineAudioActions } from "./OnlineAudioActions";
+import { OnlineTrackRow } from "./OnlineTrackRow";
+import { useOnlineFavorites } from "./useOnlineFavorites";
 import { usePages, useResource } from "../components/query";
 import type { OnlineInstance, OnlineTrack } from "../api/content";
 import { AddToPlaylist } from "./playlists/AddToPlaylist";
 import { useSourceName } from "../components/use-source-name";
 import {
-  Cover,
-  duration,
   Empty,
   ErrorNotice,
   Icon,
@@ -205,6 +204,7 @@ function SearchResults({
   const [truncated, setTruncated] = useState(false);
   const [selected, setSelected] = useState(new Set<string>());
   const [adding, setAdding] = useState<OnlineTrack[] | null>(null);
+  const favorites = useOnlineFavorites(playable ? instance : undefined);
   const ref = useRef<HTMLInputElement>(null);
   const page = usePages(
     `${instance}:${query}`,
@@ -217,6 +217,14 @@ function SearchResults({
   );
   const all =
     !!page.items.length && page.items.every((t) => selected.has(t.externalId));
+  function toggle(id: string) {
+    setSelected((previous) => {
+      const next = new Set(previous);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
   useEffect(() => {
     if (ref.current) ref.current.indeterminate = selected.size > 0 && !all;
   }, [selected, all]);
@@ -243,6 +251,7 @@ function SearchResults({
           {playable ? tr("点击播放后按需读取音频，无需等待完整下载。") : !accountId && tr("在线搜索结果仅供查看，播放能力尚未开放。")}
         </span>
       </div>
+      <ErrorNotice error={favorites.error} retry={favorites.retry} />
       {!!page.items.length && (
         <div className="table-wrap">
           <table className="tracks">
@@ -271,38 +280,10 @@ function SearchResults({
               </tr>
             </thead>
             <tbody>
-              {page.items.map((t) => (
-                <tr key={t.externalId}>
-                  <td>
-                    <input
-                      aria-label={tr("选择 {0}", { "0": t.title })}
-                      type="checkbox"
-                      checked={selected.has(t.externalId)}
-                      onChange={() =>
-                        setSelected((old) => {
-                          const n = new Set(old);
-                          if (n.has(t.externalId)) n.delete(t.externalId);
-                          else n.add(t.externalId);
-                          return n;
-                        })
-                      }
-                    />
-                  </td>
-                  <td>
-                    <div className="track-title">
-                      <Cover />
-                      <strong>{t.title}</strong>
-                    </div>
-                  </td>
-                  <td>{t.artists.join(" / ") || "—"}</td>
-                  <td>{t.album || "—"}</td>
-                  <td>{duration(t.durationMs)}</td>
-                  {(playable || accountId) && <td>
-                    {playable && <OnlineAudioActions instance={instance} external={t.externalId} title={t.title} />}
-                    {accountId && <button aria-label={tr("将 {0} 添加到歌单", { 0: t.title })} onClick={() => setAdding([t])}>{tr("添加到歌单")}</button>}
-                  </td>}
-                </tr>
-              ))}
+              {page.items.map((track) => <OnlineTrackRow key={track.externalId} instance={instance} track={track} showAlbum
+                select={toggle} selected={selected.has(track.externalId)} playable={playable}
+                favorite={playable ? favorites.forTrack(track.externalId) : undefined}
+                add={accountId ? item => setAdding([item]) : undefined} />)}
             </tbody>
           </table>
         </div>
