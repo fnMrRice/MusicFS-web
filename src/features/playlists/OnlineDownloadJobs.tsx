@@ -7,7 +7,7 @@ import { Store } from "../../app/store";
 import { ErrorNotice } from "../../components/ui";
 import { localizedPluginText } from "../../components/source-name";
 import { statusText, tr, useLocale } from "../../i18n";
-import { versionLabel } from "../library/SourceDownloads";
+import { versionLabel } from "../library/download-format";
 
 interface Receipt { id: string; quality: DownloadOptions["options"][number]; initial?: DownloadJob }
 const histories = new Map<string, Store<Receipt[]>>();

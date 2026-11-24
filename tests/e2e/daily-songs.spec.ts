@@ -35,7 +35,11 @@ async function mockRecommendations(page: Page) {
       expect(searchParams.get("limit")).toBe("50");
       if (state.response === "error") return route.fulfill({ status: 503, json: { error: { code: "TEMPORARY_FAILURE", requestId: "daily-attempt" } } });
       const track = { externalId: "1", title: `Song ${state.account}`, artists: ["Artist"], album: "", durationMs: 95000, sourceUrl: "" };
-      json = { tracks: state.response === "empty" ? [] : [track], observedAt: "2026-11-23T00:00:00Z" };
+      const saved = { quality: "lossless", codec: "flac", container: "flac", mime: "audio/flac", sizeBytes: 3000,
+        sampleRateHz: 44100, formatMeasured: true, downloadedAt: "2026-11-23T00:00:00Z", versionId: "lossless" };
+      json = { tracks: state.response === "empty" ? [] : [track], observedAt: "2026-11-23T00:00:00Z",
+        downloadVersionsByTrack: state.account === "A" ? { "1": [saved, { ...saved, quality: "exhigh", codec: "mp3",
+          container: "mp3", mime: "audio/mpeg", versionId: "lossy", sampleRateHz: 48000 }] } : undefined };
     }
     if (pathname.endsWith("/recommendations")) {
       const title = searchParams.has("history") ? "Past playlist" : "Current playlist";
@@ -82,6 +86,10 @@ test("only the current grid links to daily songs, and track requests start on th
   await daily.getByRole("button", { name: "刷新每日推荐歌曲" }).click();
   await expect(daily.getByRole("cell", { name: "Song A", exact: true })).toBeVisible();
   await expect(daily.getByRole("button", { name: "播放 Song A" })).toBeVisible();
+  const copies = daily.locator("details.online-download-format");
+  await expect(copies.locator("summary")).toHaveText("已下载 · 2 个版本 · FLAC · MP3");
+  await copies.locator("summary").click();
+  await expect(copies.locator("li")).toHaveText(["无损 · FLAC · 44.1 kHz", "极高 · MP3 · 48 kHz"]);
   await daily.getByRole("button", { name: "Song A 的更多操作" }).click();
   await expect(page.getByRole("menuitem", { name: "添加到歌单", exact: true })).toBeVisible();
   await page.keyboard.press("Escape");
@@ -98,6 +106,7 @@ test("only the current grid links to daily songs, and track requests start on th
   expect(state.dailyRequests).toHaveLength(reads);
   await card.click();
   await expect(daily.getByRole("cell", { name: "Song B", exact: true })).toBeVisible();
+  await expect(daily.locator(".online-download-format")).toHaveCount(0);
   await expect(page.getByText("Song A", { exact: true })).toHaveCount(0);
   await expect(daily.getByRole("button", { name: "将 Song B 加入队列" })).toHaveCount(0);
   await expect(daily.getByRole("button", { name: "Song B 的更多操作" })).toHaveCount(0);

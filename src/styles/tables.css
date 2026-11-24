@@ -215,6 +215,15 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.online-download-format {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: normal;
+}
+.online-download-format summary { cursor: pointer; }
+.online-download-format ul { margin: 4px 0; padding-inline-start: 16px; }
 .track-credits {
   white-space: normal;
   overflow-wrap: anywhere;

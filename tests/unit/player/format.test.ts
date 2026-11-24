@@ -12,6 +12,16 @@ function proxy(codec: string | null, container: string | null, mime: string, bit
 }
 
 describe("playing format", () => {
+  it("identifies measured downloads before playback and displays only the playing file's depth and format", () => {
+    const first = { ...online.downloadVersions[0], sampleRateHz: 44100, channels: 2, formatMeasured: true };
+    const one = { ...online, downloadVersions: [first] };
+    expect(playbackFormat(one, null)).toContain("M4A → AAC · 44.1 kHz · 128 kbps");
+    const multiple = { ...one, downloadVersions: [first, { ...first, versionId: "flac", codec: "flac", container: "flac", bitDepth: 24 }] };
+    expect(playbackFormat(multiple, null)).toContain("M4A → AAC / FLAC");
+    const active = proxy("flac", "flac", "audio/flac", 805500);
+    active.outputProfile = { ...active.outputProfile, sampleRate: 48000, channels: 6, bitDepth: 16 };
+    expect(playbackFormat(multiple, active)).toBe(["FLAC", "48 kHz", "805.5 kbps", tr("{0} 声道", { 0: 6 }), "16 bit"].join(" · "));
+  });
   it("uses the current representation across quality changes without guessing from downloads or stale catalog values", () => {
     const stale = { ...online, codec: "mp3", container: "mp3", bitrateBps: 320000 };
     expect(playbackFormat(online, null)).toBe(tr("编码未知"));

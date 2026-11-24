@@ -1,5 +1,5 @@
-import { ApiClient, ApiError } from "./client";
-import type { Provider, SourceTrack, TrackPage } from "./types";
+import { ApiClient, ApiError, errorMessage } from "./client";
+import type { DownloadVersion, Provider, SourceTrack, TrackPage } from "./types";
 import { Store } from "../app/store";
 
 function isTrack(value: SourceTrack): boolean {
@@ -13,9 +13,14 @@ function isTrack(value: SourceTrack): boolean {
     (value.durationMs === null || typeof value.durationMs === "number")
   );
 }
+interface DownloadChange {
+  removed: DownloadVersion[];
+  versions?: DownloadVersion[];
+  error?: string;
+}
 export class LibraryApi {
   readonly providerInstances = new Store<Provider[]>([]);
-  readonly downloadChanges = new Store<ReadonlyMap<string, number>>(new Map());
+  readonly downloadChanges = new Store<ReadonlyMap<string, DownloadChange>>(new Map());
   private providerEpoch = 0;
   private providerRequest = 0;
   private providerApplied = 0;
@@ -27,19 +32,28 @@ export class LibraryApi {
       throw new ApiError("INVALID_RESPONSE", "Invalid source track response");
     return response;
   }
-  async deleteDownload(sourceTrackId: string, versionId: string): Promise<void> {
+  async deleteDownload(sourceTrackId: string, version: DownloadVersion): Promise<void> {
     const session = this.providerEpoch;
     try {
-      await this.client.request<void>(`/source-tracks/${encodeURIComponent(sourceTrackId)}/downloads/${encodeURIComponent(versionId)}`, { method: "DELETE" });
+      await this.client.request<void>(`/source-tracks/${encodeURIComponent(sourceTrackId)}/downloads/${encodeURIComponent(version.versionId)}`, { method: "DELETE" });
     } catch (error) {
       // 定时清理或另一页面可能已删除同一版本，重新读取该来源即可确认现状。
       if (!(error instanceof ApiError) || error.code !== "NOT_FOUND") throw error;
     }
-    if (session === this.providerEpoch) {
-      const changes = new Map(this.downloadChanges.value);
-      changes.set(sourceTrackId, (changes.get(sourceTrackId) ?? 0) + 1);
-      this.downloadChanges.set(changes);
+    if (session === this.providerEpoch) void this.refreshDownloads(sourceTrackId, version);
+  }
+  async refreshDownloads(id: string, removed?: DownloadVersion): Promise<void> {
+    const previous = this.downloadChanges.value.get(id)?.removed ?? [];
+    const pending: DownloadChange = { removed: removed ? [...previous, removed] : previous };
+    const publish = (change: DownloadChange) => this.downloadChanges.set(new Map(this.downloadChanges.value).set(id, change));
+    publish(pending);
+    let result: Omit<DownloadChange, "removed">;
+    try {
+      result = { versions: (await this.track(id)).downloadVersions ?? [] };
+    } catch (cause) {
+      result = { error: errorMessage(cause) };
     }
+    if (this.downloadChanges.value.get(id) === pending) publish({ ...pending, ...result });
   }
   clearProviderInstances(): void {
     ++this.providerEpoch;

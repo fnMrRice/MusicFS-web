@@ -38,10 +38,12 @@ describe('Player controller (Mock media; not decoder validation)', () => {
     vi.useFakeTimers();
     const descriptor = { ...playback(), outputProfilePending: true };
     const s = setup(vi.fn().mockResolvedValue(descriptor));
-    s.api.outputProfile.mockResolvedValue(descriptor.outputProfile);
+    s.api.outputProfile.mockResolvedValue({ ...descriptor.outputProfile, sampleRate: 44100, bitDepth: 24 });
     try {
       await s.controller.select(track);
       s.event('loadedmetadata'); await Promise.resolve();
+      expect(s.controller.state.playback?.outputProfile).toMatchObject({ sampleRate: 44100, bitDepth: 24 });
+      expect(s.controller.state.playback?.outputProfilePending).toBe(true);
       s.event('timeupdate', 1);
       expect(s.api.outputProfile).toHaveBeenCalledTimes(1);
       await vi.advanceTimersByTimeAsync(2000);
@@ -50,6 +52,7 @@ describe('Player controller (Mock media; not decoder validation)', () => {
       s.event('timeupdate', 5);
       expect(s.api.outputProfile).toHaveBeenCalledTimes(2);
       expect(s.controller.state.playback?.outputProfile.channels).toBeUndefined();
+      expect(s.controller.state.playback?.outputProfilePending).toBe(false);
     } finally {
       s.controller.stop(); vi.useRealTimers();
     }

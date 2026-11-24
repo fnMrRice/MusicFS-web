@@ -14,7 +14,7 @@ test.beforeAll(async () => {
 test.afterAll(async () => { await new Promise<void>(resolve => server?.httpServer.close(() => resolve())); });
 
 function version(versionId: string, quality: string, codec: string, bitrateBps: number): DownloadVersion {
-  return { versionId, quality, codec, bitrateBps, container: codec, mime: `audio/${codec}`,
+  return { versionId, quality, codec, bitrateBps, container: codec, mime: `audio/${codec}`, formatMeasured: true,
     sizeBytes: 2097152, downloadedAt: "2026-11-20T12:00:00Z" };
 }
 
@@ -26,9 +26,10 @@ function source(sourceTrackId: string, providerInstanceId: string, title: string
 
 test("saved qualities and version deletion follow the server for standalone and grouped sources", async ({ page }) => {
   const local = source("local", "folder", "组合曲目", []);
-  const bili = source("bili", "bilibili", "视频音轨", [version("v-aac", "", "aac", 160000)]);
-  const solo = source("solo", "netease", "独立曲目", [version("copy-001", "lossless", "flac", 980000),
-    version("copy-002", "lossless", "flac", 980000), version("v-high", "exhigh", "mp3", 320000)]);
+  const bili = source("bili", "bilibili", "视频音轨", [{ ...version("v-aac", "", "aac", 160000),
+    container: "m4a", mime: "audio/mp4", sampleRateHz: 48000, channels: 2 }]);
+  const flac = { ...version("copy-001", "lossless", "flac", 980000), sampleRateHz: 44100, channels: 2, bitDepth: 24 };
+  const solo = source("solo", "netease", "独立曲目", [flac, { ...flac, versionId: "copy-002" }, version("v-high", "exhigh", "mp3", 320000)]);
   let deletes = 0, reads = 0;
   let release!: () => void;
   const pending = new Promise<void>(resolve => { release = resolve; });
@@ -63,12 +64,20 @@ test("saved qualities and version deletion follow the server for standalone and 
   });
   await page.goto(`${origin}/#/library`);
   const row = page.getByRole("row").filter({ has: page.getByRole("button", { name: "播放 独立曲目", exact: true }) });
+  await expect(row.locator(".format")).toHaveText("FLAC / MP3");
   await expect(row.locator(".source-downloads")).toHaveCount(0);
   await row.getByRole("button", { name: "展开 独立曲目 的来源版本" }).click();
   const soloVersion = page.locator(".track-version").filter({ has: page.getByRole("button", { name: "播放来源版本 独立曲目" }) });
   const details = soloVersion.locator(".source-downloads");
   await expect(details.locator("summary")).toHaveText("已下载 · 3 个版本 · 无损 / 极高");
   await details.locator("summary").click();
+  await expect(details.locator("li").first()).toContainText("FLAC · 44.1 kHz · 980 kbps · 2 声道 · 24 bit");
+  await soloVersion.getByRole("button", { name: "独立曲目 的更多操作" }).click();
+  await page.getByRole("menuitem", { name: "详情", exact: true }).click();
+  const fileInfo = page.getByRole("dialog", { name: "来源版本详情" }).getByRole("region", { name: "下载文件" });
+  await expect(fileInfo.getByRole("listitem")).toHaveCount(3);
+  await expect(fileInfo.getByRole("listitem").first()).toContainText("44.1 kHz · 980 kbps · 2 声道 · 24 bit");
+  await page.keyboard.press("Escape");
   const target = details.getByRole("button", { name: /删除下载版本 .*#copy-001/ });
   const dialog = page.getByRole("dialog", { name: "删除下载版本" });
   const submit = dialog.getByRole("button", { name: "删除", exact: true });
@@ -92,12 +101,15 @@ test("saved qualities and version deletion follow the server for standalone and 
   expect(reads).toBe(2);
   await page.getByRole("button", { name: "展开 组合曲目 的来源版本" }).click();
   const nested = page.locator(".track-version").filter({ hasText: "视频音轨" });
-  await expect(nested.locator("summary")).toHaveText("已下载 · 1 个版本 · AAC · 160 kbps");
+  await expect(nested.locator(".format")).toHaveText("M4A → AAC");
+  await expect(nested.locator(".track-version-quality")).toHaveText("48 kHz · 160 kbps · 2 声道 · 2.00 MiB");
+  await expect(nested.locator("summary")).toContainText("M4A → AAC · 48 kHz");
   await nested.locator("summary").click();
-  await nested.getByRole("button", { name: "删除下载版本 AAC · 160 kbps" }).click();
+  await nested.getByRole("button", { name: /^删除下载版本 M4A → AAC/ }).click();
   await expect(dialog).toContainText("视频音轨");
   await submit.click();
   await expect(nested.locator(".source-downloads")).toHaveCount(0);
+  await expect(nested.locator(".format")).toHaveText("—");
   await expect(nested.getByRole("button", { name: "播放来源版本 视频音轨" })).toBeVisible();
   await expect(details.locator("li")).toHaveCount(3);
   expect([deletes, reads]).toEqual([3, 3]);

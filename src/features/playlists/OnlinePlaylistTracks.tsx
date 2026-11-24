@@ -6,9 +6,10 @@ import { ErrorNotice, Sentinel } from "../../components/ui";
 import { OnlineTrackTable } from "../OnlineTrackTable";
 import { tr } from "../../i18n";
 import { withRateLimitRetry } from "../../api/rate-limit";
+import { withTrackDownloads, type DownloadVersionsPage } from "../../api/online-downloads";
 
 interface Item { position: number; externalId: string; track: OnlineTrack | null; errorCode: string | null }
-interface TrackPage { playlist: OnlinePlaylist; items: Item[]; nextCursor: string | null; complete: boolean }
+interface TrackPage extends DownloadVersionsPage { playlist: OnlinePlaylist; items: Item[]; nextCursor: string | null; complete: boolean }
 
 export function OnlinePlaylistTracks({ source, observation }: { source: OnlineInstance; observation: Observation }) {
   const s = useServices();
@@ -29,7 +30,8 @@ export function OnlinePlaylistTracks({ source, observation }: { source: OnlineIn
         (page.nextCursor !== null && typeof page.nextCursor !== "string")) {
       throw new ApiError("INVALID_RESPONSE", "Invalid online playlist page");
     }
-    return { items: page.items, cursor: page.nextCursor };
+    const items = page.items.map(item => item.track ? { ...item, track: withTrackDownloads(item.track, page) } : item);
+    return { items, cursor: page.nextCursor };
   }, (item) => String(item.position));
   return <>
     <OnlineTrackTable key={downloadScope} source={source} rows={pages.items} downloadScope={downloadScope} observation={observation} />

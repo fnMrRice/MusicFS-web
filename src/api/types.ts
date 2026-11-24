@@ -16,6 +16,7 @@ export interface Provider {
 export interface DownloadVersion {
   versionId: string; quality: string; mime: string; codec: string; container: string;
   sizeBytes: number; bitrateBps?: number; downloadedAt: string;
+  sampleRateHz?: number; channels?: number; bitDepth?: number; formatMeasured?: boolean;
 }
 export interface SourceTrack {
   sourceTrackId: string; providerInstanceId: string; displayName: string;
@@ -36,7 +37,7 @@ export interface SourceTrack {
   playbackSelection?: { trackId: string; forcedSourceTrackId: string | null };
 }
 export interface TrackPage { items: SourceTrack[]; nextCursor: string | null; libraryRevision: string }
-export interface OutputProfile { mime: string; codec: string | null; container: string | null; transport: string; channels?: number; layout?: string; sampleRate?: number; bitrateBps?: number | null }
+export interface OutputProfile { mime: string; codec: string | null; container: string | null; transport: string; channels?: number; layout?: string; sampleRate?: number; bitrateBps?: number | null; bitDepth?: number }
 export interface Playback {
   sourceTrackId: string;
   sessionId: string; attemptId: string; assetId: string; representationId: string;

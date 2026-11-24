@@ -6,6 +6,8 @@ import { Cover, duration } from "../components/ui";
 import { tr } from "../i18n";
 import { OnlineAudioFeedback, useOnlineAudioActions } from "./OnlineAudioActions";
 import { externalLink } from "./scrapers/fields";
+import { versionLabel } from "./library/download-format";
+import { formatPair } from "../player/format";
 
 interface Props {
   instance: string;
@@ -24,6 +26,8 @@ export function OnlineTrackRow({ instance, track, position, showAlbum, playable,
   const audio = useOnlineAudioActions(instance, track?.externalId);
   const title = track?.title ?? tr("内容已失效或不可用");
   const cover = <Cover src={externalLink(track?.coverUrl ?? undefined)} />;
+  const versions = track?.downloadVersions ?? [];
+  const formats = [...new Set(versions.filter(v => v.formatMeasured).map(v => formatPair(v.container, v.codec)).filter(Boolean))];
   const menu: MenuAction[] = [];
   if (track && add) menu.push({ label: tr("添加到歌单"), icon: "plus", run: () => add(track) });
   if (track && download) menu.push({ label: tr("下载"), icon: "download", run: () => download(track) });
@@ -38,6 +42,11 @@ export function OnlineTrackRow({ instance, track, position, showAlbum, playable,
             {cover}<span>{title}</span>
           </button>
         : <span className="online-track-title">{cover}<span>{title}</span></span>}
+      {versions.length === 1 && <small className="online-download-format">{tr("已下载")} · {versionLabel(versions[0])}</small>}
+      {versions.length > 1 && <details className="online-download-format">
+        <summary>{[tr("已下载 · {0} 个版本", { 0: versions.length }), ...formats].join(" · ")}</summary>
+        <ul>{versions.map(version => <li key={version.versionId}>{versionLabel(version)}</li>)}</ul>
+      </details>}
     </td>
     <td>{track?.artists.join(" / ") || "—"}</td>
     {showAlbum && <td>{track?.album || "—"}</td>}

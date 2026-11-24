@@ -1,9 +1,10 @@
 import { ApiClient, ApiError } from "./client";
 import type { OnlineTrack } from "./content";
 import { withRateLimitRetry } from "./rate-limit";
+import { withTrackDownloads, type DownloadVersionsPage } from "./online-downloads";
 
 export async function dailySongs(client: ApiClient, instance: string, signal: AbortSignal): Promise<OnlineTrack[]> {
-  const page = await withRateLimitRetry(() => client.request<{ tracks: OnlineTrack[]; observedAt: string }>(
+  const page = await withRateLimitRetry(() => client.request<DownloadVersionsPage & { tracks: OnlineTrack[]; observedAt: string }>(
     `/online-instances/${encodeURIComponent(instance)}/daily-songs?limit=50`, { signal },
   ), signal);
   if (!page || !Array.isArray(page.tracks) || page.tracks.length > 50 ||
@@ -14,5 +15,5 @@ export async function dailySongs(client: ApiClient, instance: string, signal: Ab
         (track.durationMs === null || (Number.isSafeInteger(track.durationMs) && track.durationMs >= 0)))) {
     throw new ApiError("INVALID_RESPONSE", "Invalid daily song recommendations");
   }
-  return page.tracks;
+  return page.tracks.map(track => withTrackDownloads(track, page));
 }

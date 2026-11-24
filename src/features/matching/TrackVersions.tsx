@@ -13,6 +13,7 @@ import { tr, useLocale } from "../../i18n";
 import { useDecision } from "./useDecision";
 import { TrackDetails } from "./TrackDetails";
 import { SourceDownloads } from "../library/SourceDownloads";
+import { TrackAudioFormat } from "../library/TrackAudioFormat";
 import { trackAvailabilityMessage } from "../../library/track-availability";
 
 export function TrackVersions({ tracks, revision, refresh, recordingId, defaultSourceTrackId, manualSourceTrackId, menuActions, isFavorite, favoriteDisabled, toggleFavorite }: {
@@ -76,10 +77,7 @@ export function TrackVersions({ tracks, revision, refresh, recordingId, defaultS
         {tr(manualSourceTrackId === track.sourceTrackId ? "手动默认" : "自动默认")}
       </span>}
       <span>{sourceName(track.providerInstanceId)}</span>
-      <span className="format">{(track.container || track.codec)?.toUpperCase() || "—"}</span>
-      <span className="track-version-quality" title={tr("文件大小：{0}", { 0: validSize(track.asset?.fileSizeBytes) ? `${track.asset!.fileSizeBytes} B` : tr("大小未知") })}>
-        {sampleRate(track.sampleRateHz)} · {bitrate(track.bitrateBps)} · {fileSize(track.asset?.fileSizeBytes)}
-      </span>
+      <TrackAudioFormat track={track} detailed />
       <span>{duration(track.durationMs)}</span>
       <TrackRowActions title={track.displayName} playLabel={tr("播放来源版本 {0}", { 0: track.displayName })}
         play={() => services.play(track)} enqueue={() => services.enqueue([track])} playbackDisabled={track.availability !== "available"}
@@ -92,25 +90,9 @@ export function TrackVersions({ tracks, revision, refresh, recordingId, defaultS
     {decision.retryable && <button className="text-button" disabled={decision.busy} onClick={() => void decision.run()}>{tr("重试")}</button>}
     {decision.conflict && <button className="text-button" onClick={() => { decision.reset(); current.reload(); refresh?.(); }}>{tr("刷新列表并重新选择")}</button>}
     {details && <TrackDetails key={`${details.providerInstanceId}-${details.sourceTrackId}`}
-      sourceTrackId={details.sourceTrackId} providerInstanceId={details.providerInstanceId} close={() => setDetails(null)} />}
+      track={details} close={() => setDetails(null)} />}
     {unlink && refresh && <UnlinkSong track={unlink.track} revision={unlink.revision} refresh={refresh} close={() => setUnlink(null)} />}
   </div>;
-}
-
-function sampleRate(value: number | null | undefined): string {
-  return typeof value === "number" && Number.isInteger(value) && value > 0 ? `${value / 1000} kHz` : tr("采样率未知");
-}
-function bitrate(value: number | null): string {
-  return value !== null && Number.isFinite(value) && value > 0 ? `${Math.round(value / 100) / 10} kbps` : tr("码率未知");
-}
-function validSize(value: number | null | undefined): value is number {
-  return typeof value === "number" && Number.isFinite(value) && value >= 0;
-}
-function fileSize(value: number | null | undefined): string {
-  if (!validSize(value)) return tr("大小未知");
-  if (value < 1024) return `${value} B`;
-  const unit = Math.min(3, Math.floor(Math.log(value) / Math.log(1024)));
-  return `${(value / 1024 ** unit).toFixed(2)} ${["B", "KiB", "MiB", "GiB"][unit]}`;
 }
 
 function UnlinkSong({ track, revision, refresh, close }: { track: SourceTrack; revision?: number; refresh: () => void; close: () => void }) {

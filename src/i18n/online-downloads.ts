@@ -1,4 +1,6 @@
 export default {
+  "来源标注": ["Reported by source", "來源標註", "音源提供元の情報"],
+  "下载文件": ["Downloaded files", "下載檔案", "ダウンロード済みファイル"],
   "下载": ["Download", "下載", "ダウンロード"],
   "下载全部": ["Download all", "下載全部", "すべてダウンロード"],
   "歌单曲目未读取完整，请刷新歌单后再下载全部。": ["Refresh the incomplete playlist before downloading all tracks.", "歌單曲目尚未讀取完整，請重新整理歌單後再下載全部。", "プレイリストの曲情報が不完全です。更新してから全曲をダウンロードしてください。"],

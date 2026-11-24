@@ -1,4 +1,4 @@
-import type { OutputProfile, Playback, SourceTrack } from '../api/types';
+import type { DownloadVersion, OutputProfile, Playback, SourceTrack } from '../api/types';
 import { tr } from '../i18n';
 
 function codecName(codec: string | null | undefined): string | undefined {
@@ -17,16 +17,22 @@ function channelCount(output: OutputProfile): number | undefined {
   return layouts[output.layout?.toLowerCase() ?? ''];
 }
 
-function bitrateLabel(value: number | null | undefined): string {
+export function bitrateLabel(value: number | null | undefined): string {
   return typeof value === 'number' && Number.isFinite(value) && value > 0
     ? `${Math.round(value / 100) / 10} kbps`
     : tr('码率未知');
 }
 
-function sampleRateLabel(value: number | null | undefined): string {
+export function sampleRateLabel(value: number | null | undefined): string {
   return typeof value === 'number' && Number.isInteger(value) && value > 0
     ? `${value / 1000} kHz`
     : tr('采样率未知');
+}
+
+export function versionParameters(version: DownloadVersion): string {
+  return [version.sampleRateHz && sampleRateLabel(version.sampleRateHz), version.bitrateBps && bitrateLabel(version.bitrateBps),
+    version.channels && tr('{0} 声道', { 0: version.channels }), version.bitDepth && `${version.bitDepth} bit`]
+    .filter(Boolean).join(' · ');
 }
 
 function sessionSource(track: SourceTrack, playback: Playback | null): SourceTrack | undefined {
@@ -36,7 +42,7 @@ function sessionSource(track: SourceTrack, playback: Playback | null): SourceTra
   return matches(track) ? track : track.versions?.find(matches);
 }
 
-function formatPair(container?: string | null, codec?: string | null): string | undefined {
+export function formatPair(container?: string | null, codec?: string | null): string | undefined {
   const outer = container?.trim().toUpperCase();
   const inner = codecName(codec);
   return outer && inner && outer !== inner ? `${outer} → ${inner}` : outer || inner;
@@ -72,14 +78,23 @@ function formatChain(track: SourceTrack, playback: Playback | null): string {
 /** 展示源封装、内层编码与服务端交付编码；采样率和码率使用实际交付数据。 */
 export function playbackFormat(track: SourceTrack, playback: Playback | null): string {
   const chain = formatChain(track, playback);
-  if (!playback) return chain;
+  if (!playback) {
+    const versions = track.downloadVersions ?? [];
+    const measured = versions.filter(v => v.formatMeasured);
+    if (!measured.length) return chain;
+    const formats = [...new Set(measured.map(v => formatPair(v.container, v.codec)).filter(Boolean))].join(' / ');
+    if (versions.length === 1) return [tr('已下载'), formats, versionParameters(measured[0])].filter(Boolean).join(' · ');
+    return [tr('已下载 · {0} 个版本', { 0: versions.length }), formats].filter(Boolean).join(' · ');
+  }
   const output = playback.outputProfile;
   const channels = channelCount(output);
   const channelLabel = channels === undefined ? tr('声道未知') : tr('{0} 声道', { 0: channels });
-  return `${chain} · ${sampleRateLabel(output.sampleRate)} · ${bitrateLabel(output.bitrateBps)} · ${channelLabel}`;
+  return [chain, sampleRateLabel(output.sampleRate), bitrateLabel(output.bitrateBps), channelLabel,
+    output.bitDepth && `${output.bitDepth} bit`].filter(Boolean).join(' · ');
 }
 
 export function playbackFormatTitle(track: SourceTrack, playback: Playback | null): string {
+  if (!playback && track.downloadVersions?.some(v => v.formatMeasured)) return playbackFormat(track, null);
   const source = sessionSource(track, playback);
   const sourceRate = playback && playback.deliveryMode !== 'processed' ? playback.outputProfile.bitrateBps : source?.bitrateBps;
   const details = [playbackFormat(track, playback), tr('来源码率：{0}', { 0: bitrateLabel(sourceRate) })];

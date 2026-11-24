@@ -1,6 +1,25 @@
 import { ApiClient, ApiError } from "./client";
 import type { PluginField } from "./plugin-settings";
 import type { DownloadVersion } from "./types";
+import type { OnlineTrack } from "./content";
+
+export interface DownloadVersionsPage { downloadVersionsByTrack?: Record<string, DownloadVersion[]> }
+
+function validVersion(v: DownloadVersion | undefined): v is DownloadVersion {
+  return !!v && typeof v.versionId === "string" && !!v.versionId && typeof v.quality === "string" &&
+    typeof v.mime === "string" && typeof v.container === "string" && typeof v.codec === "string" &&
+    Number.isSafeInteger(v.sizeBytes) && v.sizeBytes > 0 && typeof v.downloadedAt === "string" &&
+    [v.bitrateBps, v.channels, v.sampleRateHz, v.bitDepth].every(n => n === undefined || Number.isSafeInteger(n) && n > 0) &&
+    (v.formatMeasured === undefined || typeof v.formatMeasured === "boolean");
+}
+
+export function withTrackDownloads(track: OnlineTrack, page: DownloadVersionsPage): OnlineTrack {
+  const versions = page.downloadVersionsByTrack;
+  if (!versions || !Object.hasOwn(versions, track.externalId)) return track;
+  const saved = versions[track.externalId];
+  if (!Array.isArray(saved) || !saved.every(validVersion)) throw new ApiError("INVALID_RESPONSE", "Invalid downloaded audio versions");
+  return { ...track, downloadVersions: saved };
+}
 
 export interface DownloadOptions {
   defaultQuality: string;
@@ -47,10 +66,7 @@ export async function getDownloadOptions(client: ApiClient, instanceId: string, 
 function validItem(item: DownloadJobItem) {
   if (!item || typeof item.externalId !== "string" || !item.externalId) return false;
   if (item.state === "succeeded") {
-    const v = item.version;
-    return item.error === undefined && v && typeof v.versionId === "string" && !!v.versionId && typeof v.quality === "string" &&
-      typeof v.mime === "string" && typeof v.container === "string" && typeof v.codec === "string" &&
-      Number.isSafeInteger(v.sizeBytes) && v.sizeBytes > 0 && typeof v.downloadedAt === "string";
+    return item.error === undefined && validVersion(item.version);
   }
   if (item.state === "failed") return item.version === undefined && item.error &&
     typeof item.error.code === "string" && typeof item.error.message === "string";

@@ -65,6 +65,9 @@ async function openPlaylist(page: Page) {
     if (pathname.endsWith("/account")) json = { state: "signedIn", accountId: "account" };
     if (pathname === path) json = { playlist, entries, complete: true, observedAt: "2026-11-23T00:00:00Z" };
     if (pathname === path + "/tracks") json = { playlist, complete: true, nextCursor: null,
+      downloadVersionsByTrack: { "101": [{ versionId: "saved", quality: "lossless", mime: "audio/flac",
+        codec: "flac", container: "flac", sizeBytes: 4000, bitrateBps: 1000500, downloadedAt: "2026-11-23T00:00:00Z",
+        sampleRateHz: 44100, channels: 2, bitDepth: 16, formatMeasured: true }] },
       items: songs.map((track, position) => ({ track, position, externalId: track.externalId, errorCode: null })) };
     if (request.method() !== "GET" && pathname.includes("playlist")) playlistWrites.push(pathname);
     if (pathname.startsWith(base + "/tracks/") && pathname.endsWith("/resolve")) {
@@ -153,6 +156,8 @@ async function holdNextResolve(page: Page, externalId: string) {
 
 test("online playlist rows show their own artwork and play the chosen track without importing", async ({ page }, testInfo) => {
   const { row, songs, coverRequests, starts, resolutions, playlistWrites } = await openPlaylist(page);
+  await expect(row("山色").locator(".online-download-format")).toHaveText("已下载 · 无损 · FLAC · 44.1 kHz · 1000.5 kbps · 2 声道 · 16 bit");
+  await expect(row("海潮").locator(".online-download-format")).toHaveCount(0);
   for (const song of songs.slice(0, 2)) {
     const image = row(song.title).locator(".cover img");
     await expect(image).toHaveAttribute("src", song.coverUrl!);

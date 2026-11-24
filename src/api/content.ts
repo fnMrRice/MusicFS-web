@@ -1,7 +1,8 @@
 import { ApiClient, ApiError, type RequestOptions } from "./client";
 import { Store } from "../app/store";
 import { withRateLimitRetry } from "./rate-limit";
-import type { PluginIdentity } from "./types";
+import type { DownloadVersion, PluginIdentity } from "./types";
+import { withTrackDownloads, type DownloadVersionsPage } from "./online-downloads";
 export type { PluginIdentity } from "./types";
 
 export interface OnlineInstance {
@@ -17,6 +18,7 @@ export interface OnlineInstance {
   capabilities: { name: string; supported: boolean; reason: string }[];
 }
 export interface OnlineTrack {
+  downloadVersions?: DownloadVersion[];
   externalId: string;
   title: string;
   coverUrl?: string | null;
@@ -198,8 +200,8 @@ export class ContentApi {
   ): Promise<SearchPage> {
     const query = new URLSearchParams({ q, limit: "30" });
     if (cursor) query.set("cursor", cursor);
-    return checked(
-      await withRateLimitRetry(() => this.client.request<SearchPage>(
+    const page = checked(
+      await withRateLimitRetry(() => this.client.request<SearchPage & DownloadVersionsPage>(
         `/online-instances/${id(instance)}/search?${query}`,
         { signal },
       ), signal),
@@ -214,6 +216,7 @@ export class ContentApi {
         ) &&
         (r.nextCursor === null || string(r.nextCursor)),
     );
+    return { ...page, tracks: page.tracks.map(track => withTrackDownloads(track, page)) };
   }
   async recommendations(
     read: RecommendationRead,

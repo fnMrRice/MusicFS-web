@@ -214,10 +214,12 @@ export class PlayerController {
     this.state.phase = "loading";
     this.state.message = null;
     this.state.positionMs = playback.positionOriginMs;
-    const refreshProfile = observeOutputProfile(this.api, playback, this.controller?.signal, profile => {
-      if (this.state.playback !== playback || !this.audio) return;
-      this.state.playback = { ...playback, outputProfile: profile, outputProfilePending: false };
-      this.audio.setSourceChannels?.(profile.channels);
+    let activeProfile = playback;
+    const refreshProfile = observeOutputProfile(this.api, playback, this.controller?.signal, (profile, pending) => {
+      if (this.state.playback !== activeProfile || !this.audio) return;
+      if (profile.channels && profile.channels !== activeProfile.outputProfile.channels) this.audio.setSourceChannels?.(profile.channels);
+      activeProfile = { ...playback, outputProfile: profile, outputProfilePending: pending };
+      this.state.playback = activeProfile;
       this.emit();
     });
     this.audio = this.createAudio(playback.streamUrl, (event) => {

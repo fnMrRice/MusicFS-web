@@ -37,6 +37,9 @@ test("online search shows compact actions and shares persistent favorites with t
       capabilities: ["stream.resolve", "search.tracks", "playlist.addTracks"].map(name => ({ name, supported: true, reason: "" })),
     }] };
     if (path.endsWith("/search")) json = { nextCursor: null, truncated: false,
+      downloadVersionsByTrack: { "102": [{ versionId: "cache", quality: "lossless", codec: "flac", container: "flac",
+        mime: "audio/flac", sizeBytes: 20000, downloadedAt: "2026-11-24T00:00:00Z", formatMeasured: true,
+        sampleRateHz: 48000, bitrateBps: 812000, channels: 2, bitDepth: 24 }] },
       tracks: [{ externalId: "102", title: source.title, artists: [], album: "", durationMs: 120000, sourceUrl: "" }] };
     if (path.endsWith("/me/favorites")) json = { items: stored ? [saved] : [], nextCursor: null, revision: "1" };
     if (path.endsWith("/tracks/102/resolve")) { ++resolves; json = source; }
@@ -52,6 +55,7 @@ test("online search shows compact actions and shares persistent favorites with t
   await page.addInitScript(() => Object.defineProperty(crypto, "randomUUID", { configurable: true, value: undefined }));
   await page.goto(origin + "/#/search?source=" + instance + "&q=海潮");
   const row = page.getByRole("row").filter({ has: page.getByRole("checkbox", { name: "选择 海潮" }) });
+  await expect(row.locator(".online-download-format")).toHaveText("已下载 · 无损 · FLAC · 48 kHz · 812 kbps · 2 声道 · 24 bit");
   const buttons = row.getByRole("cell").last().getByRole("button");
   await expect(buttons).toHaveCount(4);
   expect(await buttons.evaluateAll(nodes => nodes.map(n => n.getAttribute("aria-label")))).toEqual([

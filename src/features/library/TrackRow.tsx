@@ -11,6 +11,7 @@ import { trackAvailabilityMessage } from "../../library/track-availability";
 import { TrackPlaybackIndicator } from "../TrackPlaybackIndicator";
 import type { LocalizedTitle } from "../../api/localized-titles";
 import { OtherTrackTitles } from "./OtherTrackTitles";
+import { TrackAudioFormat } from "./TrackAudioFormat";
 
 export function TrackRow({
   track: t,
@@ -109,9 +110,7 @@ export function TrackRow({
       {credits}
       {provider !== undefined && <td>{provider}</td>}
       <td>
-        <span className="format">
-          {(t.container || t.codec)?.toUpperCase() ?? "—"}
-        </span>
+        <TrackAudioFormat track={t} />
       </td>
       <td className="duration">{duration(t.durationMs)}</td>
       <td className="track-actions-cell">
