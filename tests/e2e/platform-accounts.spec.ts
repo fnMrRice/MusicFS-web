@@ -66,6 +66,21 @@ async function mockAccounts(
   return { actions, completed, get csrfSeen() { return csrfSeen; }, get searches() { return searches; } };
 }
 
+test("NetEase account checks update confirmed membership and clear the previous tier when it becomes unknown", async ({ page }) => {
+  const signedIn = { state: "signedIn", accountId: "test", displayName: "测试听众" };
+  const checks: Account[] = [{ ...signedIn, membershipTier: "vip" }, { ...signedIn, membershipTier: "svip" }, signedIn];
+  await mockAccounts(page, action => action.action === "check" ? checks.shift() : undefined, { ...signedIn, membershipTier: "free" });
+  await page.goto(`${server.origin}/#/settings`);
+  const status = page.locator(".platform-account-identity .muted");
+  await expect(status).toHaveText("已登录 · 非会员");
+  for (const label of ["已登录 · VIP", "已登录 · SVIP", "已登录"]) {
+    await page.getByRole("button", { name: "校验登录状态", exact: true }).click();
+    await expect(status).toHaveText(label);
+  }
+  await page.getByRole("button", { name: "退出网易云音乐账号", exact: true }).click();
+  await expect(status).toHaveCount(0);
+});
+
 test("Apple Music authorization uses the published Web version as its build number", async ({ page }) => {
   await mockAccounts(page, () => ({ state: "waiting", method: "musicKit", loginId: "apple" }));
   await page.route("**/api/v1/online-instances", route => route.fulfill({ json: { items: [{

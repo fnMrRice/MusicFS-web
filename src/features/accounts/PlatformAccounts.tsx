@@ -41,7 +41,7 @@ export function PlatformAccount({ instance }: { instance: OnlineInstance }) {
       {!bound && <button className="primary" aria-label={`登录${name}`} disabled={busy || pending || !account || !options?.configured || instance.availability === "offline"}
         onClick={() => { void startLogin(); }}>登录</button>}
     </div>
-    {signedIn && account ? <AccountProfile key={`${account.accountId}:${account.avatarUrl}`} account={account} />
+    {signedIn && account ? <AccountProfile key={`${account.accountId}:${account.avatarUrl}`} account={account} platform={instance.platform} />
       : status && <p className="muted" aria-live="polite">{status}</p>}
     {error && !dialogOpen && <p role="alert">{statusText(error)}</p>}
     {instance.availability === "offline" && <p className="muted">此音乐来源暂时离线，请稍后重试。</p>}
@@ -71,14 +71,25 @@ export function PlatformAccount({ instance }: { instance: OnlineInstance }) {
   </section>;
 }
 
-function AccountProfile({ account }: { account: Account }) {
+function membershipLabel(tier?: Account["membershipTier"]): string | undefined {
+  switch (tier) {
+    case "free": return tr("非会员");
+    case "vip": return "VIP";
+    case "svip": return "SVIP";
+  }
+}
+
+function AccountProfile({ account, platform }: { account: Account; platform: string }) {
   const [failed, setFailed] = useState(false);
-  const username = account.displayName?.trim() || "已登录账号";
+  const username = account.displayName?.trim() || tr("已登录账号");
+  const membership = platform === "netease" && account.accountId ? membershipLabel(account.membershipTier) : undefined;
   return <div className="platform-account-profile" aria-live="polite">
     {account.avatarUrl && !failed ? <img className="platform-account-avatar" src={account.avatarUrl} alt={`${username}的头像`}
       width={48} height={48} referrerPolicy="no-referrer" onError={() => setFailed(true)} />
       : <span className="platform-account-avatar platform-account-avatar-fallback" role="img" aria-label="默认头像"><Icon name="user" size={24} /></span>}
-    <div className="platform-account-identity"><strong>{username}</strong><span className="muted">已登录</span></div>
+    <div className="platform-account-identity"><strong>{username}</strong>
+      <span className="muted"><span>{tr("已登录")}</span>{membership && <> · <span>{membership}</span></>}</span>
+    </div>
   </div>;
 }
 

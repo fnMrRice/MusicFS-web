@@ -11,6 +11,7 @@ export interface Account {
   accountId?: string;
   displayName?: string;
   avatarUrl?: string;
+  membershipTier?: "free" | "vip" | "svip";
   loginId?: string;
   method?: string;
   qrUrl?: string;
