@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import type { SourceTrack } from "../api/types";
 import { useServices, useStore } from "../app/services";
 import { Icon, IconButton } from "../components/ui";
@@ -48,7 +48,7 @@ export function PlayerPanels({ track }: { track: SourceTrack | null }) {
       : lyricsVisible && !prefs.lyricsPinned ? "media" : null;
     const close = (panel: Panel) => setOpen(previous => ({ ...previous, [panel]: false }));
     const keydown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape" || event.defaultPrevented) return;
+      if (event.key !== "Escape" || event.defaultPrevented || document.querySelector("dialog:modal")) return;
       if (temporary) return close(temporary);
       if (!queueVisible || !lyricsVisible) return close(queueVisible ? "queue" : "media");
       const target = event.target instanceof Element
@@ -58,7 +58,7 @@ export function PlayerPanels({ track }: { track: SourceTrack | null }) {
     };
     const outside = (event: PointerEvent) => {
       if (!temporary || !(event.target instanceof Element)) return;
-      if (!event.target.closest(".player-panel, [data-player-panel-trigger]")) close(temporary);
+      if (!event.target.closest(".player-panel, [data-player-panel-trigger], dialog:modal")) close(temporary);
     };
     document.addEventListener("keydown", keydown);
     document.addEventListener("pointerdown", outside);
@@ -92,27 +92,28 @@ export function PlayerPanels({ track }: { track: SourceTrack | null }) {
             const pinLabel = isQueue
               ? pinned ? "取消固定播放队列" : "固定播放队列"
               : pinned ? "取消固定歌词" : "固定歌词";
+            const renderHeader = (action: ReactNode) => (
+              <div className="section-title">
+                <div className="player-panel-heading">
+                  <h2>{tr(names[panel])}</h2>
+                  {action}
+                </div>
+                <IconButton icon="pin" className={`pin-panel ${isQueue ? "pin-queue" : "pin-lyrics"}`}
+                  label={tr(pinLabel)} aria-pressed={pinned} onClick={() => togglePin(panel)} />
+                <IconButton icon="close" label={tr("关闭面板")}
+                  onClick={() => setOpen(previous => ({ ...previous, [panel]: false }))} />
+              </div>
+            );
             return (
               <div key={panel} className="player-panel" data-panel={panel}
                 id={`${id}-${panel}`} role="dialog" aria-label={tr(names[panel])}>
-                <div className="section-title">
-                  <div className="player-panel-heading">
-                    <h2>{tr(names[panel])}</h2>
-                    {isQueue && (
-                      <>
-                        <span className="muted">{tr("{0} 首", { 0: queue.items.length })}</span>
-                        <button className="shuffle-queue" disabled={queue.items.length < 2} onClick={() => s.shuffleQueue()}>
-                          <Icon name="shuffle" size={16} />{tr("打乱队列")}
-                        </button>
-                      </>
-                    )}
-                  </div>
-                  <IconButton icon="pin" className={`pin-panel ${isQueue ? "pin-queue" : "pin-lyrics"}`}
-                    label={tr(pinLabel)} aria-pressed={pinned} onClick={() => togglePin(panel)} />
-                  <IconButton icon="close" label={tr("关闭面板")}
-                    onClick={() => setOpen(previous => ({ ...previous, [panel]: false }))} />
-                </div>
-                {!isQueue ? <MediaPanel track={track} /> : queue.items.length ? (
+                {isQueue && renderHeader(<>
+                  <span className="muted">{tr("{0} 首", { 0: queue.items.length })}</span>
+                  <button className="shuffle-queue" disabled={queue.items.length < 2} onClick={() => s.shuffleQueue()}>
+                    <Icon name="shuffle" size={16} />{tr("打乱队列")}
+                  </button>
+                </>)}
+                {!isQueue ? <MediaPanel track={track} renderHeader={renderHeader} /> : queue.items.length ? (
                   <ol className="queue-list">
                     {queue.items.map((t, i) => (
                       <li key={`${t.sourceTrackId}:${i}`}>

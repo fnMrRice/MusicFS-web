@@ -260,3 +260,38 @@ test('lyrics follows the current line until the listener scrolls away', async ({
   await expect(title).toBeInViewport({ ratio: 1 });
   expect(errors).toEqual([]);
 });
+
+test('lyrics search sits beside the heading and the empty message precedes the artwork', async ({ page }) => {
+  const { errors } = await setup(page);
+  await page.route('**/media/lyrics-Alpha', route => route.fulfill({ contentType: 'text/plain; charset=utf-8', body: '' }));
+  await play(page);
+  await lyrics(page).click();
+  const dialog = page.getByRole('dialog', { name: '歌词', exact: true });
+  const title = dialog.getByRole('heading', { name: '歌词', exact: true });
+  const search = dialog.getByRole('button', { name: '搜索在线资料', exact: true });
+  const empty = dialog.getByText('暂无歌词', { exact: true });
+  const cover = dialog.getByRole('img', { name: '当前曲目封面', exact: true });
+  await expect(cover).toHaveJSProperty('naturalWidth', 1);
+  for (const width of [1200, 390]) {
+    await page.setViewportSize({ width, height: 844 });
+    await expect(search).toBeInViewport({ ratio: 1 });
+    await expect(title).toBeInViewport({ ratio: 1 });
+    await expect(empty).toBeInViewport({ ratio: 1 });
+    await expect(cover).toBeInViewport();
+    const [heading, button, message, image] = await Promise.all([title, search, empty, cover].map(
+      item => item.evaluate(el => el.getBoundingClientRect().toJSON()),
+    ));
+    expect(button.left).toBeGreaterThanOrEqual(heading.right);
+    const headingCenter = (heading.top + heading.bottom) / 2;
+    expect(headingCenter).toBeGreaterThanOrEqual(button.top);
+    expect(headingCenter).toBeLessThanOrEqual(button.bottom);
+    expect(message.bottom).toBeLessThanOrEqual(image.top);
+  }
+  await search.click();
+  const searchDialog = page.getByRole('dialog', { name: '搜索在线资料', exact: true });
+  await searchDialog.getByRole('textbox', { name: '标题或关键词' }).click();
+  await searchDialog.getByRole('button', { name: '关闭', exact: true }).click();
+  await expect(searchDialog).toHaveCount(0);
+  await expect(dialog).toBeVisible();
+  expect(errors).toEqual([]);
+});

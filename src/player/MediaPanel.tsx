@@ -1,5 +1,5 @@
 import { tr, useLocale } from "../i18n";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useServices } from "../app/services";
 import type { SourceTrack } from "../api/types";
 import { ErrorNotice } from "../components/ui";
@@ -14,7 +14,10 @@ interface Binding {
   current: boolean;
   state: string;
 }
-export function MediaPanel({ track }: { track: SourceTrack | null }) {
+export function MediaPanel({ track, renderHeader }: {
+  track: SourceTrack | null;
+  renderHeader: (action: ReactNode) => ReactNode;
+}) {
   useLocale();
   const s = useServices();
   const cover = useTrackCover(track);
@@ -72,8 +75,10 @@ export function MediaPanel({ track }: { track: SourceTrack | null }) {
   const { failed, onError } = useArtworkFailure(artwork);
   return (
     <>
-      {track && <button onClick={() => setScrapingId(track.sourceTrackId)}>{tr("搜索在线资料")}</button>}
-      {track && scrapingId === track.sourceTrackId && <TrackScraping key={scrapingId} track={track}
+      {renderHeader(track && <button className="lyrics-search" onClick={() => setScrapingId(track.sourceTrackId)}>
+        {tr("搜索在线资料")}
+      </button>)}
+      {track && scrapingId === track.sourceTrackId && <TrackScraping key={`search:${scrapingId}`} track={track}
         close={() => setScrapingId(null)} applied={() => setRevision((value) => value + 1)} />}
       <ErrorNotice error={state.error} />
       {state.loading ? (
@@ -82,6 +87,7 @@ export function MediaPanel({ track }: { track: SourceTrack | null }) {
         <PlaybackLyrics key={track.sourceTrackId} trackId={track.sourceTrackId} text={state.lyrics} />
       ) : (
         <div className="media-panel-empty">
+          <p className="muted">{tr("暂无歌词")}</p>
           {artwork && !failed && (
             <img
               className="media-artwork"
@@ -92,7 +98,6 @@ export function MediaPanel({ track }: { track: SourceTrack | null }) {
               alt={tr("当前曲目封面")}
             />
           )}
-          <p className="muted">{tr("暂无歌词")}</p>
         </div>
       )}
     </>

@@ -4,13 +4,18 @@
   overflow: hidden;
 }
 
-.player-panel[data-panel="media"] > .section-title,
-.player-panel[data-panel="media"] > button {
+.player-panel[data-panel="media"] > .section-title {
   flex: none;
 }
 
-.player-panel[data-panel="media"] > button {
-  align-self: flex-start;
+.lyrics-search {
+  padding: 4px 8px;
+  font-size: 13px;
+}
+
+.media-panel-empty .media-artwork {
+  display: block;
+  margin-top: 0;
 }
 
 .media-panel-empty,
