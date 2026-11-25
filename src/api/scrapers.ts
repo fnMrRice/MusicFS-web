@@ -74,7 +74,7 @@ export interface ScrapedItem {
   tracks?: ScrapedTrack[];
 }
 export interface ScrapeCandidate extends ScrapedItem { candidateToken: string }
-export interface RankedAlbumCandidate extends ScrapeCandidate { pluginId: string }
+export interface RankedAlbumCandidate extends ScrapeCandidate { pluginId: string; albumTracksToken: string }
 export interface SavedScrapedField { field: string; pluginId: string; item: ScrapedItem }
 export type AlbumMergeField = "name" | "artist" | "releaseDate" | "publisher" | "genre" | "description" | "cover" | "tracks";
 export interface TrackMediaSelection {
@@ -166,10 +166,19 @@ export class ScrapersApi {
     const result = await this.client.request<unknown>(`/library/albums/${encodeURIComponent(albumId)}/auto-scrape`, {
       method: "POST", body: provider === "all" ? {} : { providerInstanceId: provider }, signal, timeoutMs: 120_000,
     });
-    const candidates = items(result, (entry): entry is RankedAlbumCandidate => isItem(entry) &&
-      "candidateToken" in entry && nonempty(entry.candidateToken) && "pluginId" in entry && nonempty(entry.pluginId));
+    const candidates = items(result, (entry): entry is RankedAlbumCandidate => isCandidate(entry) &&
+      "albumTracksToken" in entry && nonempty(entry.albumTracksToken) && "pluginId" in entry && nonempty(entry.pluginId));
     if (candidates.length > 3) throw new ApiError("INVALID_RESPONSE", "Too many ranked album candidates");
     return candidates;
+  }
+  async applyAutoAlbum(albumId: string, expectedRevision: number, provider: string, edition: RankedAlbumCandidate, key: string) {
+    const result = await this.client.request<unknown>(`/library/albums/${encodeURIComponent(albumId)}/auto-scrape`, {
+      method: "PUT", idempotencyKey: key, body: { expectedRevision, pluginId: edition.pluginId,
+        ...(provider === "all" ? {} : { providerInstanceId: provider }),
+        candidates: { albumDetails: edition.candidateToken, albumTracks: edition.albumTracksToken } },
+    });
+    if (!record(result) || !Number.isSafeInteger(result.revision) || Number(result.revision) <= expectedRevision)
+      throw new ApiError("INVALID_RESPONSE", "Invalid automatically selected album revision");
   }
   async clearAlbum(albumId: string, expectedRevision: number, key: string): Promise<void> {
     const result = await this.client.request<unknown>(`/library/albums/${encodeURIComponent(albumId)}/scraped-fields`, {

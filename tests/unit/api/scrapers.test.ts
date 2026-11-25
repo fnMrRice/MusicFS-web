@@ -104,6 +104,27 @@ describe("Scraper content declarations and selection", () => {
     expect(options.headers.get("Idempotency-Key")).toBe("complete-album");
     expect(JSON.parse(options.body)).toEqual({ expectedRevision: 3, pluginId: "plugin", candidates });
   });
+  it("requires both verified tokens on every automatic candidate", async () => {
+    const edition = { id: "release", title: "Album", pluginId: "plugin", candidateToken: "details", albumTracksToken: "tracks" };
+    const fetch = vi.fn().mockResolvedValueOnce(reply({ items: [edition] }))
+      .mockResolvedValueOnce(reply({ items: [{ ...edition, albumTracksToken: "" }] }));
+    const api = new ScrapersApi(new ApiClient(fetch));
+    await expect(api.autoAlbumCandidates("album/1", "all")).resolves.toEqual([edition]);
+    await expect(api.autoAlbumCandidates("album/1", "all")).rejects.toMatchObject({ code: "INVALID_RESPONSE" });
+  });
+  it("saves the verified pair using automatic track validation and the observed revision", async () => {
+    const edition = { id: "release", title: "Album", pluginId: "plugin", candidateToken: "details", albumTracksToken: "tracks" };
+    const fetch = vi.fn().mockResolvedValueOnce(reply({ revision: 4 })).mockResolvedValueOnce(reply({ revision: 3 }));
+    const api = new ScrapersApi(new ApiClient(fetch));
+    await api.applyAutoAlbum("album/1", 3, "all", edition, "original-key");
+    const [path, options] = fetch.mock.calls[0];
+    expect(path).toBe("/api/v1/library/albums/album%2F1/auto-scrape");
+    expect(options.method).toBe("PUT");
+    expect(options.headers.get("Idempotency-Key")).toBe("original-key");
+    expect(JSON.parse(options.body)).toEqual({ expectedRevision: 3, pluginId: "plugin", candidates: { albumDetails: "details", albumTracks: "tracks" } });
+    await expect(api.applyAutoAlbum("album/1", 3, "provider", edition, "original-key")).rejects.toMatchObject({ code: "INVALID_RESPONSE" });
+    expect(JSON.parse(fetch.mock.calls[1][1].body).providerInstanceId).toBe("provider");
+  });
   it("sends only explicitly selected merge fields with their original candidate pair and revision", async () => {
     const fetch = vi.fn().mockResolvedValue(reply({ revision: 4 }));
     const client = new ApiClient(fetch);

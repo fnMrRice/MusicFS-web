@@ -1,15 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ApiError, withRequestId } from "../../api/client";
-import { ScrapersApi } from "../../api/scrapers";
+import { ApiError, randomRequestId, withRequestId } from "../../api/client";
+import { ScrapersApi, type RankedAlbumCandidate } from "../../api/scrapers";
 import { useServices } from "../../app/services";
 import { Modal } from "../../components/Modal";
 import { ErrorNotice } from "../../components/ui";
 import { tr, useLocale } from "../../i18n";
-import { AlbumPreviews, type AlbumEdition } from "./album-previews";
 import { albumLookupMessage, albumSaveMessage } from "./album-search-errors";
 import { scraperName } from "./fields";
 
-type Selection = { edition: AlbumEdition; revision: number; key: string };
+type Search = { candidates: RankedAlbumCandidate[]; revision: number; hasSavedFields: boolean };
+type Selection = { search: Search; index: number; key: string };
 type Notice = { kind: "progress" | "result" | "error"; message: string };
 type Feedback = Notice | { kind: "confirm"; message: string; accept: () => void };
 
@@ -33,77 +33,70 @@ export function AutoAlbumScrape({ albumId, name, provider, close }: {
     function show(kind: Notice["kind"], message: string) {
       if (!signal.aborted) setFeedback({ kind, message });
     }
-    function confirmReplacement(edition: AlbumEdition) {
+    function confirmReplacement(edition: RankedAlbumCandidate) {
       return new Promise<boolean>(resolve => {
         const cancel = () => resolve(false);
         signal.addEventListener("abort", cancel, { once: true });
         setFeedback({ kind: "confirm",
           message: tr("将采用 {0} 的《{1}》，更新已保存的平台专辑资料和曲目表。", {
-            0: scraperName(edition.pluginId), 1: edition.details.title,
+            0: scraperName(edition.pluginId), 1: edition.title,
           }),
           accept: () => { signal.removeEventListener("abort", cancel); resolve(true); },
         });
       });
     }
-    async function save(choice: Selection) {
-      const { edition, revision, key } = choice;
-      writing.current = true;
-      show("progress", tr("正在保存专辑资料…"));
-      try {
-        await api.applyAlbumBundle(albumId, revision, edition.pluginId, {
-          albumDetails: edition.details.candidateToken, albumTracks: edition.tracks.candidateToken,
-        }, key);
-        pending.current = null;
-        reload.current = true;
-        services.invalidateLibraries();
-        show("result", tr("已采用 {0} 的《{1}》。", { 0: scraperName(edition.pluginId), 1: edition.details.title }));
-      } catch (cause) {
-        const uncertain = cause instanceof ApiError && (cause.status === 0 || cause.status >= 500 || cause.code === "INVALID_RESPONSE");
-        pending.current = uncertain ? choice : null;
-        reload.current = uncertain || cause instanceof ApiError && cause.status === 409;
-        const message = uncertain ? withRequestId("保存结果待确认，请重试或关闭后刷新。", cause) : albumSaveMessage(cause, "selection");
-        // 只在服务端明确拒绝候选资料时换用下一项。
-        if (cause instanceof ApiError && cause.code === "NOT_FOUND" && cause.message === "Scraper candidate expired or unavailable")
-          return withRequestId("预览资料已失效，请刷新预览。", cause);
-        if (cause instanceof ApiError && cause.status === 400 && cause.code === "INVALID_ARGUMENT") return message;
-        show("error", message);
-      } finally {
-        writing.current = false;
-      }
-    }
-    async function run() {
-      // 写入结果不明时原样重试，保留候选令牌、修订与幂等键。
-      if (pending.current) {
-        const rejected = await save(pending.current);
-        if (rejected) show("error", rejected);
-        return;
-      }
+    async function search(): Promise<Search> {
       show("progress", tr("正在查询资料…"));
       // 先读取修订，再检查已存资料。两次读取后的并发编辑由保存时的修订检查保护。
       const album = await services.musicCatalog.album(albumId, signal);
       const hasSavedFields = (await api.savedAlbum(albumId, signal)).length > 0;
-      const requestedAt = Date.now();
       const candidates = await api.autoAlbumCandidates(albumId, provider, signal);
-      const previews = new AlbumPreviews(api);
+      return { candidates, revision: album.revision, hasSavedFields };
+    }
+    async function run() {
+      const previous = pending.current;
+      const ranked = previous?.search ?? await search();
       let lastFailure: string | undefined;
-      for (const item of candidates) {
+      for (let index = previous?.index ?? 0; index < ranked.candidates.length; ++index) {
+        const edition = ranked.candidates[index];
         signal.throwIfAborted();
-        show("progress", tr("正在查询资料…"));
-        let edition: AlbumEdition;
+        // 不确定的写入原样重试；确定改选下一项时重新征得覆盖已有资料的确认。
+        const retry = previous?.index === index;
+        if (!retry && ranked.hasSavedFields && !await confirmReplacement(edition)) return;
+        signal.throwIfAborted();
+        const key = retry ? previous.key : randomRequestId();
+        writing.current = true;
+        show("progress", tr("正在保存专辑资料…"));
         try {
-          edition = await previews.read(item.pluginId, { externalId: item.id, sourceUrl: item.sourceUrl },
-            signal, { summary: { item, requestedAt } });
+          await api.applyAutoAlbum(albumId, ranked.revision, provider, edition, key);
+          pending.current = null;
+          reload.current = true;
+          services.invalidateLibraries();
+          show("result", tr("已采用 {0} 的《{1}》。", { 0: scraperName(edition.pluginId), 1: edition.title }));
+          return;
         } catch (cause) {
-          signal.throwIfAborted();
-          lastFailure = albumLookupMessage(cause);
-          continue;
+          if (cause instanceof ApiError && (cause.status === 0 || cause.status >= 500 || cause.code === "INVALID_RESPONSE")) {
+            pending.current = { search: ranked, index, key };
+            reload.current = true;
+            show("error", withRequestId("保存结果待确认，请重试或关闭后刷新。", cause));
+            return;
+          }
+          pending.current = null;
+          if (cause instanceof ApiError && cause.code === "ALBUM_TRACK_MISMATCH") continue;
+          if (cause instanceof ApiError && cause.code === "NOT_FOUND" && cause.message === "Scraper candidate expired or unavailable") {
+            lastFailure = withRequestId("预览资料已失效，请刷新预览。", cause);
+            continue;
+          }
+          if (cause instanceof ApiError && cause.status === 400 && cause.code === "INVALID_ARGUMENT") {
+            lastFailure = albumSaveMessage(cause, "selection");
+            continue;
+          }
+          if (cause instanceof ApiError && cause.status === 409) reload.current = true;
+          show("error", albumSaveMessage(cause, "selection"));
+          return;
+        } finally {
+          writing.current = false;
         }
-        signal.throwIfAborted();
-        if (hasSavedFields && !await confirmReplacement(edition)) return;
-        signal.throwIfAborted();
-        const rejected = await save({ edition, revision: album.revision, key: crypto.randomUUID() });
-        if (!rejected) return;
-        lastFailure = rejected;
       }
       if (lastFailure) show("error", lastFailure);
       else show("result", tr("没有匹配的资料。"));
