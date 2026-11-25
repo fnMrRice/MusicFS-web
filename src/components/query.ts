@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { ApiError, errorMessage } from "../api/client";
+import { CursorPages } from "../api/cursor-pages";
 import { capabilityResources } from "../app/capability-resources";
 
 export function useResource<T>(
@@ -50,66 +51,46 @@ export function usePages<T>(
     error: string | null;
   }>({ items: [], cursor: null, loading: true, error: null });
   const ref = useRef(state);
-  ref.current = state;
   const load = useRef(loader);
   load.current = loader;
   const identify = useRef(identity);
   identify.current = identity;
   const control = useRef<AbortController | null>(null);
-  const busy = useRef(false);
-  const seen = useRef(new Set<string>());
-  const empty = useRef(0);
+  const pages = useRef<CursorPages<T> | null>(null);
   const request = useCallback(async (append: boolean) => {
-    if (append && busy.current) return;
+    if (append && (control.current || !ref.current.cursor)) return;
     control.current?.abort();
     const controller = new AbortController();
     control.current = controller;
-    busy.current = true;
     const previous = append ? ref.current.items : [];
     const cursor = append ? ref.current.cursor : null;
-    if (!append) {
-      seen.current.clear();
-      empty.current = 0;
+    if (!append) pages.current = null;
+    function update(next: typeof state) {
+      ref.current = next;
+      setState(next);
     }
-    setState({ items: previous, cursor, loading: true, error: null });
+    update({ items: previous, cursor, loading: true, error: null });
     try {
       const page = await load.current(cursor, controller.signal);
       if (controller.signal.aborted) return;
-      const items = [
-        ...new Map(
-          [...previous, ...page.items].map((t) => [identify.current(t), t]),
-        ).values(),
-      ];
-      empty.current = items.length === previous.length ? empty.current + 1 : 0;
-      if (
-        page.cursor &&
-        (page.cursor === cursor ||
-          seen.current.has(page.cursor) ||
-          empty.current >= 3)
-      )
-        throw new ApiError("PAGINATION_STALLED", "Pagination stalled");
-      if (cursor) seen.current.add(cursor);
-      setState({ items, cursor: page.cursor, loading: false, error: null });
+      const index = pages.current ?? new CursorPages(identify.current);
+      const items = index.merge(page.items, cursor, page.cursor);
+      pages.current = page.cursor ? index : null;
+      update({ items, cursor: page.cursor, loading: false, error: null });
     } catch (e) {
-      if (!controller.signal.aborted)
-        setState({
-          items: previous,
-          cursor:
-            e instanceof ApiError && e.code === "CURSOR_EXPIRED"
-              ? null
-              : cursor,
-          loading: false,
-          error: errorMessage(e),
-        });
+      if (controller.signal.aborted) return;
+      const expired = e instanceof ApiError && e.code === "CURSOR_EXPIRED";
+      if (expired) pages.current = null;
+      update({ items: previous, cursor: expired ? null : cursor, loading: false, error: errorMessage(e) });
     } finally {
-      if (control.current === controller) busy.current = false;
+      if (control.current === controller) control.current = null;
     }
   }, []);
   useEffect(() => {
     void request(false);
     return () => {
       control.current?.abort();
-      busy.current = false;
+      control.current = null;
     };
   }, [key, request]);
   return {

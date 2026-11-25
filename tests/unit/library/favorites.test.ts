@@ -99,6 +99,42 @@ describe("Personal favorites state", () => {
     await state.setFavorite(source, true);
     expect(api.add.mock.calls[0][0]).toBe("moved-source");
   });
+  it("indexes saved versions once for table lookups and mixed batch removals", async () => {
+    const { api, state } = fixture();
+    let versionReads = 0;
+    const items = Array.from({ length: 500 }, (_, index) => {
+      const saved = entry(`favorite-${index}`);
+      const version = { ...track, get sourceTrackId() { ++versionReads; return `source-${index}`; } };
+      saved.musicTrack.selectedSource!.versions = [version];
+      return saved;
+    });
+    api.page.mockResolvedValueOnce({ items, nextCursor: null, revision: "1" });
+    await state.load();
+    versionReads = 0;
+    for (let index = 0; index < 1000; ++index) {
+      expect(state.has(`unstarred-${index}`)).toBe(false);
+    }
+    expect(versionReads).toBeLessThanOrEqual(items.length);
+    versionReads = 0;
+    const removals = items.slice(0, 250).flatMap(({ musicTrack }, index) => [musicTrack.trackId, `unknown-${index}`]);
+    state.applyBatch(removals, false, []);
+    expect(state.value.items).toHaveLength(250);
+    expect(versionReads).toBeLessThanOrEqual(items.length);
+  });
+  it("resolves saved versions when a scoped catalog result lists fewer versions", async () => {
+    const { api, state } = fixture();
+    const saved = entry("canonical");
+    const first = { ...track, sourceTrackId: "first" }, second = { ...track, sourceTrackId: "second" };
+    saved.musicTrack.selectedSource!.versions = [first, second];
+    api.page.mockResolvedValueOnce({ items: [saved], nextCursor: null, revision: "1" });
+    await state.load();
+    state.applyBatch([], false, [{ ...saved.musicTrack, selectedSource: { ...first, versions: [first] } }]);
+    expect(state.has("second")).toBe(true);
+    expect(state.getEntry("second")).toBe(saved);
+    await state.setFavorite(second, false);
+    expect(api.remove).toHaveBeenCalledWith("canonical", expect.any(AbortSignal));
+    expect(state.has("second")).toBe(false);
+  });
   it("loads every page atomically, deduplicates requests and preserves distinct tracks", async () => {
     const { api, state } = fixture();
     const more = deferred<FavoritePage>();

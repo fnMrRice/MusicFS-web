@@ -1,4 +1,5 @@
 import { ApiError, errorMessage } from "../api/client";
+import { CursorPages } from "../api/cursor-pages";
 import type { CatalogPage } from "../api/categories";
 
 interface CatalogSnapshot<T> {
@@ -15,8 +16,7 @@ export class CatalogState<T> {
   private controller: AbortController | null = null;
   private queryId: string | null = null;
   private released = new Set<string>();
-  private consumed = new Set<string>();
-  private emptyPages = 0;
+  private pages: CursorPages<T> | null = null;
   constructor(private load: Loader<T>, private identity: (item: T) => string, private release: (id: string) => Promise<void>) {}
   subscribe = (listener: () => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; };
   refresh = (): Promise<void> => this.request(false);
@@ -27,6 +27,7 @@ export class CatalogState<T> {
     this.controller?.abort();
     this.releaseQuery(this.queryId);
     this.queryId = null;
+    this.pages = null;
   };
   private releaseQuery(id: string | null) {
     if (!id || this.released.has(id)) return;
@@ -44,8 +45,7 @@ export class CatalogState<T> {
     if (!append) {
       this.releaseQuery(this.queryId);
       this.queryId = null;
-      this.consumed.clear();
-      this.emptyPages = 0;
+      this.pages = null;
     }
     this.update(append ? { ...before, loading: true, error: null } :
       { items: [], total: null, cursor: null, revision: null, loading: true, error: null });
@@ -57,18 +57,18 @@ export class CatalogState<T> {
         throw new ApiError("CURSOR_EXPIRED", "Catalog revision changed");
       }
       this.queryId = page.queryId;
-      const previous = append ? before.items : [];
-      const items = [...new Map([...previous, ...page.items].map((item) => [this.identity(item), item])).values()];
-      this.emptyPages = items.length === previous.length ? this.emptyPages + 1 : 0;
-      if (page.nextCursor && (page.nextCursor === cursor || this.consumed.has(page.nextCursor) || this.emptyPages >= 3))
-        throw new ApiError("PAGINATION_STALLED", "Catalog pagination did not advance");
-      if (cursor) this.consumed.add(cursor);
+      const pages = this.pages ?? new CursorPages(this.identity);
+      const items = pages.merge(page.items, cursor, page.nextCursor);
+      this.pages = page.nextCursor ? pages : null;
       this.update({ items, total: page.total, cursor: page.nextCursor, revision: page.catalogRevision, loading: false, error: null });
       if (!page.nextCursor) this.releaseQuery(page.queryId);
     } catch (error) {
       if (generation !== this.generation) return;
       const expired = error instanceof ApiError && error.code === "CURSOR_EXPIRED";
-      if (expired) this.releaseQuery(this.queryId);
+      if (expired) {
+        this.pages = null;
+        this.releaseQuery(this.queryId);
+      }
       this.update({ ...this.snapshot, loading: false, cursor: expired ? null : this.snapshot.cursor, error: errorMessage(error) });
     }
   }

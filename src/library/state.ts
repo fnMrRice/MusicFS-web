@@ -1,4 +1,5 @@
 import { ApiError, errorMessage } from "../api/client";
+import { CursorPages } from "../api/cursor-pages";
 import type { MusicTrack, MusicTrackPage } from "../api/music-catalog";
 
 export interface LibrarySnapshot {
@@ -28,12 +29,12 @@ export class LibraryState {
   private generation = 0;
   private controller: AbortController | null = null;
   private provider = "";
-  private emptyPages = 0;
-  private consumed = new Set<string>();
+  private pages: CursorPages<MusicTrack> | null = null;
   constructor(private load: PageLoader, private received?: (items: MusicTrack[]) => void) {}
   select(provider: string): Promise<void> {
     if (provider !== this.provider) {
       this.provider = provider;
+      this.pages = null;
       this.snapshot = {
         items: [],
         revision: null,
@@ -57,6 +58,7 @@ export class LibraryState {
     ++this.generation;
     this.controller?.abort();
     this.provider = "";
+    this.pages = null;
     this.snapshot = {
       items: [],
       revision: null,
@@ -75,10 +77,6 @@ export class LibraryState {
   }
   private async request(append: boolean): Promise<void> {
     if (!this.provider) return;
-    if (!append) {
-      this.emptyPages = 0;
-      this.consumed.clear();
-    }
     const generation = ++this.generation;
     this.controller?.abort();
     this.controller = new AbortController();
@@ -94,28 +92,12 @@ export class LibraryState {
       if (generation !== this.generation) return;
       if (append && (page.libraryRevision !== this.snapshot.revision || page.matchingRevision !== this.snapshot.matchingRevision))
         throw new ApiError("CURSOR_EXPIRED", "Revision changed");
-      const added = page.items.filter(
-        (item) =>
-          !this.snapshot.items.some(
-            (old) => old.trackId === item.trackId,
-          ),
-      );
-      this.emptyPages = append && !added.length ? this.emptyPages + 1 : 0;
-      if (
-        page.nextAfter &&
-        (page.nextAfter === cursor ||
-          this.consumed.has(page.nextAfter) ||
-          this.emptyPages >= 3)
-      )
-        throw new ApiError("PAGINATION_STALLED", "Pagination did not advance");
-      if (cursor) this.consumed.add(cursor);
-      const items = append
-        ? [...this.snapshot.items, ...page.items]
-        : page.items;
+      const pages = (append ? this.pages : null) ?? new CursorPages<MusicTrack>((item) => item.trackId);
+      // 主曲库从续页开始累计连续无新增曲目的次数。
+      const items = pages.merge(page.items, cursor, page.nextAfter, append);
+      this.pages = page.nextAfter ? pages : null;
       this.snapshot = {
-        items: [
-          ...new Map(items.map((item) => [item.trackId, item])).values(),
-        ],
+        items,
         revision: page.libraryRevision,
         matchingRevision: page.matchingRevision,
         cursor: page.nextAfter,
@@ -128,6 +110,7 @@ export class LibraryState {
       if (generation !== this.generation) return;
       const expired =
         error instanceof ApiError && error.code === "CURSOR_EXPIRED";
+      if (expired) this.pages = null;
       this.snapshot = {
         ...this.snapshot,
         loading: false,

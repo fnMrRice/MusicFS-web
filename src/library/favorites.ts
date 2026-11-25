@@ -18,6 +18,8 @@ export class FavoritesState extends Store<FavoritesSnapshot> {
   private generation = 0;
   private entries = new Map<string, FavoriteEntry>();
   private aliases = new Map<string, string>();
+  private sourcesByTrack = new Map<string, string[]>();
+  private savedSources: Map<string, string> | null = null;
   private requests = new Set<AbortController>();
   private writes = new Map<string, Promise<void>>();
   private loading: Promise<void> | null = null;
@@ -39,6 +41,8 @@ export class FavoritesState extends Store<FavoritesSnapshot> {
     this.writes.clear();
     this.entries.clear();
     this.aliases.clear();
+    this.sourcesByTrack.clear();
+    this.savedSources = null;
     this.overrides.clear();
     this.dirty = false;
     this.changes = null;
@@ -47,26 +51,43 @@ export class FavoritesState extends Store<FavoritesSnapshot> {
     this.set(initial());
   }
   private canonicalId(id: string): string {
-    if (this.aliases.has(id)) return this.aliases.get(id)!;
+    const known = this.aliases.get(id);
+    if (known !== undefined) return known;
     if (this.entries.has(id)) return id;
-    for (const entry of this.entries.values()) {
-      if (entry.musicTrack.selectedSource?.versions?.some((source) => source.sourceTrackId === id)) return entry.musicTrack.trackId;
+    // 按来源筛选的曲库可能只列出部分版本，仍需识别收藏快照里的其他版本。
+    if (!this.savedSources) {
+      this.savedSources = new Map();
+      for (const { musicTrack } of this.entries.values()) {
+        for (const { sourceTrackId } of musicTrack.selectedSource?.versions ?? []) {
+          if (!this.savedSources.has(sourceTrackId)) this.savedSources.set(sourceTrackId, musicTrack.trackId);
+        }
+      }
     }
-    return id;
+    return this.savedSources.get(id) ?? id;
   }
   private remember(track: MusicTrack): void {
-    const current = new Set((track.selectedSource?.versions ?? []).map((source) => source.sourceTrackId));
-    for (const [id, canonical] of this.aliases) {
-      if (canonical === track.trackId && !current.has(id)) this.aliases.delete(id);
+    for (const id of this.sourcesByTrack.get(track.trackId) ?? []) {
+      if (this.aliases.get(id) === track.trackId) this.aliases.delete(id);
     }
-    for (const source of track.selectedSource?.versions ?? []) {
-      this.aliases.set(source.sourceTrackId, track.trackId);
-      const override = this.overrides.get(source.sourceTrackId);
+    const ids = (track.selectedSource?.versions ?? []).map(source => source.sourceTrackId);
+    if (ids.length) this.sourcesByTrack.set(track.trackId, ids);
+    else this.sourcesByTrack.delete(track.trackId);
+    for (const id of ids) {
+      this.aliases.set(id, track.trackId);
+      const override = this.overrides.get(id);
       if (override !== undefined && !this.overrides.has(track.trackId)) this.overrides.set(track.trackId, override);
-      if (source.sourceTrackId !== track.trackId) this.overrides.delete(source.sourceTrackId);
+      if (id !== track.trackId) this.overrides.delete(id);
     }
   }
-  has(id: string): boolean { return this.overrides.get(this.canonicalId(id)) ?? this.entries.has(this.canonicalId(id)); }
+  private setEntry(id: string, entry: FavoriteEntry | null): void {
+    if (entry) this.entries.set(id, entry);
+    else if (!this.entries.delete(id)) return;
+    this.savedSources = null;
+  }
+  has(id: string): boolean {
+    const canonical = this.canonicalId(id);
+    return this.overrides.get(canonical) ?? this.entries.has(canonical);
+  }
   invalidate(): void { this.dirty = true; ++this.batchRevision; }
   // 批量接口返回来源 ID；仅用已知曲目资料更新列表，未知资料留待下次读取。
   applyBatch(ids: string[], favorite: boolean, tracks: TrackItem[]): void {
@@ -78,12 +99,15 @@ export class FavoritesState extends Store<FavoritesSnapshot> {
       known.set(item.trackId, item);
       item.selectedSource?.versions?.forEach((source) => known.set(source.sourceTrackId, item));
     }
-    for (const sourceId of ids) {
+    // 在整批写入前解析所有来源，让属于同一首歌的版本看到同一份收藏资料。
+    const resolved = ids.map(sourceId => {
       const track = known.get(sourceId);
-      const id = track?.trackId ?? this.canonicalId(sourceId);
+      return { id: track?.trackId ?? this.canonicalId(sourceId), track };
+    });
+    for (const { id, track } of resolved) {
       this.overrides.set(id, favorite);
-      if (!favorite) this.entries.delete(id);
-      else if (track && !this.entries.has(id)) this.entries.set(id, { musicTrack: track, track: track.selectedSource, forcedSourceTrackId: null, recordedAt: new Date().toISOString() });
+      if (!favorite) this.setEntry(id, null);
+      else if (track && !this.entries.has(id)) this.setEntry(id, { musicTrack: track, track: track.selectedSource, forcedSourceTrackId: null, recordedAt: new Date().toISOString() });
       if (!favorite || this.entries.has(id)) this.changes?.set(id, this.entries.get(id) ?? null);
     }
     this.set({ ...this.value, items: this.tracks(), error: null });
@@ -103,9 +127,15 @@ export class FavoritesState extends Store<FavoritesSnapshot> {
       if (generation !== this.generation) return;
       // 读取期间完成的写入已由服务端确认，不能被较早的列表快照覆盖。
       changes.forEach((entry, id) => { if (entry) entries.set(id, entry); else entries.delete(id); });
-      if (batchRevision === this.batchRevision) { this.aliases.clear(); this.overrides.clear(); this.dirty = false; }
+      if (batchRevision === this.batchRevision) {
+        this.aliases.clear();
+        this.sourcesByTrack.clear();
+        this.overrides.clear();
+        this.dirty = false;
+      }
       entries.forEach((entry) => this.remember(entry.musicTrack));
       this.entries = entries;
+      this.savedSources = null;
       this.set({ ...this.value, items: this.tracks(), loaded: true, error: null });
     }).catch((error) => {
       if (generation === this.generation) this.set({ ...this.value, error: errorMessage(error) });
@@ -135,7 +165,7 @@ export class FavoritesState extends Store<FavoritesSnapshot> {
         if (generation !== this.generation) return;
         if (entry) this.remember(entry.musicTrack);
         const canonicalId = entry?.musicTrack.trackId ?? this.canonicalId(id);
-        if (entry) this.entries.set(canonicalId, entry); else this.entries.delete(canonicalId);
+        this.setEntry(canonicalId, entry);
         this.overrides.delete(id);
         this.overrides.delete(canonicalId);
         if ("sourceTrackId" in track) this.overrides.delete(track.sourceTrackId);

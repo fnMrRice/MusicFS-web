@@ -6,6 +6,25 @@ import type { MusicTrackPage } from '../../../src/api/music-catalog';
 import { deferred, page } from '../../fixtures/dto';
 
 describe('Library revision state (Mock pages)', () => {
+  it('reads each incoming track identity once across twenty 100-track pages', async () => {
+    let reads = 0;
+    const track = page('sample').items[0];
+    const state = new LibraryState(async (_provider, cursor) => {
+      const offset = Number(cursor);
+      return {
+        ...page('sample'),
+        nextAfter: offset < 1900 ? String(offset + 100) : null,
+        items: Array.from({ length: 100 }, (_, index) => ({
+          ...track,
+          get trackId() { ++reads; return String(offset + index); },
+        })),
+      };
+    });
+    await state.select(instanceIds.local);
+    while (state.snapshot.cursor && !state.snapshot.error) await state.more();
+    expect(state.snapshot.items).toHaveLength(2000);
+    expect(reads).toBe(2000);
+  });
   it('discards an old page after a new refresh', async () => {
     const old = deferred<MusicTrackPage>(); const fresh = deferred<MusicTrackPage>();
     const received = vi.fn();
@@ -45,5 +64,16 @@ describe('Library revision state (Mock pages)', () => {
     const state = new LibraryState(vi.fn().mockResolvedValueOnce(page('one')).mockRejectedValueOnce(new ApiError('NETWORK_ERROR', 'offline')));
     await state.select(instanceIds.local); await state.refresh();
     expect(state.snapshot.items).toHaveLength(1); expect(state.snapshot.stale).toBe(true);
+  });
+  it('can still append to the previous snapshot after a failed refresh', async () => {
+    const load = vi.fn().mockResolvedValueOnce(page('one', 'next')).mockRejectedValueOnce(new Error('offline'))
+      .mockResolvedValueOnce(page('two')).mockResolvedValueOnce(page('fresh'));
+    const state = new LibraryState(load);
+    await state.select(instanceIds.local);
+    await state.refresh();
+    await state.more();
+    expect(state.snapshot.items.map((item) => item.trackId)).toEqual(['one', 'two']);
+    await state.refresh();
+    expect(state.snapshot.items.map((item) => item.trackId)).toEqual(['fresh']);
   });
 });
