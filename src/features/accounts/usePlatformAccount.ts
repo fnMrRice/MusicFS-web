@@ -3,6 +3,7 @@ import QRCode from "qrcode";
 import { version as webVersion } from "../../../package.json";
 import { useServices, useStore } from "../../app/services";
 import { errorMessage } from "../../api/client";
+import { withRateLimitRetry } from "../../api/rate-limit";
 import type { OnlineInstance } from "../../api/content";
 import { loadMusicKit, type MusicKitInstance } from "./musickit";
 
@@ -70,16 +71,20 @@ export function usePlatformAccount(instance: OnlineInstance) {
     locked.current = false;
     setAccount(null); setOptions(null); setError(""); setQRError("");
     setQR(""); setBusy(false); setDialogOpen(false); setMusicKit(null);
-    void Promise.all([
-      s.client.request<Account>(path, { signal: controller.signal }),
-      s.client.request<Options>(`${path}/options`, { signal: controller.signal }),
-    ]).then(([view, opts]) => {
-      if (!current(version) || controller.signal.aborted) return;
+    const { signal } = controller;
+    const sameSession = () => !signal.aborted && s.auth.value.session === session;
+    async function loadAccount() {
+      const view = await withRateLimitRetry(() => s.client.request<Account>(path, { signal }), signal);
+      if (!current(version) || signal.aborted) return;
       accept(view);
-      setOptions(opts);
       if (view.loginId && instance.platform === "netease") setDialogOpen(true);
-    }, (e: unknown) => {
-      if (current(version) && !controller.signal.aborted) setError(errorMessage(e));
+
+      // 每个来源依次读取状态和登录选项，避免打开设置页时同时占用两份账号并发配额。
+      const opts = await withRateLimitRetry(() => s.client.request<Options>(`${path}/options`, { signal }), signal);
+      if (sameSession()) setOptions(opts);
+    }
+    void loadAccount().catch((e: unknown) => {
+      if (sameSession()) setError(errorMessage(e));
     });
     return () => {
       alive.current = false;

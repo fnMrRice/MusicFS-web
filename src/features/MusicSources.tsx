@@ -14,15 +14,21 @@ import type { PluginIdentity } from "../api/types";
 import { PlatformAccount } from "./accounts/PlatformAccounts";
 import { Link } from "react-router-dom";
 
-export function MusicSources() {
+export function useSettingsSources(admin: boolean) {
+  const s = useServices();
+  const plugins = useResource(admin ? "settings-plugins-false" : "", (signal) => admin
+    ? s.client.request<PluginSnapshot>("/admin/plugins", { signal })
+    : Promise.resolve<PluginSnapshot>({ items: [] }));
+  const online = useResource("platform-account-instances", (signal) => s.content.online(signal));
+  return { plugins, online };
+}
+
+export type SettingsSources = ReturnType<typeof useSettingsSources>;
+
+export function MusicSources({ plugins, online, admin }: SettingsSources & { admin: boolean }) {
   const { locale } = useLocale();
   const s = useServices();
-  const auth = useStore(s.auth);
-  const admin = auth.session?.user.role === "admin";
   const [query, setQuery] = useSearchParams();
-  const plugins = useResource(`settings-local-directories-${admin}`, (signal) => admin
-    ? s.client.request<PluginSnapshot>("/admin/plugins", { signal })
-    : Promise.resolve({ items: [] }));
   const previousLocal = useRef<(ManagedInstance & { plugin: PluginIdentity })[]>([]);
   if (plugins.data) previousLocal.current = plugins.data.items.filter((plugin) => plugin.pluginId === "musicfs.plugin.source.localfiles")
     .flatMap((plugin) => plugin.instances.map((instance) => ({ ...instance, plugin: plugin.plugin })));
@@ -37,8 +43,9 @@ export function MusicSources() {
   }
   const sourceName = useSourceName();
   const providers = useResource("settings-providers", (signal) => s.libraryApi.providers(signal));
-  const online = useResource("platform-account-instances", (signal) => s.content.online(signal));
-  const sources = new Map(musicSources(providers.data ?? [], online.data ?? []).map((source) => [source.id, source]));
+  // 刷新插件列表时保留在线账号组件及其正在进行的登录流程。
+  const instances = useStore(s.content.onlineInstances);
+  const sources = new Map(musicSources(providers.data ?? [], instances).map((source) => [source.id, source]));
 
   return <div className="settings-card">
     <ErrorNotice error={providers.error} retry={providers.reload} />

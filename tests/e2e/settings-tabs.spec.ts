@@ -31,8 +31,9 @@ async function mock(page: Page, role = "admin") {
   let albumSettings = { revision: 0, localPluginOrder: scrapers.slice(0, 3).map(source => source.pluginId) };
   let lyricsSettings = { revision: 0, pluginOrder: ["local", "netease", "qqmusic"].map(name => prefix + name) };
   await routeApi(page, (route) => {
-    const path = new URL(route.request().url()).pathname;
-    requests.push(path);
+    const url = new URL(route.request().url());
+    const path = url.pathname;
+    requests.push(path + url.search);
     let json: unknown = { items: [], nextCursor: null, nextAfter: null, libraryRevision: "1" };
     if (path.endsWith('/scan-status')) json = { job: null };
     if (path.endsWith('/root-statistics')) json = { roots: [] };
@@ -76,6 +77,30 @@ async function mock(page: Page, role = "admin") {
 function navigation(page: Page) {
   return page.getByRole("navigation", { name: "设置分类", exact: true });
 }
+
+test("settings share source requests and refresh only the selected plugin scope", async ({ page }) => {
+  const requests = await mock(page);
+  await page.goto(origin + "/#/library");
+  const openSettings = page.getByRole("button", { name: "设置", exact: true });
+  await expect(openSettings).toBeVisible();
+  await page.waitForLoadState("networkidle");
+  requests.length = 0;
+  await openSettings.click();
+  const refresh = page.getByRole("button", { name: "刷新插件列表" });
+  await expect(refresh).toBeEnabled();
+  await expect(section(page, "歌词刮削顺序").getByText("本地歌词", { exact: true })).toBeVisible();
+  const counts = () => ["/admin/plugins", "/admin/plugins?allUsers=true", "/online-instances", "/scrapers"]
+    .map(endpoint => requests.filter(path => path === "/api/v1" + endpoint).length);
+  expect(counts()).toEqual([1, 0, 1, 1]);
+  const scope = page.getByLabel("显示所有用户实例");
+  await scope.check();
+  await expect.poll(counts).toEqual([1, 1, 1, 1]);
+  await refresh.click();
+  await expect.poll(counts).toEqual([1, 2, 2, 1]);
+  await scope.uncheck();
+  await refresh.click();
+  await expect.poll(counts).toEqual([2, 2, 3, 1]);
+});
 
 function section(page: Page, name: string) {
   return page.getByRole("region", { name, exact: true });
@@ -129,6 +154,20 @@ test("listeners can save and reload the local album scraper order", async ({ pag
   await expect(settings.getByRole("status")).toHaveText("设置已保存。");
   await page.reload();
   await expect(names).toHaveText(["Apple Music (iTunes)", "MusicBrainz", "QQ 音乐"]);
+});
+
+test("retrying album settings keeps lyrics edits and reuses the scraper list", async ({ page }) => {
+  const requests = await mock(page);
+  await page.route("**/api/v1/scrapers/album-auto-settings", route => route.fulfill({ status: 503, json: {} }), { times: 1 });
+  await page.goto(origin + "/#/settings");
+  const album = section(page, "本地专辑刮削顺序");
+  const lyrics = section(page, "歌词刮削顺序");
+  await lyrics.getByRole("button", { name: "下移 本地歌词" }).click();
+  await album.getByRole("button", { name: "重试" }).click();
+  await expect(album.getByRole("button", { name: "保存设置" })).toBeVisible();
+  await expect(lyrics.locator("li span")).toHaveText(["网易云音乐", "本地歌词", "QQ 音乐"]);
+  await expect(lyrics.getByRole("button", { name: "保存设置" })).toBeEnabled();
+  expect(requests.filter(path => path.endsWith("/scrapers") || path.endsWith("/lyrics-auto-settings"))).toHaveLength(2);
 });
 
 test("lyrics order supports local and online sources and can be emptied", async ({ page }) => {
@@ -432,6 +471,7 @@ test("regular users retain every section and see plugin permissions without admi
   await expect(page.getByRole("heading", { name: "本地音乐", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: /^(添加本地目录|管理音乐目录)$/ })).toHaveCount(0);
   expect(requests.filter((path) => path.includes("/admin/"))).toEqual([]);
+  expect(requests.filter((path) => path.endsWith("/scrapers"))).toHaveLength(1);
 });
 
 test("directory management links take priority and dismiss before navigating to another section", async ({ page }) => {

@@ -66,6 +66,42 @@ async function mockAccounts(
   return { actions, completed, get csrfSeen() { return csrfSeen; }, get searches() { return searches; } };
 }
 
+test("account initialization retries only the rate-limited login options", async ({ page }) => {
+  const mock = await mockAccounts(page);
+  await page.goto(`${server.origin}/#/search?q=sample`);
+  await expect(page.getByText("登录此音乐平台，再使用在线搜索。", { exact: false })).toBeVisible();
+
+  const path = `**/online-instances/${instanceIds.netease}/account`;
+  const releaseState = deferred<void>();
+  const reads: string[] = [];
+  let optionsAttempts = 0;
+  await page.route(path, async (route) => {
+    if (route.request().method() !== "GET") return route.fallback();
+    reads.push("state");
+    await releaseState.promise;
+    return route.fallback();
+  });
+  await page.route(`${path}/options`, async (route) => {
+    reads.push("options");
+    if (++optionsAttempts === 1) return route.fulfill({
+      status: 429, headers: { "Retry-After": "1" }, json: { error: { code: "RATE_LIMITED", retryAfter: 1 } },
+    });
+    return route.fallback();
+  });
+  await page.goto(`${server.origin}/#/settings`);
+  const login = page.getByRole("button", { name: "登录网易云音乐", exact: true });
+  try {
+    await expect.poll(() => reads).toEqual(["state"]);
+    await expect(login).toBeDisabled();
+    expect(reads).toEqual(["state"]);
+  } finally {
+    releaseState.resolve();
+  }
+  await expect(login).toBeEnabled();
+  expect(reads).toEqual(["state", "options", "options"]);
+  expect(mock.actions).toEqual([]);
+});
+
 test("NetEase account checks update confirmed membership and clear the previous tier when it becomes unknown", async ({ page }) => {
   const signedIn = { state: "signedIn", accountId: "test", displayName: "测试听众" };
   const checks: Account[] = [{ ...signedIn, membershipTier: "vip" }, { ...signedIn, membershipTier: "svip" }, signedIn];

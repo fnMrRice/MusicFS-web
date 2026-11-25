@@ -1,5 +1,5 @@
 import { useId, useState } from "react";
-import { useServices, useStore } from "../app/services";
+import { useServices } from "../app/services";
 import { useResource } from "../components/query";
 import { ErrorNotice, Icon } from "../components/ui";
 import { Tooltip } from "../components/Tooltip";
@@ -10,12 +10,12 @@ import { pluginName } from "../components/source-name";
 import { matchesPlugin, pluginPurposes, pluginPurposeLabel } from "./plugin-filters";
 import { PluginListEntry } from "./PluginListEntry";
 import { PluginSettings } from "./plugin-settings/PluginSettings";
+import type { SettingsSources } from "./MusicSources";
 import "./plugin-status.css";
 
-export default function PluginStatus() {
+export default function PluginStatus({ plugins: ownPlugins, online }: SettingsSources) {
   const { locale } = useLocale();
   const s = useServices();
-  const auth = useStore(s.auth);
   const [allUsers, setAllUsers] = useState(false);
   const [query, setQuery] = useState("");
   const [purposes, setPurposes] = useState<Set<string>>(() => new Set());
@@ -24,11 +24,10 @@ export default function PluginStatus() {
   const [configBusy, setConfigBusy] = useState(false);
   const typeLabelId = useId();
   const typeHelp = tr("可多选；按住 Shift 点击可仅选择该类型；未选择时显示全部。");
-  const showAllUsers = auth.session?.user.role === "admin" && allUsers;
-  const plugins = useResource(`settings-plugins-${showAllUsers}`, (signal) =>
-    s.client.request<PluginSnapshot>(`/admin/plugins${showAllUsers ? "?allUsers=true" : ""}`, { signal }),
-  );
-  const online = useResource("platform-account-instances", (signal) => s.content.online(signal));
+  const allPlugins = useResource(allUsers ? "settings-plugins-true" : "", (signal) => allUsers
+    ? s.client.request<PluginSnapshot>("/admin/plugins?allUsers=true", { signal })
+    : Promise.resolve(null));
+  const plugins = allUsers ? allPlugins : ownPlugins;
   const items = plugins.data?.items ?? [];
   const purposeOptions = [...new Set([...items.flatMap(pluginPurposes), ...purposes])];
   const filtered = items.filter((plugin) => matchesPlugin(plugin, purposes, query));
@@ -87,10 +86,10 @@ export default function PluginStatus() {
           </div>
         </fieldset>
       </div>
-      {auth.session?.user.role === "admin" && <label className="check-label plugin-scope">
+      <label className="check-label plugin-scope">
         <input type="checkbox" checked={allUsers} onChange={(event) => setAllUsers(event.target.checked)} />
         {tr("显示所有用户实例")}
-      </label>}
+      </label>
       <ErrorNotice error={plugins.error} retry={plugins.reload} />
       <ErrorNotice error={online.error} retry={online.reload} />
       {plugins.data?.restartRequired && <p>{tr("配置变更需要重启服务端后生效。")}</p>}

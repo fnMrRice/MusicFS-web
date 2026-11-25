@@ -5,7 +5,7 @@ import { useServices, useStore } from "../app/services";
 import { LanguageSelect } from "../i18n/LanguageSelect";
 import { ThemeChoices } from "../components/ThemeChoices";
 import { RecommendationOrderSettings } from "./RecommendationOrderSettings";
-import { MusicSources } from "./MusicSources";
+import { MusicSources, useSettingsSources } from "./MusicSources";
 import { ScraperOrderSettings } from "./scrapers/ScraperOrderSettings";
 import { DSPSettings } from "./dsp/DSPSettings";
 import { VolumeSlider } from "../player/VolumeControl";
@@ -17,9 +17,14 @@ import "./settings-navigation.css";
 const PluginStatus = lazy(() => import("./PluginStatus"));
 
 export default function Settings() {
+  const { ready, session } = useStore(useServices().auth);
+  const scope = JSON.stringify([ready?.instanceId, session?.user.id, session?.user.role]);
+  return <SettingsPage key={scope} admin={session?.user.role === "admin"} />;
+}
+
+function SettingsPage({ admin }: { admin: boolean }) {
   useLocale();
-  const s = useServices();
-  const auth = useStore(s.auth);
+  const sources = useSettingsSources(admin);
   const { page, navigation, active, select } = useSettingsNavigation();
 
   return (
@@ -51,11 +56,11 @@ export default function Settings() {
           tabIndex={-1}
         >
           <h2 id={`settings-heading-${tab.id}`} className="settings-section-title">{tr(tab.label)}</h2>
-          {tab.id === "sources" && <><MusicSources /><ScraperOrderSettings kind="album" /><ScraperOrderSettings kind="lyrics" /></>}
+          {tab.id === "sources" && <><MusicSources {...sources} admin={admin} /><ScraperOrderSettings /></>}
           {tab.id === "plugins" && (
-            auth.session?.user.role === "admin" ? (
+            admin ? (
               <Suspense fallback={<p className="loading" role="status">{tr("正在加载…")}</p>}>
-                <PluginStatus />
+                <PluginStatus {...sources} />
               </Suspense>
             ) : (
               <div className="settings-card">

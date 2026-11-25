@@ -1,37 +1,43 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { localLyricsId, scraperOrder, type ScraperOrder, type ScraperOrderKind } from "../../api/scraper-order";
 import { ApiError, errorMessage } from "../../api/client";
 import { ScrapersApi, type Scraper } from "../../api/scrapers";
-import { useServices, useStore } from "../../app/services";
+import { useServices } from "../../app/services";
 import { useResource } from "../../components/query";
 import { ErrorNotice } from "../../components/ui";
 import { tr, useLocale } from "../../i18n";
 import { scraperName } from "./fields";
 
-export function ScraperOrderSettings({ kind }: { kind: ScraperOrderKind }) {
+export function ScraperOrderSettings() {
   useLocale();
-  const services = useServices();
-  const auth = useStore(services.auth);
-  const key = `${kind}-auto-settings:${auth.ready?.instanceId}:${auth.session?.user.id}`;
+  const { client } = useServices();
+  const scrapers = useResource("settings-scrapers", signal => new ScrapersApi(client).list(signal));
+  return <>
+    <ScraperOrderSection kind="album" scrapers={scrapers} />
+    <ScraperOrderSection kind="lyrics" scrapers={scrapers} />
+  </>;
+}
+
+function ScraperOrderSection({ kind, scrapers }: { kind: ScraperOrderKind; scrapers: ReturnType<typeof useResource<Scraper[]>> }) {
+  const { client } = useServices();
+  const settings = useResource(`${kind}-auto-settings`, signal => scraperOrder(client, kind, signal));
   const heading = `${kind}-scraper-priority`;
-  const resource = useResource(key, async signal => {
-    const [settings, scrapers] = await Promise.all([
-      scraperOrder(services.client, kind, signal), new ScrapersApi(services.client).list(signal),
-    ]);
-    const eligible = scrapers.filter(source => !source.requiresExternalId && (kind === "lyrics" ? source.fields.includes("lyrics")
+  const eligible = useMemo(() => {
+    const sources = scrapers.data?.filter(source => !source.requiresExternalId && (kind === "lyrics" ? source.fields.includes("lyrics")
       : source.fields.includes("albumDetails") && source.fields.includes("albumTracks")));
-    if (kind === "lyrics" && !eligible.some(source => source.pluginId === localLyricsId)) {
-      eligible.unshift({ pluginId: localLyricsId, name: "本地歌词", type: "scraper", fields: ["lyrics"], available: true });
+    if (sources && kind === "lyrics" && !sources.some(source => source.pluginId === localLyricsId)) {
+      sources.unshift({ pluginId: localLyricsId, name: "本地歌词", type: "scraper", fields: ["lyrics"], available: true });
     }
-    return { settings, scrapers: eligible };
-  });
+    return sources;
+  }, [kind, scrapers.data]);
   return <section className="settings-card album-auto-settings" aria-labelledby={heading}>
     <h3 id={heading}>{tr(kind === "lyrics" ? "歌词刮削顺序" : "本地专辑刮削顺序")}</h3>
     <p className="muted">{tr(kind === "lyrics" ? "目录刷新和自动搜索按此顺序查找歌词，找到后停止。移除全部来源可关闭自动查找。"
       : "按以下顺序查找本地专辑。网易云音乐和 QQ 音乐的专辑优先使用各自的平台。")}</p>
-    {resource.loading && <p role="status">{tr("正在读取设置…")}</p>}
-    <ErrorNotice error={resource.error} retry={resource.reload} />
-    {resource.data && <SourceOrder key={key} initial={resource.data.settings} scrapers={resource.data.scrapers} kind={kind} reload={resource.reload} />}
+    {(settings.loading || scrapers.loading) && <p role="status">{tr("正在读取设置…")}</p>}
+    <ErrorNotice error={settings.error} retry={settings.reload} />
+    <ErrorNotice error={scrapers.error} retry={scrapers.reload} />
+    {settings.data && eligible && <SourceOrder initial={settings.data} scrapers={eligible} kind={kind} reload={settings.reload} />}
   </section>;
 }
 
