@@ -52,6 +52,10 @@ test("the track menu opens a logical track and lyrics use the explicitly selecte
   const pluginId = "example.lyrics";
   const localPlugin = "musicfs.scraper.local";
   const target = { sourceTrackId: "Alpha", assetId: "Alpha", assetVersion: "v2" };
+  const lyricsPreview = [
+    '{"t":0,"c":[{"tx":"作词: "},{"tx":"兰音Reine","or":"orpheus://nm/artist/home?id=46424022&type=artist"}]}',
+    "[00:05]Lyric preview",
+  ].join("\n");
   let attempts = 0;
   await mockApi(page, async (route, path) => {
     if (path.endsWith("/scrapers")) {
@@ -70,7 +74,7 @@ test("the track menu opens a logical track and lyrics use the explicitly selecte
       }] } });
     } else if (path.endsWith(`/scrapers/${pluginId}/search`)) {
       expect(route.request().postDataJSON()).toMatchObject({ field: "lyrics", query: { artist: "Library artist", title: "Alpha", duration: 120 } });
-      await route.fulfill({ json: { items: [{ id: "123", title: "Alpha", lyrics: "[00:05]Lyric preview", candidateToken: "token" }] } });
+      await route.fulfill({ json: { items: [{ id: "123", title: "Alpha", lyrics: lyricsPreview, candidateToken: "token" }] } });
     } else if (path.endsWith("/Alpha/scraped-fields/lyrics")) {
       expect(route.request().postDataJSON()).toEqual({ assetId: "Alpha", assetVersion: "v2", expectedRevision: 4, pluginId: localPlugin, candidateToken: "local-token" });
       attempts++;
@@ -93,6 +97,9 @@ test("the track menu opens a logical track and lyrics use the explicitly selecte
   await sources.selectOption(pluginId);
   await search.getByRole("button", { name: "搜索", exact: true }).click();
   await expect(search.getByText("[00:05]Lyric preview")).toBeVisible();
+  await expect(search).toContainText("作词: 兰音Reine");
+  await expect(search.getByRole("link", { name: "兰音Reine", exact: true }))
+    .toHaveAttribute("href", "https://music.163.com/artist?id=46424022");
   expect(attempts).toBe(0);
   await expect(search.getByRole("button", { name: "选用这项资料" })).toHaveCount(0);
   await search.getByLabel("保存到来源版本", { exact: true }).selectOption("Alpha");

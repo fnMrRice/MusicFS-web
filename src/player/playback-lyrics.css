@@ -1,0 +1,77 @@
+.player-panel[data-panel="media"] {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.player-panel[data-panel="media"] > .section-title,
+.player-panel[data-panel="media"] > button {
+  flex: none;
+}
+
+.player-panel[data-panel="media"] > button {
+  align-self: flex-start;
+}
+
+.media-panel-empty,
+.lyrics-viewport {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.playback-lyrics {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  margin-top: 12px;
+}
+
+.lyrics-viewport {
+  scrollbar-gutter: stable both-edges;
+  overflow-anchor: none;
+}
+
+.lyrics-viewport:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.lyrics-viewport .lyrics {
+  margin: 0;
+  padding-inline: 4px;
+  text-align: center;
+}
+
+.lyrics-viewport:has(.lyric-line) {
+  height: min(22rem, 42dvh);
+  container-type: size;
+}
+
+/* 两端预留半个正文视口，使第一句和最后一句也能滚到中央。 */
+.lyrics-viewport:has(.lyric-line) .lyrics {
+  padding-block: max(0px, calc(50cqh - .5lh));
+}
+
+.lyrics-viewport .lyric-line[aria-current="time"] {
+  color: var(--text);
+  font-size: 1.2em;
+  font-weight: 700;
+}
+
+.lyrics-return {
+  position: absolute;
+  right: 16px;
+  bottom: 4px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  color: var(--accent);
+  background: var(--panel);
+  box-shadow: 0 2px 8px var(--shadow);
+  font-size: 12px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .lyrics-viewport { scroll-behavior: smooth; }
+}

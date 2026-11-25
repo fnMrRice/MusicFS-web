@@ -31,7 +31,14 @@ async function setup(page: Page) {
   const wav = sound();
   await routeApi(page, async (route) => {
     const request = route.request(), path = new URL(request.url()).pathname;
-    if (path.endsWith('/stream')) return route.fulfill({ contentType: 'audio/wav', body: wav });
+    if (path.endsWith('/stream')) {
+      const range = /^bytes=(\d+)-(\d*)$/.exec(request.headers().range ?? '');
+      const headers = { 'Accept-Ranges': 'bytes' };
+      if (!range) return route.fulfill({ contentType: 'audio/wav', headers, body: wav });
+      const start = Number(range[1]), end = range[2] ? Math.min(Number(range[2]), wav.length - 1) : wav.length - 1;
+      return route.fulfill({ status: 206, contentType: 'audio/wav',
+        headers: { ...headers, 'Content-Range': `bytes ${start}-${end}/${wav.length}` }, body: wav.subarray(start, end + 1) });
+    }
     const media = /\/media\/lyrics-(.+)$/.exec(path);
     if (media) return route.fulfill({ contentType: 'text/plain; charset=utf-8', body: `${media[1]} 第一行\n${media[1]} 第二行` });
     if (/\/media\/artwork-.+$/.test(path)) return route.fulfill({ contentType: 'image/png',
@@ -175,4 +182,81 @@ test('pinned lyrics and a temporary queue can be opened in either order', async 
   await expect(lyrics(page)).toHaveAttribute('aria-pressed', 'false');
   await expect.poll(() => preferences(page)).toMatchObject({ lyricsPinned: true });
   expect(creates).toEqual(['Alpha']); expect(errors).toEqual([]);
+});
+
+test('NetEase credits and LRC lyrics follow playback across seeks', async ({ page }) => {
+  const { errors } = await setup(page);
+  const imagePath = 'p1.music.126.net/bb0rolxzFDxg0iqJHdOpZQ==/109951172856616911.jpg';
+  const artist = String.raw`{"tx":"兰音Reine","li":"http\://${imagePath}","or":"orpheus\://nm/artist/home?id=46424022&type=artist"}`;
+  const source = [
+    `{"t":0,"c":[{"tx":"作词: "},${artist}]}\\`,
+    `{"t":1000,"c":[{"tx":"作曲: "},${artist}]}`,
+    '{"t":1800,"c":null}',
+    '[00:03.25]第一句歌词',
+  ].join('\r\n');
+  await page.route('**/media/lyrics-Alpha', route => route.fulfill({ contentType: 'text/plain; charset=utf-8', body: source }));
+  let imageRequests = 0;
+  await page.route(`https://${imagePath}`, route => { ++imageRequests; return route.abort(); });
+  await play(page);
+  const audio = page.locator('audio');
+  await audio.evaluate((element: HTMLAudioElement) => { element.pause(); element.currentTime = 0; });
+  await lyrics(page).click();
+  const dialog = page.getByRole('dialog', { name: '歌词', exact: true });
+  const current = dialog.locator('[aria-current="time"]');
+  await expect(current).toHaveText('作词: 兰音Reine');
+  await expect(current).toHaveCSS('text-align', 'center');
+  await expect.poll(() => imageRequests).toBeGreaterThan(0);
+  await expect(current.locator('img')).not.toBeVisible();
+  await expect(current.getByRole('link', { name: '兰音Reine' })).toHaveAttribute('href', 'https://music.163.com/artist?id=46424022');
+  await expect(dialog.getByText('{"t":1800,"c":null}', { exact: true })).toBeVisible();
+  await expect(dialog).not.toContainText('orpheus');
+
+  for (const [seconds, line] of [[1, '作曲: 兰音Reine'], [3.25, '第一句歌词'], [0.5, '作词: 兰音Reine']] as const) {
+    await audio.evaluate((element: HTMLAudioElement, time) => { element.currentTime = time; }, seconds);
+    await expect(current).toHaveText(line);
+  }
+  expect(errors).toEqual([]);
+});
+
+test('lyrics follows the current line until the listener scrolls away', async ({ page }) => {
+  const { errors } = await setup(page);
+  const source = Array.from({ length: 60 }, (_, sec) => `[00:${String(sec).padStart(2, '0')}.00]第 ${sec} 行`).join('\n');
+  await page.route('**/media/lyrics-Alpha', route => route.fulfill({ contentType: 'text/plain; charset=utf-8', body: source }));
+  await play(page);
+  const audio = page.locator('audio');
+  await audio.evaluate((element: HTMLAudioElement) => { element.pause(); element.currentTime = 0; });
+  await lyrics(page).click();
+  const dialog = page.getByRole('dialog', { name: '歌词', exact: true });
+  const title = dialog.getByRole('heading', { name: '歌词', exact: true });
+  const current = dialog.locator('[aria-current="time"]');
+  const first = dialog.getByText('第 0 行', { exact: true });
+  const middle = dialog.getByText('第 35 行', { exact: true });
+  await expect(middle).toHaveCSS('text-align', 'center');
+  await expect(first).toBeInViewport({ ratio: 1 });
+  await expect(middle).not.toBeInViewport();
+  await audio.evaluate((element: HTMLAudioElement) => { element.currentTime = 35; });
+  await expect(current).toHaveText('第 35 行');
+  await expect(middle).toBeInViewport({ ratio: 1 });
+  await expect(title).toBeInViewport({ ratio: 1 });
+  const normalSize = await first.evaluate(el => parseFloat(getComputedStyle(el).fontSize));
+  const normalColor = await first.evaluate(el => getComputedStyle(el).color);
+  await expect.poll(() => middle.evaluate(el => parseFloat(getComputedStyle(el).fontSize))).toBeGreaterThan(normalSize);
+  await expect(middle).not.toHaveCSS('color', normalColor);
+
+  await middle.hover();
+  await page.mouse.wheel(0, -8000);
+  await expect(first).toBeInViewport({ ratio: 1 });
+  await expect(current).not.toBeInViewport();
+  const resume = dialog.getByRole('button', { name: '回到当前歌词', exact: true });
+  await expect(resume).toBeInViewport({ ratio: 1 });
+  await audio.evaluate((element: HTMLAudioElement) => element.play());
+  await expect(current).toHaveText('第 36 行');
+  await audio.evaluate((element: HTMLAudioElement) => element.pause());
+  await expect(first).toBeInViewport({ ratio: 1 });
+  await expect(current).not.toBeInViewport();
+  await expect(title).toBeInViewport({ ratio: 1 });
+  await resume.click();
+  await expect(current).toBeInViewport({ ratio: 1 });
+  await expect(title).toBeInViewport({ ratio: 1 });
+  expect(errors).toEqual([]);
 });

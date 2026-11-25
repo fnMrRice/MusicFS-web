@@ -7,6 +7,7 @@ import { errorMessage } from "../api/client";
 import { useTrackCover } from "../components/use-track-cover";
 import { useArtworkFailure } from "../components/use-artwork-failure";
 import { TrackScraping } from "../features/scrapers/TrackScraping";
+import { PlaybackLyrics } from "./PlaybackLyrics";
 interface Binding {
   objectId: string;
   field: string;
@@ -77,10 +78,10 @@ export function MediaPanel({ track }: { track: SourceTrack | null }) {
       <ErrorNotice error={state.error} />
       {state.loading ? (
         <p>{tr("正在读取内容…")}</p>
-      ) : state.lyrics.trim() ? (
-        <pre className="lyrics">{state.lyrics}</pre>
+      ) : track && state.lyrics.trim() ? (
+        <PlaybackLyrics key={track.sourceTrackId} trackId={track.sourceTrackId} text={state.lyrics} />
       ) : (
-        <>
+        <div className="media-panel-empty">
           {artwork && !failed && (
             <img
               className="media-artwork"
@@ -92,7 +93,7 @@ export function MediaPanel({ track }: { track: SourceTrack | null }) {
             />
           )}
           <p className="muted">{tr("暂无歌词")}</p>
-        </>
+        </div>
       )}
     </>
   );
