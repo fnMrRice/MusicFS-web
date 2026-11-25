@@ -251,6 +251,7 @@
 .queue-list button {
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   gap: 8px;
   background: transparent;
   border: 0;

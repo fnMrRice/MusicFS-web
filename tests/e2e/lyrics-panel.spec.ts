@@ -51,10 +51,13 @@ async function setup(page: Page) {
       ...track, sourceTrackId: name, assetId: name, displayName: `${name}.wav`, durationMs: 60000,
     })));
     const selection = /\/source-tracks\/([^/]+)\/media-selection$/.exec(path);
-    if (selection) json = { bindings: [
-      { objectId: `lyrics-${selection[1]}`, field: 'lyrics', current: true, state: 'available' },
-      { objectId: `artwork-${selection[1]}`, field: 'artwork', current: true, state: 'available' },
-    ] };
+    if (selection) json = {
+      target: { sourceTrackId: selection[1], assetId: selection[1], assetVersion: '1' }, revision: 1,
+      bindings: [
+        { objectId: `lyrics-${selection[1]}`, field: 'lyrics', current: true, state: 'available' },
+        { objectId: `artwork-${selection[1]}`, field: 'artwork', current: true, state: 'available' },
+      ],
+    };
     if (path.endsWith('/playback/sessions') && request.method() === 'POST') {
       creates.push(request.postDataJSON().sourceTrackId);
       json = { ...playback(`attempt-${creates.length}`), seekableRange: { startMs: 0, endMs: 60000 } };
@@ -114,6 +117,42 @@ test('lyrics has the renamed entry and temporary panels close on outside clicks'
   await expect(panel(page)).toHaveCount(0);
   await expect(lyrics(page)).toHaveAttribute('aria-expanded', 'false');
   expect(await audio.getAttribute('src')).toBe(source); expect(creates).toEqual(['Alpha']);
+  expect(errors).toEqual([]);
+});
+
+test('online metadata search keeps the temporary lyrics panel open until dismissed separately', async ({ page }) => {
+  const { errors } = await setup(page);
+  await play(page);
+  await lyrics(page).click();
+  await expectLyrics(page);
+  const openSearch = panel(page).getByRole('button', { name: '搜索在线资料', exact: true });
+  const search = page.getByRole('dialog', { name: '搜索在线资料', exact: true });
+  await openSearch.click();
+  const title = search.getByRole('textbox', { name: '标题或关键词' });
+  await title.click();
+  await title.fill('Alpha live');
+  // 左侧内边距直接命中 dialog 元素。
+  await search.click({ position: { x: 8, y: 30 } });
+  await expect(title).toHaveValue('Alpha live');
+  await search.getByRole('button', { name: '搜索', exact: true }).click();
+  await expect(search.getByText('没有匹配的资料。')).toBeVisible();
+  await search.getByRole('button', { name: '关闭', exact: true }).click();
+  await expect(search).toHaveCount(0);
+  await expectLyrics(page);
+
+  await openSearch.click();
+  await expect(search).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(search).toHaveCount(0);
+  await expectLyrics(page);
+
+  await openSearch.click();
+  await expect(search).toBeVisible();
+  await page.mouse.click(2, 2);
+  await expect(search).toHaveCount(0);
+  await expectLyrics(page);
+  await clickOutside(page);
+  await expect(panel(page)).toHaveCount(0);
   expect(errors).toEqual([]);
 });
 

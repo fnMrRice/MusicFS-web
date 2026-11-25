@@ -36,7 +36,10 @@ export function Modal({
         close();
       }}
       onClick={(e) => {
-        if (e.target === ref.current) close();
+        if (e.target !== e.currentTarget) return;
+        // 点击内边距和遮罩时，事件目标都是 dialog，只有边界外的点击才关闭弹窗。
+        const { left, right, top, bottom } = e.currentTarget.getBoundingClientRect();
+        if (e.clientX < left || e.clientX >= right || e.clientY < top || e.clientY >= bottom) close();
       }}
     >
       <div className="section-title">

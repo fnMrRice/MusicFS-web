@@ -202,11 +202,24 @@ async function tooltipGeometry(page: Page, info: TestInfo, label: string, input:
 }
 
 for (const viewport of [{ width: 1200, height: 900 }, { width: 390, height: 844 }]) {
-  test(`queue header order and unclipped pin tooltips fit at ${viewport.width}px`, async ({ page }, info) => {
+  test(`queue rows align left and header controls fit at ${viewport.width}px`, async ({ page }, info) => {
     await page.setViewportSize(viewport);
     const { creates, errors } = await setup(page, 30);
     await page.getByRole('button', { name: '加入队列', exact: true }).click();
     await queue(page).click(); await expectQueue(page);
+    const rows = await panel(page).locator('.queue-list button').evaluateAll(buttons => buttons.map(button => {
+      const cover = button.querySelector('.cover')!;
+      return {
+        left: button.getBoundingClientRect().left + button.clientLeft + parseFloat(getComputedStyle(button).paddingLeft),
+        cover: cover.getBoundingClientRect().left,
+        title: cover.nextElementSibling!.getBoundingClientRect().left,
+      };
+    }));
+    expect(rows).toHaveLength(30);
+    for (const row of rows) {
+      expect(row.cover).toBeCloseTo(row.left, 0);
+      expect(row.title).toBeCloseTo(rows[0].title, 0);
+    }
     const title = await panel(page).getByRole('heading', { name: '播放队列', exact: true }).boundingBox();
     const count = await panel(page).getByText('30 首', { exact: true }).boundingBox();
     const shuffle = await page.getByRole('button', { name: '打乱队列', exact: true }).boundingBox();
