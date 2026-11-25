@@ -415,11 +415,17 @@ export class Services {
   play(track: SourceTrack, items?: SourceTrack[]): void {
     if (track.availability !== "available") return;
     if (items) this.queue.replace(track, items);
-    else {
-      this.queue.enqueue([track]);
-      this.queue.select(this.queue.value.items.length - 1);
-    }
+    else this.queue.selectOrAppend(track);
     void this.player.select(track, this.playbackPreferences());
+  }
+  playSelection(tracks: SourceTrack[]): void {
+    const available = tracks.filter((track) => track.availability === "available");
+    if (available.length === 1) this.play(available[0]);
+    else if (available.length > 1) {
+      const start = this.queue.value.items.length;
+      this.queue.enqueue(available);
+      this.playQueueIndex(start);
+    }
   }
   playQueueIndex(index: number): void {
     const track = this.queue.select(index);

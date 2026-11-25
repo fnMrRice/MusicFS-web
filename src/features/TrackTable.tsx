@@ -148,7 +148,7 @@ export function TrackTable({
     const menuCanPlay = menuPlayable.length > 0 || (target.selection && selection.needsComplete);
     return [
       { label: tr("播放"), icon: "play", disabled: busy || !menuCanPlay, reason: !menuCanPlay ? tr("暂无可播放曲目") : undefined,
-        run: () => runMenu((items) => { const available = sources(items).filter((track) => track.availability === "available"); if (available.length) { s.play(available[0]); s.enqueue(available.slice(1)); } }) },
+        run: () => runMenu((items) => s.playSelection(sources(items))) },
       { label: tr("下一首播放"), icon: "next", disabled: busy || !menuCanPlay, reason: !menuCanPlay ? tr("暂无可播放曲目") : undefined,
         run: () => runMenu((items) => { s.playNext(sources(items).filter((track) => track.availability === "available")); setMessage("已设为下一首播放"); }) },
       { label: tr("添加到播放列表"), icon: "queue", disabled: busy || !menuCanPlay, reason: !menuCanPlay ? tr("暂无可播放曲目") : undefined,

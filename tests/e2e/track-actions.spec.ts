@@ -111,7 +111,7 @@ async function queue(page: Page, expected: string[], selected?: string): Promise
   await page.getByRole('button', { name: '关闭面板', exact: true }).click();
 }
 
-test('track titles and context play append to the existing queue and start the chosen track', async ({ page }) => {
+test('track titles and context play reuse queued tracks and append new ones', async ({ page }) => {
   const { creates, errors } = await setup(page);
   await page.getByRole('button', { name: '播放 Alpha.wav', exact: true }).click();
   await waitPlaying(page);
@@ -125,7 +125,21 @@ test('track titles and context play append to the existing queue and start the c
   await expect(page.locator('.now-playing strong')).toHaveText('Gamma.wav');
   await waitPlaying(page);
   await queue(page, titles, 'Gamma.wav');
-  expect(creates).toEqual(['track-1', 'track-2', 'track-3']);
+
+  await row(page, 'Beta.wav').getByRole('button', { name: 'Beta.wav', exact: true }).click();
+  await expect(page.locator('.now-playing strong')).toHaveText('Beta.wav');
+  await waitPlaying(page);
+  await queue(page, titles, 'Beta.wav');
+  await rightClick(page, 'Alpha.wav');
+  await item(page, '播放').click();
+  await expect(page.locator('.now-playing strong')).toHaveText('Alpha.wav');
+  await waitPlaying(page);
+  await queue(page, titles, 'Alpha.wav');
+
+  await page.getByRole('button', { name: '下一首', exact: true }).click();
+  await expect(page.locator('.now-playing strong')).toHaveText('Beta.wav');
+  await waitPlaying(page);
+  expect(creates).toEqual(['track-1', 'track-2', 'track-3', 'track-2', 'track-1', 'track-2']);
   expect(errors).toEqual([]);
 });
 

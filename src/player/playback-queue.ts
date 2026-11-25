@@ -115,6 +115,19 @@ export class PlaybackQueue extends Store<PlaybackQueueState> {
     this.set({ ...previous, items });
   }
 
+  selectOrAppend(track: SourceTrack): void {
+    const { items, index } = this.value;
+    // 队列允许主动加入重复项；再次点播当前曲目时保留所在位置。
+    const match = items[index]?.sourceTrackId === track.sourceTrackId
+      ? index : items.findIndex((item) => item.sourceTrackId === track.sourceTrackId);
+    if (match >= 0) {
+      this.select(match);
+    } else {
+      this.enqueue([track]);
+      this.select(items.length);
+    }
+  }
+
   playNext(tracks: SourceTrack[]): void {
     const additions = tracks.filter((item) => item.availability === "available");
     if (!additions.length) return;

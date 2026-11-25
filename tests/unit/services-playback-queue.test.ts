@@ -242,18 +242,46 @@ describe("playback modes and queue order", () => {
 });
 
 describe("track queue actions", () => {
-  it("appends and plays a requested track while preserving the existing queue", async () => {
+  it("reuses the queued source from a fresh lookup and advances from its position", async () => {
     const s = setup();
     s.player.setTransitions({ enabled: false, trackMs: 0, seekMs: 0, pauseMs: 0 });
-    s.services.play(first, [first, second]); await settle(); s.playing();
-    s.services.play(first); await settle();
+    s.services.play(third, [first, second, third]); await settle(); s.playing();
+    const requested = { ...second, playbackSelection: { trackId: "catalog-track", forcedSourceTrackId: "second" } };
+    s.services.play(requested); await settle();
+    expect(s.services.queue.value.items).toEqual([first, second, third]);
+    expect(s.services.queue.value.index).toBe(1);
+    expect(s.player.state.track).toBe(requested);
+    s.services.next(1); await settle();
+    expect(s.services.queue.value.index).toBe(2);
+    expect(s.player.state.track).toBe(third);
+    s.services.play({ ...second, availability: "unavailable" });
+    expect(s.services.queue.value.index).toBe(2);
+    expect(s.api.create.mock.calls.map((call) => call[0])).toEqual(["third", "second", "third"]);
+    s.player.stop();
+  });
+
+  it("prefers the selected occurrence of a duplicate, then the first match", async () => {
+    const s = setup();
+    s.services.enqueue([first, second, first]);
+    s.services.playQueueIndex(2); await settle();
+    s.services.play({ ...first }); await settle();
+    expect(s.services.queue.value.index).toBe(2);
+    s.services.play(second); await settle();
+    s.services.play({ ...first }); await settle();
+    expect(s.services.queue.value.index).toBe(0);
     expect(s.services.queue.value.items).toEqual([first, second, first]);
+    s.player.stop();
+  });
+
+  it("appends a multi-track selection in order even when its first track is queued", async () => {
+    const s = setup();
+    s.services.enqueue([first, second]);
+    s.services.playSelection([first, third]); await settle();
+    expect(s.services.queue.value.items).toEqual([first, second, first, third]);
     expect(s.services.queue.value.index).toBe(2);
     expect(s.player.state.track).toBe(first);
-    expect(s.api.create).toHaveBeenCalledTimes(2);
-    s.services.play({ ...third, availability: "unavailable" });
-    expect(s.services.queue.value.items).toEqual([first, second, first]);
-    expect(s.api.create).toHaveBeenCalledTimes(2);
+    s.services.next(1); await settle();
+    expect(s.player.state.track).toBe(third);
     s.player.stop();
   });
 

@@ -34,6 +34,39 @@ function cache(queue: unknown) {
 }
 
 describe("queue persistence", () => {
+  it("reuses track metadata and only writes committed skips while navigating a large queue", () => {
+    const { queue } = connected();
+    const readTitle = vi.fn(() => 'Title "quoted"');
+    const items = Array.from({ length: 500 }, (_, index) => ({
+      ...track, sourceTrackId: String(index), get title() { return readTitle(); },
+    }));
+    queue.replace(items[0], items);
+    queue.commitSelection();
+    const write = vi.spyOn(localStorage, "setItem");
+    readTitle.mockClear();
+    for (let i = 0; i < 20; i++) {
+      queue.advance(1);
+      queue.commitSelection();
+    }
+    expect({ titleReads: readTitle.mock.calls.length, writes: write.mock.calls.length })
+      .toEqual({ titleReads: 0, writes: 20 });
+    const restored = connected().queue.value;
+    expect(restored.index).toBe(20);
+    expect(restored.items[20].title).toBe('Title "quoted"');
+  });
+
+  it("retries a failed storage write when the same snapshot is published again", () => {
+    const { queue } = connected();
+    queue.replace(first, [first, second]);
+    queue.commitSelection();
+    queue.advance(1);
+    vi.spyOn(localStorage, "setItem").mockImplementationOnce(() => { throw new Error("Storage unavailable"); });
+    queue.commitSelection();
+    expect(JSON.parse(saved.get(key)!).queue.index).toBe(0);
+    queue.commitSelection();
+    expect(connected().queue.value.index).toBe(1);
+  });
+
   it("restores the authenticated source artwork path and drops untrusted proxy URLs", () => {
     const path = "/api/v1/source-tracks/first/online-artwork";
     connected().queue.enqueue([{ ...first, onlineCoverPath: path }, { ...second, onlineCoverPath: "https://cdn.invalid/signed" }]);

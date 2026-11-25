@@ -45,9 +45,15 @@ function readSnapshot(value: unknown): PlaybackQueueSnapshot | null {
   };
 }
 
+// 只去掉对象外层的大括号，字段名和值均由 JSON.stringify 转义。
+function serializedFields(fields: object): string {
+  return JSON.stringify(fields).slice(1, -1);
+}
+
 export class QueuePersistence {
   private serverAddress: string | null = null;
   private userId: string | null = null;
+  private lastWrite: { items: SourceTrack[]; encodedItems: string; navigation: string } | null = null;
   private unsaved: { serverAddress: string; userId: string; snapshot: PlaybackQueueSnapshot } | null = null;
 
   constructor(private queue: PlaybackQueue) {
@@ -56,6 +62,7 @@ export class QueuePersistence {
 
   setServer(serverAddress: string, userId: string): void {
     if (serverAddress === this.serverAddress && userId === this.userId) {
+      this.lastWrite = null;
       this.queue.restore(this.queue.snapshot());
       return;
     }
@@ -80,7 +87,11 @@ export class QueuePersistence {
     }
   }
 
-  detach(): void { this.serverAddress = null; this.userId = null; }
+  detach(): void {
+    this.serverAddress = null;
+    this.userId = null;
+    this.lastWrite = null;
+  }
 
   clear(): void {
     this.detach();
@@ -93,14 +104,19 @@ export class QueuePersistence {
     if (!this.serverAddress || this.userId === null) return;
     const snapshot = this.queue.snapshot();
     try {
-      localStorage.setItem(storageKey, JSON.stringify({
-        serverAddress: this.serverAddress,
-        userId: this.userId,
-        queue: { ...snapshot, items: snapshot.items.map(trackMetadata) },
-      }));
+      const { items, ...state } = snapshot;
+      const navigation = serializedFields(state);
+      const previous = this.lastWrite?.items === items ? this.lastWrite : null;
+      if (previous?.navigation === navigation) return;
+      // 队列编辑会替换条目数组；切歌时复用已编码的曲目，仍以单键原子写入。
+      const encodedItems = previous?.encodedItems ?? JSON.stringify(items.map(trackMetadata));
+      const owner = serializedFields({ serverAddress: this.serverAddress, userId: this.userId });
+      localStorage.setItem(storageKey, `{${owner},"queue":{${navigation},"items":${encodedItems}}}`);
+      this.lastWrite = { items, encodedItems, navigation };
       this.unsaved = null;
     } catch {
       // 本地存储写满时，同页重新登录仍可恢复这次编辑。
+      this.lastWrite = null;
       this.unsaved = { serverAddress: this.serverAddress, userId: this.userId, snapshot };
     }
   }
