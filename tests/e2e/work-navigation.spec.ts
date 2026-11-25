@@ -17,7 +17,7 @@ test.beforeAll(async () => {
 test.afterAll(async () => { await new Promise<void>((resolve) => server?.httpServer.close(() => resolve())); });
 
 const types: ContentType[] = [
-  { id: "music", name: "音乐专辑" },
+  { id: "archive", name: "归档作品" },
   { id: "radio", name: "电台", library: { order: 30, icon: "radio", trackListOptional: false } },
   { id: "asmr", name: "ASMR", library: { order: 20, icon: "headphones", trackListOptional: false } },
   { id: "spoken", name: "演播作品", library: { order: 40, icon: "album", trackListOptional: false } },
@@ -28,7 +28,7 @@ function work(workId: string, title: string, contentType: string): Work {
   return { workId, title, contentType, description: "按目录收藏的本地作品。", credits: [], externalIds: [], tags: ["收藏"],
     revision: 1, showInTrackList: false, createdAt: "2026-10-22T01:00:00Z", updatedAt: "2026-10-22T01:00:00Z" };
 }
-const works = [work("asmr", "雨夜音声", "asmr"), work("album", "钢琴数字专辑", "music"),
+const works = [work("asmr", "雨夜音声", "asmr"), work("piano", "钢琴电台访谈", "radio"),
   work("cd", "钢琴 CD 专辑", "cd_album"), work("radio", "深夜节目", "radio"), work("spoken", "林间演播", "spoken")];
 
 async function mockNavigation(page: Page) {
@@ -148,7 +148,7 @@ test("sidebar categories match query filters and retain future registered conten
   await expect.poll(() => Object.fromEntries(state.lists.at(-1)?.searchParams ?? [])).toMatchObject({ contentType: "cd_album", q: "钢琴", tag: "收藏" });
   expect(state.lists.at(-1)?.searchParams.has("packageKind")).toBe(false);
   await expect(page.getByRole("heading", { name: "钢琴 CD 专辑", exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "钢琴数字专辑", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "钢琴电台访谈", exact: true })).toHaveCount(0);
   await selected(page, "CD专辑");
   await expect(page.getByRole("group", { name: "作品分类", exact: true })).toHaveCount(0);
   await page.screenshot({ path: info.outputPath("work-navigation-desktop-dark.png") });

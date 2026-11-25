@@ -310,17 +310,19 @@ test("uncertain committed saves lock original content and replay without duplica
   }
 });
 
-test("unavailable content types remain readable and retired metadata stays visible", async ({ page }) => {
-  const state = await mock(page);
-  state.works[0].contentType = "unavailable";
-  await page.goto(`${origin}/#/works/one`);
-  await expect(page.getByRole("heading", { name: "雨夜故事一", exact: true })).toBeVisible();
+test("existing music works remain readable by ID after the plugin is retired", async ({ page }) => {
+  await mock(page);
+  await page.goto(`${origin}/#/works/music`);
+  await expect(page.getByRole("heading", { name: "钢琴专辑", exact: true })).toBeVisible();
   await expect(page.getByText("此作品的内容类型当前不可用，已有资料可以阅读，编辑暂不可用。", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "编辑作品资料", exact: true })).toBeDisabled();
-  state.works[0].contentType = "asmr";
+});
+
+test("retired metadata remains visible on an existing ASMR work", async ({ page }) => {
+  const state = await mock(page);
   state.works[0].credits[0].role = "retired_role";
   state.works[0].externalIds[0].namespace = "retired_source";
-  await page.reload();
+  await page.goto(`${origin}/#/works/one`);
   await page.getByRole("button", { name: "编辑作品资料", exact: true }).click();
   const editor = page.getByRole("dialog", { name: "编辑作品资料", exact: true });
   await expect(editor.getByLabel("署名角色 1", { exact: true })).toHaveValue("retired_role");
