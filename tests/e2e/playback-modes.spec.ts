@@ -27,8 +27,9 @@ function tone(): Buffer {
   return data;
 }
 
-async function setup(page: Page, count = 3, failPlayback = false) {
+async function setup(page: Page, count = 3, options: { playbackError?: 401 | 503; lifetimeMs?: number } = {}) {
   const creates: string[] = [], errors: string[] = [];
+  const expiresAt = () => new Date(Date.now() + (options.lifetimeMs ?? 3600_000)).toISOString();
   page.on('pageerror', (error) => errors.push(error.message));
   // 固定随机源，让队列重排与随机切歌的断言可重复。
   await page.addInitScript(() => { Math.random = () => 0; });
@@ -45,15 +46,16 @@ async function setup(page: Page, count = 3, failPlayback = false) {
     if (request.method() === 'DELETE') return route.fulfill({ status: 204 });
     let json: unknown = { items: [], nextCursor: null, nextAfter: null, libraryRevision: '1' };
     if (path.endsWith('/health/ready')) json = { product: 'MusicFS', ready: true, apiVersion: '1', instanceId: 'playback-modes' };
-    if (path.endsWith('/auth/session')) json = { csrfToken: 'fixture', user: { id: 'listener', role: 'user' } };
+    if (path.endsWith('/auth/session')) json = { csrfToken: 'fixture', user: { id: 'listener', role: 'user' }, expiresAt: expiresAt() };
     if (path.endsWith('/library/tracks')) json = musicPage(titles.slice(0, count).map((displayName, index) => ({
       ...track, sourceTrackId: `track-${index + 1}`, assetId: `asset-${index + 1}`, displayName,
     })));
     if (path.endsWith('/playback/sessions') && request.method() === 'POST') {
       creates.push(request.postDataJSON().sourceTrackId);
-      if (failPlayback) return route.fulfill({ status: 503, json: { error: { code: 'SOURCE_UNAVAILABLE', message: 'Unavailable' } } });
+      if (options.playbackError === 401 && creates.length === 1) return route.fulfill({ status: 401, json: { error: { code: 'AUTH_REQUIRED', message: 'Session expired' } } });
+      if (options.playbackError === 503) return route.fulfill({ status: 503, json: { error: { code: 'SOURCE_UNAVAILABLE', message: 'Unavailable' } } });
       const attempt = `attempt-${creates.length}`;
-      json = { ...playback(attempt), sessionId: `session-${creates.length}`,
+      json = { ...playback(attempt), sessionId: `session-${creates.length}`, expiresAt: expiresAt(),
         streamUrl: `/api/v1/playback/sessions/session-${creates.length}/attempts/${attempt}/stream` };
     }
     return route.fulfill({ json });
@@ -238,7 +240,7 @@ test('shuffling preserves queue members, current audio, selected item and pause 
 
 test('mode and queue shuffle remain reachable on mobile and error messages have no stop button', async ({ page }, info) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await setup(page, 3, true);
+  await setup(page, 3, { playbackError: 503 });
   await expect(mode(page, '顺序播放')).toBeInViewport();
   await page.getByRole('button', { name: '播放全部', exact: true }).click();
   await expect(page.getByRole('button', { name: '从头播放', exact: true })).toBeVisible();
@@ -248,6 +250,45 @@ test('mode and queue shuffle remain reachable on mobile and error messages have 
   await expect(page.getByRole('button', { name: '打乱队列', exact: true })).toBeEnabled();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: info.outputPath('mobile-playback-modes.png') });
+});
+
+test('signing in after a control-channel 401 restores the queue, selected track and playback mode', async ({ page }) => {
+  const { creates, errors } = await setup(page, 3, { playbackError: 401 });
+  await page.getByRole('button', { name: '加入队列', exact: true }).click();
+  await setMode(page, '列表循环');
+  const queue = page.getByRole('button', { name: '播放队列', exact: true });
+  await queue.click();
+  await page.locator('.queue-list button').nth(1).click();
+  await page.getByLabel('管理员登录令牌').fill('fixture');
+  await page.getByRole('button', { name: '登录', exact: true }).click();
+  await expect(mode(page, '列表循环')).toBeVisible();
+  await queue.click();
+  await expect(page.locator('.queue-list button')).toHaveText(titles);
+  await expect(selected(page)).toHaveText('Beta.wav');
+  await expect(page.locator('audio')).toHaveCount(0);
+  expect(creates).toEqual(['track-2']);
+  await page.getByRole('button', { name: '播放', exact: true }).click();
+  await waitPlaying(page);
+  expect(creates).toEqual(['track-2', 'track-2']);
+  expect(errors).toEqual([]);
+});
+
+test('a playing track keeps its session alive across the initial expiry', async ({ page }) => {
+  const lifetimeMs = 3000;
+  const { creates, errors } = await setup(page, 3, { lifetimeMs });
+  const renewals: string[] = [];
+  await page.route('**/playback/sessions/session-1/keepalive', async route => {
+    const request = route.request();
+    renewals.push(`${request.method()} ${request.headers()['x-csrf-token']}`);
+    await route.fulfill({ json: { expiresAt: new Date(Date.now() + lifetimeMs).toISOString() } });
+  });
+  await playAll(page);
+  await expect.poll(() => renewals.length).toBeGreaterThanOrEqual(2);
+  await expect.poll(() => page.locator('audio').evaluate((audio: HTMLAudioElement) => audio.currentTime)).toBeGreaterThan(lifetimeMs / 1000);
+  await page.getByRole('button', { name: '暂停', exact: true }).click();
+  expect(renewals.every(request => request === 'POST fixture')).toBe(true);
+  expect(creates).toEqual(['track-1']);
+  expect(errors).toEqual([]);
 });
 
 test('time displays toggle independently without disturbing audio and retain their modes across tracks', async ({ page }) => {

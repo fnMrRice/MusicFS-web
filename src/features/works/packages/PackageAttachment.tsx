@@ -21,6 +21,7 @@ export function PackageAttachment({ api, packageId, node, close }: {
   useEffect(() => {
     if (!canPreview) return;
     const controller = new AbortController();
+    const session = services.auth.value.session;
     const timer = setTimeout(() => controller.abort(), 15_000);
     let objectURL = "";
     let disposed = false;
@@ -28,7 +29,7 @@ export function PackageAttachment({ api, packageId, node, close }: {
     void (async () => {
       try {
         const response = await fetch(api.attachmentURL(packageId, node.nodeId), { signal: controller.signal, credentials: "same-origin" });
-        if (response.status === 401) services.clear();
+        if (response.status === 401 && !controller.signal.aborted && session === services.auth.value.session) services.clear();
         if (!response.ok) throw new ApiError("HTTP_ERROR", "Unable to read package attachment", response.status);
         const declared = Number(response.headers.get("content-length"));
         if (declared > limit) throw new ApiError("UNSUPPORTED", "Attachment preview size exceeded");

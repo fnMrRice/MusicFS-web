@@ -51,6 +51,7 @@ export interface ControlTransport {
 export class ApiClient {
   csrfToken: string | null = null;
   onUnauthorized: (() => void) | null = null;
+  onAuthenticated: ((startedAt: number) => void) | null = null;
   controlTransport: ControlTransport | null = null;
   constructor(private fetcher: typeof fetch = (...args) => fetch(...args)) {}
 
@@ -63,6 +64,7 @@ export class ApiClient {
   }
 
   async request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+    const startedAt = Date.now();
     const csrfToken = this.csrfToken;
     const controller = new AbortController();
     const cancel = () => controller.abort(options.signal?.reason);
@@ -114,6 +116,8 @@ export class ApiClient {
           scraperFailure(detail?.scraper),
         );
       }
+      if (csrfToken && csrfToken === this.csrfToken && !options.signal?.aborted && !options.bearer && !path.startsWith("/health/"))
+        this.onAuthenticated?.(startedAt);
       if (response.status === 204) return undefined as T;
       try {
         return (await response.json()) as T;

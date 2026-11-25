@@ -12,14 +12,12 @@ export class AuthApi {
     return this.client.request('/health/ready', { signal, timeoutMs });
   }
   async restore(): Promise<AuthSession> {
-    const value = session(await this.client.request<AuthSession>('/auth/session'));
-    this.client.csrfToken = value.csrfToken; return value;
+    return session(await this.client.request<AuthSession>('/auth/session'));
   }
   async login(token: string): Promise<AuthSession> {
-    const value = session(await this.client.request<AuthSession>('/auth/session', { method: 'POST', bearer: token }));
-    this.client.csrfToken = value.csrfToken; return value;
+    return session(await this.client.request<AuthSession>('/auth/session', { method: 'POST', bearer: token }));
   }
   async logout(): Promise<void> {
-    await this.client.request('/auth/session', { method: 'DELETE' }); this.client.csrfToken = null;
+    await this.client.request('/auth/session', { method: 'DELETE' });
   }
 }

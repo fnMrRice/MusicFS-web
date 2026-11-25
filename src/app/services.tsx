@@ -11,6 +11,7 @@ import type {
   Preferences,
 } from "../api/types";
 import { PlayerController } from "../player/controller";
+import { PlaybackSessionRenewal } from "./playback-session-renewal";
 import { PreferencesStore, type PreferencesState } from "./preferences";
 import { PlaybackQueue, type PlaybackMode } from "../player/playback-queue";
 import { QueuePersistence } from "../player/queue-persistence";
@@ -51,6 +52,8 @@ interface AuthState {
 export class Services {
   client = new ApiClient();
   authApi = new AuthApi(this.client);
+  private playbackRenewal = new PlaybackSessionRenewal((id, signal) =>
+    this.client.request(`/playback/sessions/${encodeURIComponent(id)}/keepalive`, { method: "POST", signal }));
   profile = new PersonalProfileState(new ProfileApi(this.client));
   libraryApi = new LibraryApi(this.client);
   musicCatalog = new MusicCatalogApi(this.client);
@@ -206,6 +209,7 @@ export class Services {
     this.playerState = new Store({ ...this.player.state });
     this.player.onSelectionCancelled = () => this.queue.rollbackSelection();
     this.player.onChange = () => {
+      this.playbackRenewal.setPlayback(this.player.state.playback, this.player.state.phase === "playing" && this.player.state.wantsPlay);
       // 仅提交已开始解析的选择，保留切歌中 stop 发出的瞬时空曲目之前的队列。
       if (this.player.state.phase === "resolving" && this.playerState.value.phase !== "resolving") {
         this.queue.commitSelection();
@@ -222,9 +226,11 @@ export class Services {
         });
     };
     this.client.onUnauthorized = () => this.clear();
+    this.client.onAuthenticated = (startedAt) => this.playbackRenewal.activity(startedAt);
   }
   inspectAudioOutput(): void { this.dsp.inspectOutput(); }
   private accept(session: AuthSession): void {
+    this.client.csrfToken = session.csrfToken;
     this.onlinePlaylistPlayback.cancel();
     const serverAddress = new URL(this.client.url(""), window.location.href).href;
     const instanceId = this.auth.value.ready!.instanceId;
@@ -232,6 +238,7 @@ export class Services {
     this.queuePersistence.setServer(serverAddress, session.user.id);
     const { items, index } = this.queue.value;
     this.player.restorePaused(items[index] ?? null);
+    this.playbackRenewal.setSession(session);
     this.dsp.dispose();
     this.sourcePlaylists.clear();
     this.content.clearOnlineInstances();
@@ -274,6 +281,7 @@ export class Services {
       if (generation !== this.generation) return;
       this.accept(session);
     } catch (e) {
+      if (generation !== this.generation) return;
       this.auth.set({
         ...this.auth.value,
         busy: false,
@@ -295,6 +303,7 @@ export class Services {
       if (generation !== this.generation) return;
       this.accept(session);
     } catch (e) {
+      if (generation !== this.generation) return;
       this.auth.set({
         ...this.auth.value,
         busy: false,
@@ -311,6 +320,7 @@ export class Services {
     try {
       await this.authApi.logout();
       if (generation !== this.generation) return;
+      this.queuePersistence.clear();
       this.clear();
     } catch (e) {
       if (generation !== this.generation) return;
@@ -323,10 +333,10 @@ export class Services {
       });
     }
   }
-  clear(options: { preserveQueue?: boolean } = {}): void {
+  clear(): void {
+    this.playbackRenewal.setSession(null);
     this.onlinePlaylistPlayback.cancel();
-    if (options.preserveQueue) this.queuePersistence.detach();
-    else this.queuePersistence.clear();
+    this.queuePersistence.detach();
     this.tasks.clear();
     this.refreshSubmissions.clear();
     this.favorites.clear();

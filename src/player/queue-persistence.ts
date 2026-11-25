@@ -48,6 +48,7 @@ function readSnapshot(value: unknown): PlaybackQueueSnapshot | null {
 export class QueuePersistence {
   private serverAddress: string | null = null;
   private userId: string | null = null;
+  private unsaved: { serverAddress: string; userId: string; snapshot: PlaybackQueueSnapshot } | null = null;
 
   constructor(private queue: PlaybackQueue) {
     queue.subscribe(() => this.save());
@@ -62,6 +63,12 @@ export class QueuePersistence {
     this.queue.clear();
     this.serverAddress = serverAddress;
     this.userId = userId;
+    const unsaved = this.unsaved;
+    this.unsaved = null;
+    if (unsaved?.serverAddress === serverAddress && unsaved.userId === userId) {
+      this.queue.restore(unsaved.snapshot);
+      return;
+    }
     try {
       const saved: unknown = JSON.parse(localStorage.getItem(storageKey) ?? "null");
       const snapshot = record(saved) && saved.serverAddress === serverAddress &&
@@ -77,21 +84,24 @@ export class QueuePersistence {
 
   clear(): void {
     this.detach();
+    this.unsaved = null;
     try { localStorage.removeItem(storageKey); } catch { /* 存储不可用时仍清空内存。 */ }
     this.queue.clear();
   }
 
   private save(): void {
-    if (!this.serverAddress) return;
+    if (!this.serverAddress || this.userId === null) return;
+    const snapshot = this.queue.snapshot();
     try {
-      const snapshot = this.queue.snapshot();
       localStorage.setItem(storageKey, JSON.stringify({
         serverAddress: this.serverAddress,
         userId: this.userId,
         queue: { ...snapshot, items: snapshot.items.map(trackMetadata) },
       }));
+      this.unsaved = null;
     } catch {
-      // 写入失败不阻断播放和队列操作。
+      // 本地存储写满时，同页重新登录仍可恢复这次编辑。
+      this.unsaved = { serverAddress: this.serverAddress, userId: this.userId, snapshot };
     }
   }
 }
