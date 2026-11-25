@@ -78,6 +78,7 @@ export default {
   "请在设置中查看此音乐平台的登录状态。": ["Check your sign-in status for this music service in Settings.", "請在設定中查看此音樂平台的登入狀態。", "設定でこの音楽サービスのログイン状態を確認してください。"],
   "无权执行此操作。": ["You do not have permission for this action.", "無權執行此操作。", "この操作を行う権限がありません。"],
   "操作失败，请重试或检查 Server 状态。": ["The action failed. Retry or check the server status.", "操作失敗，請重試或檢查伺服器狀態。", "操作に失敗しました。再試行するか、サーバーの状態を確認してください。"],
+  "请求过于频繁，请在 {0} 秒后重试。": ["Too many requests. Try again after {0} s.", "請求過於頻繁，請在 {0} 秒後重試。", "リクエストが多すぎます。{0} 秒後に再試行してください。"],
   "{0} 请求编号：{1}": ["{0} Request ID: {1}", "{0} 請求編號：{1}", "{0} リクエスト ID：{1}"],
   "需要已就绪的 MusicFS API v1 服务。": ["A ready MusicFS API v1 server is required.", "需要已就緒的 MusicFS API v1 服務。", "利用可能な MusicFS API v1 サーバーが必要です。"],
   "关键词过长，请缩短后重试。": ["Your keywords are too long. Shorten them and try again.", "關鍵字過長，請縮短後重試。", "キーワードが長すぎます。短くしてお試しください。"],

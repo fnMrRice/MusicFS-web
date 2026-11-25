@@ -36,4 +36,10 @@ describe('API boundary (Mock fetch)', () => {
   it('does not expose server error details that could contain secrets', () => {
     expect(errorMessage(new ApiError('HTTP_ERROR', 'secret=bootstrap', 500))).not.toContain('bootstrap');
   });
+  it('reports rate limits with the supplied wait time and request ID', () => {
+    expect(errorMessage(new ApiError('RATE_LIMITED', '', 429, 'r1', 5)))
+      .toBe('请求过于频繁，请在 5 秒后重试。 请求编号：r1');
+    expect(errorMessage(new ApiError('RATE_LIMITED', ''))).toBe('请求过于频繁，请稍后再试。');
+    expect(errorMessage(new ApiError('HTTP_ERROR', '', 429))).toBe('请求过于频繁，请稍后再试。');
+  });
 });

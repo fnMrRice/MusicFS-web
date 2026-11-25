@@ -148,6 +148,13 @@ export function withRequestId(message: string, error: unknown): string {
 
 export function errorMessage(error: unknown): string {
   if (!(error instanceof ApiError)) return "发生异常，请重试。";
+  if (error.code === "RATE_LIMITED" || error.status === 429) {
+    const wait = error.retryAfter;
+    const message = wait !== undefined && Number.isSafeInteger(wait) && wait > 0
+      ? `请求过于频繁，请在 ${wait} 秒后重试。`
+      : "请求过于频繁，请稍后再试。";
+    return withRequestId(message, error);
+  }
   const messages: Record<string, string> = {
     CANCELLED: "操作已取消。",
     TIMEOUT: "请求超时，请重试。",
