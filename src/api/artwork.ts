@@ -9,7 +9,7 @@ export function mediaObject(path: string | null | undefined): string | undefined
 
 export function catalogArtworkPath(path: string | null | undefined): string | undefined {
   if (typeof path !== "string" || !path) return;
-  if (mediaObject(path) || onlineArtworkPath(path)) return path;
+  if (mediaObject(path) || onlineArtworkPath(path) || /^\/api\/v1\/library\/albums\/[A-Za-z0-9_-]+\/artwork$/.test(path)) return path;
   try {
     const url = new URL(path);
     if (url.protocol === "https:" && !url.username && !url.password) return url.href;
