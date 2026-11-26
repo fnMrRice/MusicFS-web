@@ -144,6 +144,65 @@ test("an eligible account keeps one daily card when the feed contains other sour
   expect(state.dailyRequests).toEqual([]);
 });
 
+test("NetEase daily songs open from the cover and card padding through regular playlist APIs", async ({ page }) => {
+  const state = await mockRecommendations(page);
+  const external = "daily-songs:42";
+  const cover = "https://p1.music.126.net/fixture/cover.jpg";
+  const playlist = { externalId: external, title: "每日推荐歌曲", trackCount: 1, coverUrl: cover };
+  const detail = `/online-instances/${id}/playlists/${external}`;
+  const reads: string[] = [];
+  await page.route(cover, route => route.fulfill({
+    contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" fill="#378894"/></svg>',
+  }));
+  await page.route("**/api/v1/**", route => {
+    const path = decodeURIComponent(new URL(route.request().url()).pathname);
+    if (path.endsWith("/online-instances")) return route.fulfill({ json: { items: [{
+      instanceId: id, platform: "netease", plugin: neteasePlugin, name: "Listener", accountId: "42",
+      availability: "available", capabilities: ["recommendations.playlists", "playlist.observe", "playlist.tracks", "stream.resolve"]
+        .map(name => ({ name, supported: true, reason: "" })),
+    }] } });
+    if (path.endsWith("/recommendations")) return route.fulfill({ json: { historyDepth: 0, sources: [{
+      instanceId: id, personalized: true, items: [
+        { playlist, position: 0, reason: "" },
+        { playlist: { externalId: "123", title: "普通歌单", trackCount: 2 }, position: 1, reason: "" },
+      ],
+    }] } });
+    if (path.endsWith(detail)) {
+      reads.push("detail");
+      return route.fulfill({ json: { playlist, complete: true, observedAt: "2026-11-26T00:00:00Z",
+        entries: [{ position: 0, externalTrackId: "71" }] } });
+    }
+    if (path.endsWith(`${detail}/tracks`)) {
+      reads.push("tracks");
+      return route.fulfill({ json: { playlist, complete: true, nextCursor: null, items: [
+        { position: 0, externalId: "71", track: { externalId: "71", title: "今日歌曲", artists: ["Artist"], durationMs: 95000 } },
+      ] } });
+    }
+    return route.fallback();
+  });
+  await page.goto(`${origin}/#/recommendations`);
+  const content = page.locator("#page-scroll");
+  const card = content.getByRole("link", { name: /每日推荐歌曲/ });
+  const expectDetail = async () => {
+    await expect(content.getByRole("heading", { name: playlist.title })).toBeVisible();
+    await expect(content.getByRole("cell", { name: "今日歌曲", exact: true })).toBeVisible();
+    await expect(content.getByRole("button", { name: "播放全部" })).toBeEnabled();
+  };
+  await expect(card).toHaveCount(1);
+  await expect(content.getByRole("link", { name: /普通歌单/ })).toBeVisible();
+  await expect(card.locator("img")).toHaveAttribute("src", cover);
+  expect(reads).toEqual([]);
+  await card.locator("img").click();
+  await expectDetail();
+  await page.getByRole("button", { name: "返回", exact: true }).click();
+  await expect(card).toBeVisible();
+  await card.click({ position: { x: 4, y: 4 } });
+  await expectDetail();
+  expect(reads).toContain("detail");
+  expect(reads).toContain("tracks");
+  expect(state.dailyRequests).toEqual([]);
+});
+
 for (const width of [375, 1280]) {
   test(`playlist title and recommendation controls share a row at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
